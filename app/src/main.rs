@@ -1,9 +1,6 @@
-fn main() {
-    use rfd::FileDialog;
 
-    let files = FileDialog::new()
-        .add_filter("text", &["txt", "rs"])
-        .add_filter("rust", &["rs", "toml"])
-        .set_directory("/")
-        .pick_file();
+fn main() {
+    let v = std::env::var("ahaha").unwrap_or("12".to_string()).parse::<u8>().unwrap_or(12);
+    let op = Opcode::try_from(v);
+    println!("{op:?}")
 }
