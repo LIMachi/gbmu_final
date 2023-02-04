@@ -6,7 +6,7 @@ mod decode;
 
 use registers::*;
 use opcodes::*;
-use cpu::Cpu;
+pub use cpu::Cpu;
 use crate::MemStatus::Idle;
 
 pub enum Value {
