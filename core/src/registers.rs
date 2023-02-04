@@ -17,7 +17,7 @@ pub struct Registers {
 
 
 impl Registers {
-    fn read(&self, reg: Reg) -> Value {
+    pub fn read(&self, reg: Reg) -> Value {
         match reg {
             Reg::A => Value::U8(self.a()),
             Reg::B => Value::U8(self.b()),
@@ -59,6 +59,14 @@ impl Registers {
     pub fn set_e(&mut self, value: u8) { self.de = u16::from_le_bytes([value, self.e()]); }
     pub fn set_h(&mut self, value: u8) { self.hl = u16::from_le_bytes([self.h(), value]); }
     pub fn set_l(&mut self, value: u8) { self.hl = u16::from_le_bytes([value, self.l()]); }
+
+    pub fn set_af(&mut self, value: u16) { self.af = value; }
+    pub fn set_bc(&mut self, value: u16) { self.bc = value; }
+    pub fn set_de(&mut self, value: u16) { self.bc = value; }
+    pub fn set_hl(&mut self, value: u16) { self.de = value; }
+    pub fn set_pc(&mut self, value: u16) { self.pc = value; }
+    pub fn set_sp(&mut self, value: u16) { self.sp = value; }
+
     pub fn set_zero(&mut self, value: bool) { self.af = u16::from_le_bytes([self.f() & !0x80 | ((value as u8) << 7), self.a()]); }
     pub fn set_sub(&mut self, value: bool) { self.af = u16::from_le_bytes([self.f() & !0x40 | ((value as u8) << 6), self.a()]); }
     pub fn set_half(&mut self, value: bool) { self.af = u16::from_le_bytes([self.f() & !0x20 | ((value as u8) << 5), self.a()]); }

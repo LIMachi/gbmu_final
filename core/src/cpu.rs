@@ -1,5 +1,5 @@
-use crate::Bus;
-use super::{ops::{Flow, Op}, Value, State, Registers, Opcode, CBOpcode};
+use crate::{Bus, Reg};
+use super::{ops::{Flow, Op}, Value, State, Registers, Opcode, CBOpcode, decode::decode};
 
 pub struct Cpu {
     instructions: Vec<Vec<Op>>,
@@ -8,27 +8,22 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn fetch(&mut self, state: &mut State) {
-        let opcode = state.read();
-        if let Ok(opcode) = Opcode::try_from(opcode) {
-            self.instructions = match opcode {
-                Opcode::Nop => vec![vec![]],
-                Opcode::LdAA => vec![vec![]],
-                _ => unimplemented!()
-            }
-        }
-    }
 
     pub fn cycle(&mut self, bus: &mut dyn Bus) {
-        // TODO create state
-        if let Some(ops) = self.instructions.pop() {
-            // TODO run ops
-        } else {
-
-        }
+        let mut state = State::new(bus, &mut self.regs, &mut self.stack);
         if self.instructions.is_empty() {
-
+            let opcode = state.read();
+            if let Ok(opcode) = Opcode::try_from(opcode) {
+                self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
+            } else {
+                self.instructions = vec![vec![]];
+                log::warn!("invalid opcode {opcode:x}");
+            }
         }
+
+        for op in self.instructions.pop().expect("this can never be empty") {
+            op(&mut state);
+        }
+        // if state.memState == Ready || Idle, read_pc
     }
 }
-
