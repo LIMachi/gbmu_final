@@ -7,6 +7,12 @@ edition = "2021"
 
 [dependencies]
 rfd = "0.10.0"
+log = "0.4.17"
+env_logger = "0.10.0"
+
+[features]
+debug = ["core/log_opcode"]
 
 [dependencies.core]
 path = "../core"
+

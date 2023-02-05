@@ -1,23 +1,42 @@
+extern crate core;
+
 mod cpu;
 mod ops;
 mod opcodes;
 mod registers;
 mod decode;
 
+use std::fmt;
+use std::fmt::{Formatter, LowerHex, Write};
 use registers::*;
 use opcodes::*;
 pub use cpu::Cpu;
-use crate::MemStatus::Idle;
+
+pub enum Target {
+    GB,
+    GBC
+}
 
 pub enum Value {
     U8(u8),
     U16(u16)
 }
 
-pub trait Bus {
-    fn status(&self) -> MemStatus;
+impl LowerHex for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::U8(v) => fmt::LowerHex::fmt(v, f),
+            Value::U16(v) => fmt::LowerHex::fmt(v, f),
+        }
+    }
 }
 
+pub trait Bus {
+    fn status(&self) -> MemStatus;
+    fn update(&mut self, status: MemStatus);
+}
+
+#[derive(Copy, Debug, Clone, Eq, PartialEq)]
 pub enum MemStatus {
     Read(u8),
     Write(u16),
@@ -47,15 +66,15 @@ impl MemStatus {
     }
 
     pub fn req_read(&mut self, addr: u16) {
-        match self {
-            MemStatus::Idle | MemStatus::Ready => { unimplemented!() },
+        *self = match self {
+            MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqRead(addr) },
             _ => panic!("invalid state")
         }
     }
 
     pub fn req_write(&mut self, addr: u16) {
-        match self {
-            MemStatus::Idle | MemStatus::Ready => { unimplemented!() },
+        *self = match self {
+            MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqWrite(addr) },
             _ => panic!("invalid state")
         }
     }
@@ -66,6 +85,16 @@ pub struct State<'a> {
     bus: &'a mut dyn Bus,
     regs: &'a mut Registers,
     stack: &'a mut Vec<Value>
+}
+
+impl<'a> Drop for State<'a> {
+    fn drop(&mut self) {
+        let mem = match self.mem {
+            MemStatus::Idle | MemStatus::Ready => MemStatus::ReqRead(self.regs.pc()),
+            mem => mem
+        };
+        self.bus.update(mem);
+    }
 }
 
 #[derive(Default)]
@@ -110,6 +139,10 @@ impl<'a> State<'a> {
     pub fn write(&mut self, value: Value) {
         let addr = self.mem.write();
         // self.bus.write(addr, value);
+    }
+
+    pub fn peek(&self) -> Option<Value> {
+        self.stack.get(0).map(|x| *x)
     }
 
     pub fn push(&mut self, value: Value) {
@@ -158,4 +191,11 @@ impl<'a> State<'a> {
             .set_zero(self.regs.zero())
     }
 
+    pub fn req_read(&mut self, addr: u16) {
+        self.mem.req_read(addr);
+    }
+
+    pub fn req_write(&mut self, addr: u16) {
+        self.mem.req_write(addr);
+    }
 }
