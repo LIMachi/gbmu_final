@@ -1,3 +1,4 @@
+use log::warn;
 use super::*;
 
 pub fn read_pc(state: &mut State) -> Flow {
@@ -26,6 +27,7 @@ pub fn write(state: &mut State) -> Flow {
 
 pub fn push16(state: &mut State) -> Flow {
     if let Value::U16(_) = state.peek().expect("empty cache") {
+        warn!("unexpected push16 whith u16 in the cache");
         return CONTINUE;
     };
     match (state.pop(), state.pop()) {

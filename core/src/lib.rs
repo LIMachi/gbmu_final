@@ -8,6 +8,7 @@ mod decode;
 
 use std::fmt;
 use std::fmt::{Formatter, LowerHex, Write};
+use log::warn;
 use registers::*;
 use opcodes::*;
 pub use cpu::Cpu;
@@ -17,6 +18,7 @@ pub enum Target {
     GBC
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Value {
     U8(u8),
     U16(u16)
@@ -34,6 +36,7 @@ impl LowerHex for Value {
 pub trait Bus {
     fn status(&self) -> MemStatus;
     fn update(&mut self, status: MemStatus);
+    fn tick(&mut self);
 }
 
 #[derive(Copy, Debug, Clone, Eq, PartialEq)]
@@ -84,16 +87,19 @@ pub struct State<'a> {
     mem: MemStatus,
     bus: &'a mut dyn Bus,
     regs: &'a mut Registers,
-    stack: &'a mut Vec<Value>
+    cache: &'a mut Vec<Value>
 }
 
 impl<'a> Drop for State<'a> {
     fn drop(&mut self) {
-        let mem = match self.mem {
-            MemStatus::Idle | MemStatus::Ready => MemStatus::ReqRead(self.regs.pc()),
-            mem => mem
+        match self.mem {
+            MemStatus::ReqRead(_) | MemStatus::ReqWrite(_) => { },
+            e => {
+                if e != MemStatus::Idle && e!= MemStatus::Ready { warn!("{e:?} I/O result wasn't used this cycle") };
+                self.mem = MemStatus::ReqRead(self.regs.pc());
+            },
         };
-        self.bus.update(mem);
+        self.bus.update(self.mem);
     }
 }
 
@@ -128,7 +134,7 @@ impl<'a> State<'a> {
             mem: bus.status(),
             bus,
             regs,
-            stack
+            cache: stack
         }
     }
 
@@ -141,16 +147,20 @@ impl<'a> State<'a> {
         // self.bus.write(addr, value);
     }
 
+    pub fn clear(&mut self) {
+        self.cache.clear();
+    }
+
     pub fn peek(&self) -> Option<Value> {
-        self.stack.get(0).map(|x| *x)
+        self.cache.get(0).map(|x| *x)
     }
 
     pub fn push(&mut self, value: Value) {
-        self.stack.push(value);
+        self.cache.push(value);
     }
 
     pub fn pop(&mut self) -> Value {
-        self.stack.pop().expect("stack empty")
+        self.cache.pop().expect("stack empty")
     }
 
     pub fn register(&self, register: Reg) -> Value {
@@ -194,7 +204,6 @@ impl<'a> State<'a> {
     pub fn req_read(&mut self, addr: u16) {
         self.mem.req_read(addr);
     }
-
     pub fn req_write(&mut self, addr: u16) {
         self.mem.req_write(addr);
     }

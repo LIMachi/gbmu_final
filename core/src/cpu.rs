@@ -31,10 +31,13 @@ impl Cpu {
                 log::warn!("invalid opcode {opcode:x}");
             }
         }
-
         for op in self.instructions.pop().expect("this can never be empty") {
-            op(&mut state);
+            if op(&mut state) == BREAK { // assuming pc is already set to next instruction, else kaboom
+                state.clear();
+                self.instructions.clear();
+                break;
+            }
         }
-        // State drop will fetch PC if nothing else to do with the bus
+        // State drop will update bus
     }
 }
