@@ -3,6 +3,7 @@ extern crate core;
 mod cpu;
 mod ops;
 mod opcodes;
+mod dbg_opcodes;
 mod registers;
 mod decode;
 

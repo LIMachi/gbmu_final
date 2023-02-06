@@ -5,7 +5,8 @@ use super::{ops::*, Value, State, Registers, Opcode, CBOpcode, decode::decode};
 pub struct Cpu {
     instructions: Vec<Vec<Op>>,
     regs: Registers,
-    cache: Vec<Value>
+    cache: Vec<Value>,
+    just_finished: bool
 }
 
 impl Cpu {
@@ -14,13 +15,19 @@ impl Cpu {
         Self {
             instructions: Vec::new(),
             regs: match target { super::Target::GB => Registers::GB, super::Target::GBC => Registers::GBC },
-            cache: Vec::new()
+            cache: Vec::new(),
+            just_finished: false
         }
+    }
+
+    pub fn registers(&self) -> &Registers {
+        &self.regs
     }
 
     pub fn cycle(&mut self, bus: &mut dyn Bus) {
         let mut state = State::new(bus, &mut self.regs, &mut self.cache);
         if self.instructions.is_empty() {
+            self.just_finished = false;
             let opcode = state.read();
             if let Ok(opcode) = Opcode::try_from(opcode) {
                 #[cfg(feature = "log_opcode")]
@@ -38,6 +45,7 @@ impl Cpu {
                 break;
             }
         }
+        if self.instructions.is_empty() { self.just_finished = true }
         // State drop will update bus
     }
 }

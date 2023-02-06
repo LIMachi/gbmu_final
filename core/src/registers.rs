@@ -38,6 +38,14 @@ impl Registers {
             e => panic!("invalid read {:?}", e)
         }
     }
+    pub fn a(&self) -> u8 { self.a }
+    pub fn f(&self) -> u8 { self.f }
+    pub fn b(&self) -> u8 { self.b }
+    pub fn c(&self) -> u8 { self.c }
+    pub fn d(&self) -> u8 { self.d }
+    pub fn e(&self) -> u8 { self.e }
+    pub fn h(&self) -> u8 { self.h }
+    pub fn l(&self) -> u8 { self.l }
     pub fn af(&self) -> u16 { u16::from_le_bytes([self.f, self.a]) }
     pub fn bc(&self) -> u16 { u16::from_le_bytes([self.c, self.b]) }
     pub fn de(&self) -> u16 { u16::from_le_bytes([self.e, self.d]) }

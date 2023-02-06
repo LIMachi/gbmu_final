@@ -13,6 +13,5 @@ members = [
     "lcd",
     "app",
     "apu",
-    "bus",
-    "dbg"
+    "bus"
 ]
