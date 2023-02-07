@@ -41,6 +41,7 @@ impl<U: 'static + Ui> EguiContext<U> {
             None)).expect("no matching device");
         let size = window.inner_size();
         let config = surface.get_default_config(&adapter, size.width as u32, size.height as u32).expect("unsupported");
+
         surface.configure(&device, &config);
         let rpass = RenderPass::new(&device, config.format, 1);
         let descriptor = ScreenDescriptor {

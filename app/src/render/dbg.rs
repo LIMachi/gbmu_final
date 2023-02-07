@@ -1,33 +1,28 @@
 use super::*;
 
-use egui::{SidePanel, CentralPanel, panel::Side, Style, TextStyle, Color32, Layout, Align, Vec2, Visuals};
+use egui::{SidePanel, CentralPanel, panel::Side, Style, TextStyle, Color32, Layout, Align, Vec2, Visuals, Rounding, FontFamily};
 use egui::style::DebugOptions;
 
 pub struct Debugger { }
 
 impl Ui for Debugger {
     fn draw(&mut self, ctx: &egui::Context) {
-        ctx.set_style(Style {
-            debug: DebugOptions { debug_on_hover: true, ..Default::default() },
-            visuals: Visuals {
-                override_text_color: Some(Color32::WHITE),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        CentralPanel::default()
-            .show(ctx, |ui: &mut egui::Ui| {
-                let rect = ui.max_rect();
-                ui.allocate_ui_with_layout(Vec2::new(rect.width(), rect.height()), Layout::top_down(Align::LEFT), |ui: &mut egui::Ui| {
-                    ui.columns(8, |uis: &mut [egui::Ui]| {
-                        uis[0].set_max_width(80.);
-                        uis[1].set_max_width(80.);
-                        uis[2].set_max_width(80.);
-                        uis[3].set_max_width(80.);
-                        uis[4].set_max_width(80.);
-                        uis[5].set_max_width(80.);
-                        uis[6].set_max_width(80.);
-                        uis[7].set_max_width(80.);
+        use egui::{FontId, TextStyle::*, FontFamily::Proportional};
+        let mut style = (*ctx.style()).clone();
+        style.text_styles = [
+            (Heading, FontId::new(30.0, Proportional)),
+            (Body, FontId::new(18.0,FontFamily::Monospace)),
+            (Monospace, FontId::new(14.0, Proportional)),
+            (Button, FontId::new(14.0, Proportional)),
+            (Small, FontId::new(10.0, Proportional)),
+        ].into();
+        ctx.set_style(style);
+        CentralPanel::default().show(ctx, |ui: &mut egui::Ui| {
+                egui::Frame::group(ui.style())
+                    .fill(Color32::DARK_GRAY)
+                    .show(ui, |ui: &mut egui::Ui| {
+                        ui.style_mut().visuals.override_text_color = Some(Color32::WHITE);
+                        ui.columns(8, |uis: &mut [egui::Ui]| {
                             uis[0].with_layout(Layout::top_down(Align::Center), |ui: &mut egui::Ui| {
                                 ui.label("A");
                                 ui.label(format!("{:#x}", 0x12));
@@ -60,8 +55,9 @@ impl Ui for Debugger {
                                 ui.label("L");
                                 ui.label(format!("{:#x}", 0x12));
                             });
-                        })
-                });
+                        });
+                    });
             });
     }
 }
+
