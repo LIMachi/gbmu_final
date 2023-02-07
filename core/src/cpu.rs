@@ -1,6 +1,6 @@
-use log::Level::Debug;
-use crate::{Bus, Reg};
-use super::{ops::*, Value, State, Registers, Opcode, CBOpcode, decode::decode};
+use crate::Bus;
+use shared::{Target, cpu::{Reg, Value, Opcode}};
+use super::{ops::*, State, Registers, decode::decode};
 
 pub struct Cpu {
     instructions: Vec<Vec<Op>>,
@@ -11,10 +11,10 @@ pub struct Cpu {
 
 impl Cpu {
 
-    pub fn new(target: super::Target) -> Self {
+    pub fn new(target: Target) -> Self {
         Self {
             instructions: Vec::new(),
-            regs: match target { super::Target::GB => Registers::GB, super::Target::GBC => Registers::GBC },
+            regs: match target { Target::GB => Registers::GB, Target::GBC => Registers::GBC },
             cache: Vec::new(),
             just_finished: false
         }

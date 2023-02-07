@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use wgpu::{InstanceDescriptor};
@@ -29,13 +30,19 @@ impl Windows {
         }
     }
 
-    pub fn get_mut(&mut self, handle: Handle) -> Option<&mut Box<dyn Context>> {
-        self.handles.get_mut(&handle).and_then(|x| self.windows.get_mut(x))
-    }
+    /**
+        Retrieves inner data from the associated handle, if any.
+        It will be returned as a Box<dyn Any> which can be downcasted to the inner type.
+        Preferably don't use, unless you know exactly what you're getting.
 
-    pub fn debugger(&mut self) -> Option<&mut crate::Debugger> {
-        self.get_mut(Handle::Main)
-            .and_then(|x| x.data().downcast_mut())
+        Handle::Main => Debugger
+        _ => Unused
+    **/
+    pub fn get_mut(&mut self, handle: Handle) -> Option<Box<&mut dyn Any>> {
+        self.handles
+            .get_mut(&handle)
+            .and_then(|x| self.windows.get_mut(x))
+            .map(|x| x.data())
     }
 
     pub fn handle_events(&mut self, event: &Event<'_, ()>, flow: &mut ControlFlow) {

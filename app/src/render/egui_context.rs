@@ -2,14 +2,9 @@ use std::any::Any;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use log::error;
 use wgpu::{Device, Queue, SurfaceConfiguration};
+use shared::{Ui, egui};
 
 pub use super::*;
-
-pub trait Ui {
-    fn draw(&mut self, ctx: &egui::Context) { }
-}
-
-impl Ui for () { }
 
 pub struct EguiContext<U: Ui> {
     data: U,
@@ -64,6 +59,10 @@ impl<U: 'static + Ui> EguiContext<U> {
             queue,
             descriptor
         }
+    }
+
+    pub fn builder(data: U) -> Box<dyn FnOnce(&Instance, Window, &EventLoop<()>) -> Self> {
+        Box::new(move |instance, window, event| Self::new(instance, window, event, data))
     }
 }
 

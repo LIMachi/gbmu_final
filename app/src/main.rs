@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use wgpu::Instance;
 use winit::{
     window::{Window},
@@ -5,12 +6,14 @@ use winit::{
     event::{Event}
 };
 use winit::dpi::PhysicalSize;
+use winit::event_loop::EventLoopBuilder;
 use winit::window::WindowBuilder;
+use dbg::Emulator;
 
 mod render;
 mod app;
-use render::{Handle, windows::Windows, dbg::Debugger};
-use crate::render::EguiContext;
+
+use render::{Handle, windows::Windows, EguiContext};
 
 pub struct App {
     event_loop: Option<EventLoop<()>>,
@@ -19,8 +22,9 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        let e = EventLoopBuilder::with_user_event().build();
         Self {
-            event_loop: Some(EventLoop::new()),
+            event_loop: Some(e),
             windows: Windows::new(),
         }
     }
@@ -37,13 +41,11 @@ impl App {
 
     pub fn run<F: 'static + FnMut(&mut App)>(mut self, mut handler: F) -> ! {
         let event = self.event_loop.take().expect("yeah no");
-        let mut start = true;
         event.run(move |mut event: Event<'_, ()>, target: &EventLoopWindowTarget<()>, flow: &mut ControlFlow| {
             flow.set_poll();
             self.windows.handle_events(&event, flow);
             match event {
                 Event::MainEventsCleared => {
-                    let dbg: Option<&mut Debugger> = self.windows.debugger();
                     handler(&mut self);
                     self.windows.update();
                 },
@@ -56,17 +58,15 @@ impl App {
     }
 }
 
-fn cycle(app: &mut App) {
-}
-
 fn main() {
     env_logger::init();
 
-    let mut emu = app::Emulator::new();
     let app = App::new();
-    let dbg = Debugger::new(emu.clone());
-    app.create::<1280, 720, _, _>(Handle::Main, move |instance, win, event| EguiContext::new(instance, win, event, dbg))
+    let mut emu = app::Emulator::new();
+    let dbg = dbg::Debugger::new(emu.clone());
+    app.create::<1280, 720, _, _>(Handle::Main, EguiContext::builder(dbg.clone()))
         .run(move |app| {
+            dbg.info();
             emu.cycle();
         });
 }

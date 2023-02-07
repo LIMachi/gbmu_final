@@ -2,8 +2,6 @@ extern crate core;
 
 mod cpu;
 mod ops;
-mod opcodes;
-mod dbg_opcodes;
 mod registers;
 mod decode;
 
@@ -11,47 +9,15 @@ use std::fmt;
 use std::fmt::{Formatter, LowerHex, Write};
 use log::{info, warn};
 
-pub use registers::Reg;
 use registers::*;
-use opcodes::*;
+use shared::cpu::{Value, Opcode, CBOpcode, Reg};
 pub use cpu::Cpu;
-
-pub enum Target {
-    GB,
-    GBC
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Value {
-    U8(u8),
-    U16(u16)
-}
-
-impl From<u8> for Value {
-    fn from(value: u8) -> Self {
-        Self::U8(value)
-    }
-}
-
-impl From<u16> for Value {
-    fn from(value: u16) -> Self {
-        Self::U16(value)
-    }
-}
-
-impl LowerHex for Value {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Value::U8(v) => fmt::LowerHex::fmt(v, f),
-            Value::U16(v) => fmt::LowerHex::fmt(v, f),
-        }
-    }
-}
 
 pub trait Bus {
     fn status(&self) -> MemStatus;
     fn update(&mut self, status: MemStatus);
     fn tick(&mut self);
+    fn get_range(&self, start: u16, len: u16) -> Vec<u8>;
 }
 
 #[derive(Copy, Debug, Clone, Eq, PartialEq)]

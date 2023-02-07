@@ -1,10 +1,7 @@
-use super::Value;
+use shared::cpu::{Reg, Value};
 
 const HIGH: usize = 1;
 const LOW: usize = 0;
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum Reg { A, F, AF, B, C, BC, D, E, DE, H, L, HL, SP, PC }
 
 pub struct Registers {
     a: u8,

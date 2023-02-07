@@ -2,13 +2,10 @@ use wgpu::Instance;
 use winit::{window::Window, event_loop::EventLoop};
 use winit::dpi::PhysicalSize;
 
-pub mod dbg;
 mod egui_context;
 mod pixels;
 
 pub mod windows;
-
-use egui_context::Ui;
 
 pub type Flow = std::ops::ControlFlow<()>;
 pub const CONTINUE: Flow = Flow::Continue(());

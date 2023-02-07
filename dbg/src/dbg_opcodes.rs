@@ -1,6 +1,5 @@
-use std::fmt::{Display, Formatter, Write};
-use crate::CBOpcode;
-use super::Opcode;
+use std::fmt::{Display, Formatter};
+use shared::cpu::*;
 
 pub struct DebugInfo {
     sz: usize,

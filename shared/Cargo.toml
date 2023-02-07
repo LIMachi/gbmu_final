@@ -1,17 +1,10 @@
 [package]
-name = "core"
+name = "shared"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+egui = "0.20.1"
 thiserror = "1.0.38"
-anyhow = "1.0.68"
-log = "0.4.17"
-
-[dependencies.shared]
-path = "../shared"
-
-[features]
-log_opcode = []

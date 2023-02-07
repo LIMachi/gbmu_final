@@ -1,9 +1,13 @@
-use std::cell::{Ref, RefCell};
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::fs::File;
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
-use std::rc::Rc;
+
 use log::error;
+
+use shared::cpu::*;
+use shared::Target;
 
 pub struct FakeBus {
     rom: Vec<u8>,
@@ -39,10 +43,16 @@ impl core::Bus for FakeBus {
             st => st
         }
     }
+
+    fn get_range(&self, start: u16, len: u16) -> Vec<u8> {
+        let st = start as usize;
+        let end = st + (len as usize);
+        self.rom[st..end].to_vec()
+    }
 }
 
 pub struct Emu {
-    bus: FakeBus,
+    pub bus: FakeBus,
     pub cpu: core::Cpu,
     running: bool,
 }
@@ -56,14 +66,21 @@ impl Emulator {
     pub fn new() -> Self {
         Self { emu: Rc::new(RefCell::new(Emu::new())) }
     }
-
     pub fn cycle(&mut self) {
         self.emu.borrow_mut().cycle();
     }
+}
 
-    pub fn cpu_register(&self, reg: core::Reg) -> core::Value {
-        self.emu.borrow().cpu.registers().read(reg)
+impl dbg::ReadAccess for Emulator {
+    fn cpu_register(&self, reg: Reg) -> Value {
+        self.emu.as_ref().borrow().cpu.registers().read(reg)
     }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        use core::Bus;
+        self.emu.as_ref().borrow().bus.get_range(st, len)
+    }
+
 }
 
 impl Emu {
@@ -71,9 +88,9 @@ impl Emu {
         let mut v = Vec::new();
         let mut file = File::open("roms/29459/29459.gbc").expect("not found");
         file.read_to_end(&mut v).expect("failed to read");
-        println!("{:#X?}", &v[0..0x100]);
+        // println!("{:#X?}", &v[0..0x100]);
         let mut bus = FakeBus::new(v);
-        let mut cpu = core::Cpu::new(core::Target::GB);
+        let mut cpu = core::Cpu::new(Target::GB);
         Self {
             bus,
             cpu,
