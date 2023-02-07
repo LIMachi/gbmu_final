@@ -71,7 +71,7 @@ impl Emu {
         let mut v = Vec::new();
         let mut file = File::open("roms/29459/29459.gbc").expect("not found");
         file.read_to_end(&mut v).expect("failed to read");
-        println!("{:#X?}", &v[0x101..0x104]);
+        println!("{:#X?}", &v[0..0x100]);
         let mut bus = FakeBus::new(v);
         let mut cpu = core::Cpu::new(core::Target::GB);
         Self {

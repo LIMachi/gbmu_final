@@ -1,9 +1,6 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use super::*;
 
-use egui::{SidePanel, CentralPanel, panel::Side, Style, TextStyle, Color32, Layout, Align, Vec2, Visuals, Rounding, FontFamily, Widget, Response};
-use egui::style::DebugOptions;
+use egui::{CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response};
 use core::{Reg, Value};
 use crate::app;
 use crate::app::Emulator;
@@ -60,7 +57,7 @@ impl Ui for Debugger {
                             uis[6].add(Register("H", self.emu.cpu_register(Reg::H)));
                             uis[7].add(Register("L", self.emu.cpu_register(Reg::L)));
                             uis[8].add(Register("SP", self.emu.cpu_register(Reg::SP)));
-                            uis[9].add(Register("PC", Value::U16(0x0100)));
+                            uis[9].add(Register("PC", self.emu.cpu_register(Reg::PC)));
                         });
                     });
         });
