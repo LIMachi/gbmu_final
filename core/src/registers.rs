@@ -23,6 +23,7 @@ impl Registers {
     pub fn read(&self, reg: Reg) -> Value {
         match reg {
             Reg::A => Value::U8(self.a),
+            Reg::F => Value::U8(self.f),
             Reg::B => Value::U8(self.b),
             Reg::C => Value::U8(self.c),
             Reg::D => Value::U8(self.d),

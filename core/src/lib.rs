@@ -9,7 +9,9 @@ mod decode;
 
 use std::fmt;
 use std::fmt::{Formatter, LowerHex, Write};
-use log::warn;
+use log::{info, warn};
+
+pub use registers::Reg;
 use registers::*;
 use opcodes::*;
 pub use cpu::Cpu;
@@ -23,6 +25,18 @@ pub enum Target {
 pub enum Value {
     U8(u8),
     U16(u16)
+}
+
+impl From<u8> for Value {
+    fn from(value: u8) -> Self {
+        Self::U8(value)
+    }
+}
+
+impl From<u16> for Value {
+    fn from(value: u16) -> Self {
+        Self::U16(value)
+    }
 }
 
 impl LowerHex for Value {
@@ -97,6 +111,7 @@ impl<'a> Drop for State<'a> {
             MemStatus::ReqRead(_) | MemStatus::ReqWrite(_) => { },
             e => {
                 if e != MemStatus::Idle && e!= MemStatus::Ready { warn!("{e:?} I/O result wasn't used this cycle") };
+                info!("req read pc: {:x?}", self.regs.pc());
                 self.mem = MemStatus::ReqRead(self.regs.pc());
             },
         };

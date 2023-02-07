@@ -60,8 +60,13 @@ fn cycle(app: &mut App) {
 }
 
 fn main() {
+    env_logger::init();
+
+    let mut emu = app::Emulator::new();
     let app = App::new();
-    let dbg = Debugger { };
-    app.create::<1920, 1080, _, _>(Handle::Main, move |instance, win, event| EguiContext::new(instance, win, event, dbg))
-        .run(cycle);
+    let dbg = Debugger::new(emu.clone());
+    app.create::<1280, 720, _, _>(Handle::Main, move |instance, win, event| EguiContext::new(instance, win, event, dbg))
+        .run(move |app| {
+            emu.cycle();
+        });
 }

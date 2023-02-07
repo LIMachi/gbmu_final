@@ -1,6 +1,8 @@
+use std::cell::{Ref, RefCell};
 use std::fs::File;
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
+use std::rc::Rc;
 use log::error;
 
 pub struct FakeBus {
@@ -41,13 +43,31 @@ impl core::Bus for FakeBus {
 
 pub struct Emu {
     bus: FakeBus,
-    cpu: core::Cpu,
+    pub cpu: core::Cpu,
     running: bool,
+}
+
+#[derive(Clone)]
+pub struct Emulator {
+    emu: Rc<RefCell<Emu>>
+}
+
+impl Emulator {
+    pub fn new() -> Self {
+        Self { emu: Rc::new(RefCell::new(Emu::new())) }
+    }
+
+    pub fn cycle(&mut self) {
+        self.emu.borrow_mut().cycle();
+    }
+
+    pub fn cpu_register(&self, reg: core::Reg) -> core::Value {
+        self.emu.borrow().cpu.registers().read(reg)
+    }
 }
 
 impl Emu {
     pub fn new() -> Self {
-        env_logger::init();
         let mut v = Vec::new();
         let mut file = File::open("roms/29459/29459.gbc").expect("not found");
         file.read_to_end(&mut v).expect("failed to read");

@@ -31,7 +31,7 @@ impl Cpu {
             let opcode = state.read();
             if let Ok(opcode) = Opcode::try_from(opcode) {
                 #[cfg(feature = "log_opcode")]
-                log::debug!("[0x{:x}] instruction {opcode:?}", state.register(Reg::PC));
+                log::info!("[0x{:x}] instruction {opcode:?}", state.register(Reg::PC));
                 self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
             } else {
                 self.instructions = vec![vec![inc::pc]];
