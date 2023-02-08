@@ -30,6 +30,12 @@ pub fn e(state: &mut State) -> Flow {
     CONTINUE
 }
 
+pub fn f(state: &mut State) -> Flow {
+    let value = state.pop();
+    state.set_register(Reg::F, value);
+    CONTINUE
+}
+
 pub fn h(state: &mut State) -> Flow {
     let value = state.pop();
     state.set_register(Reg::H, value);
@@ -78,5 +84,11 @@ pub fn pc(state: &mut State) -> Flow {
         Value::U16(v) => state.set_register(Reg::PC,Value::U16(v)),
         _ => panic!("expected u16 in cache.")
     };
+    CONTINUE
+}
+
+pub fn mem(state: &mut State) -> Flow {
+    let v = state.pop();
+    state.write(v);
     CONTINUE
 }

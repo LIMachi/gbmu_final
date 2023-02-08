@@ -10,6 +10,7 @@ use shared::cpu::*;
 use shared::Target;
 
 pub struct FakeBus {
+    ram: Vec<u8>,
     rom: Vec<u8>,
     status: core::MemStatus
 }
@@ -17,6 +18,7 @@ pub struct FakeBus {
 impl FakeBus {
     pub fn new(rom: Vec<u8>) -> Self {
         Self {
+            ram: vec![0; u16::MAX as usize + 1],
             rom,
             status: core::MemStatus::ReqRead(0x100u16)
         }
@@ -48,6 +50,10 @@ impl core::Bus for FakeBus {
         let st = start as usize;
         let end = st + (len as usize);
         self.rom[st..end].to_vec()
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.ram[addr as usize] = value;
     }
 }
 
@@ -88,7 +94,7 @@ impl Emu {
         let mut v = Vec::new();
         let mut file = File::open("roms/29459/29459.gbc").expect("not found");
         file.read_to_end(&mut v).expect("failed to read");
-        // println!("{:#X?}", &v[0..0x100]);
+        println!("{:#X?}", &v[0x15c..0x168]);
         let mut bus = FakeBus::new(v);
         let mut cpu = core::Cpu::new(Target::GB);
         Self {

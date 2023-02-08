@@ -248,7 +248,7 @@ pub fn dbg_opcodes(opcode: Opcode) -> (usize, &'static str) {
         Opcode::Andd8        => (2, "AND u8"),
         Opcode::Rst20H       => (1, "RST 20H"),
         Opcode::AddSPr8      => (2, "ADD SP,i8"),
-        Opcode::JpIndHL      => (1, "JP (HL)"),
+        Opcode::JpHL         => (1, "JP HL"),
         Opcode::LdInda16A    => (3, "LD (a16),A"),
         Opcode::Xord8        => (2, "XOR u8"),
         Opcode::Rst28H       => (1, "RST 28H"),
@@ -264,7 +264,8 @@ pub fn dbg_opcodes(opcode: Opcode) -> (usize, &'static str) {
         Opcode::LdAInda16    => (3, "LD A,(a16)"),
         Opcode::Ei           => (1, "EI"),
         Opcode::Cpd8         => (2, "CP u8"),
-        Opcode::Rst38H       => (1, "RST 38H")
+        Opcode::Rst38H       => (1, "RST 38H"),
+        Opcode::CB(cb) => (0, "PREFIX")
     }
 }
 

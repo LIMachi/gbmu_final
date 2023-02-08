@@ -1,33 +1,43 @@
 use super::*;
 
 pub fn pc(state: &mut State) -> Flow {
-    if let Value::U16(v) = state.register(Reg::PC) {
-        state.set_register(Reg::PC, Value::U16(v + 1));
-    }
+    let pc = state.register(Reg::PC).u16() + 1;
+    state.set_register(Reg::PC, pc.into());
+    CONTINUE
+}
+
+pub fn jmp(state: &mut State) -> Flow {
+    let mut pc = state.register(Reg::PC).u16();
+    let e = state.pop().u8() as i8;
+    pc = if e < 0 { pc - (-e) as u16 } else { pc + e as u16 };
+    state.set_register(Reg::PC, pc.into());
     CONTINUE
 }
 
 pub fn sp(state: &mut State) -> Flow {
-    if let Value::U16(v) = state.register(Reg::PC) {
-        state.set_register(Reg::PC, Value::U16(v + 1));
-    }
+    let v = state.register(Reg::SP).u16() + 1;
+    state.set_register(Reg::SP, v.into());
     CONTINUE
 }
 
 pub fn inc(state: &mut State) -> Flow {
-    let v = state.pop();
-    state.push(match v {
-        Value::U8(v) => Value::U8(v + 1),
-        Value::U16(_) => panic!("invalid inc")
-    });
+    let v = state.pop().u8() + 1;
+
+    state.flags().set_zero(v == 0)
+        .set_sub(false)
+        .set_half((v & 0x10) != 0);
+    state.push(v.into());
     CONTINUE
 }
 
 pub fn inc16(state: &mut State) -> Flow {
-    let v = state.pop();
-    state.push(match v {
-        Value::U16(v) => Value::U16(v + 1),
-        Value::U8(_) => panic!("invalid inc")
-    });
+    let v = state.pop().u16() + 1;
+    state.push(v.into());
+    CONTINUE
+}
+
+pub fn hl(state: &mut State) -> Flow {
+    let hl = state.register(Reg::HL).u16() + 1;
+    state.set_register(Reg::HL, hl.into());
     CONTINUE
 }

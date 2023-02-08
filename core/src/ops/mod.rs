@@ -1,9 +1,14 @@
-pub mod math;
 pub mod inc;
 pub mod dec;
 pub mod read;
 pub mod write;
 pub mod mem;
+
+pub mod alu;
+pub mod bits;
+
+pub mod cond;
+pub mod int;
 
 use super::*;
 
@@ -12,5 +17,3 @@ pub type Op = fn(&mut State) -> Flow;
 
 pub const CONTINUE: Flow = Flow::Continue(());
 pub const BREAK: Flow = Flow::Break(());
-
-pub const INC_PC: &[Op] = &[read::pc, inc::inc16, write::pc];

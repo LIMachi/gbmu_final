@@ -30,7 +30,7 @@ impl App {
     }
 
     pub fn create<const W: u32, const H: u32, C: 'static + Sized + render::Context, F: 'static + FnOnce(&Instance, Window, &EventLoop<()>) -> C>
-        (mut self, handle: render::Handle, builder: F) -> Self {
+        (mut self, handle: Handle, builder: F) -> Self {
         let win = WindowBuilder::new()
             .with_title("GBMU")
             .with_inner_size(PhysicalSize::<u32>::from((W, H)))
@@ -66,7 +66,6 @@ fn main() {
     let dbg = dbg::Debugger::new(emu.clone());
     app.create::<1280, 720, _, _>(Handle::Main, EguiContext::builder(dbg.clone()))
         .run(move |app| {
-            dbg.info();
             emu.cycle();
         });
 }

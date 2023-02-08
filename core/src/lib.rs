@@ -12,12 +12,14 @@ use log::{info, warn};
 use registers::*;
 use shared::cpu::{Value, Opcode, CBOpcode, Reg};
 pub use cpu::Cpu;
+use crate::ops::alu::add;
 
 pub trait Bus {
     fn status(&self) -> MemStatus;
     fn update(&mut self, status: MemStatus);
     fn tick(&mut self);
     fn get_range(&self, start: u16, len: u16) -> Vec<u8>;
+    fn write(&mut self, addr: u16, value: u8);
 }
 
 #[derive(Copy, Debug, Clone, Eq, PartialEq)]
@@ -59,16 +61,29 @@ impl MemStatus {
     pub fn req_write(&mut self, addr: u16) {
         *self = match self {
             MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqWrite(addr) },
-            _ => panic!("invalid state")
+            MemStatus::Read(_) => {
+                warn!("unused read");
+                MemStatus::ReqWrite(addr)
+            },
+            s => panic!("invalid state {s:?}")
         }
     }
+}
+#[derive(Default, Copy, Clone)]
+pub struct Flags {
+    zero: bool,
+    half: bool,
+    sub: bool,
+    carry: bool
 }
 
 pub struct State<'a> {
     mem: MemStatus,
     bus: &'a mut dyn Bus,
     regs: &'a mut Registers,
-    cache: &'a mut Vec<Value>
+    cache: &'a mut Vec<Value>,
+    flags: Option<Flags>,
+    prefix: &'a mut bool
 }
 
 impl<'a> Drop for State<'a> {
@@ -81,42 +96,47 @@ impl<'a> Drop for State<'a> {
                 self.mem = MemStatus::ReqRead(self.regs.pc());
             },
         };
+        if let Some(flags) = self.flags {
+            self.regs.set_zero(flags.zero);
+            self.regs.set_sub(flags.sub);
+            self.regs.set_half(flags.half);
+            self.regs.set_carry(flags.carry);
+        }
         self.bus.update(self.mem);
     }
 }
 
-#[derive(Default)]
-pub struct Flags {
-    zero: Option<bool>,
-    half: Option<bool>,
-    sub: Option<bool>,
-    carry: Option<bool>
-}
 
 impl Flags {
-    pub fn c() -> Self { Self::default().set_carry(true) }
-    pub fn nc() -> Self { Self::default().set_carry(false) }
-    pub fn z() -> Self { Self::default().set_zero(true) }
-    pub fn nz() -> Self { Self::default().set_zero(false) }
+    pub fn get(r: &Registers) -> Self {
+        Self {
+            zero: r.zero(),
+            half: r.half(),
+            sub: r.sub(),
+            carry: r.carry()
+        }
+    }
 
-    pub fn set_zero(mut self, z: bool) -> Self { self.zero = Some(z); self }
-    pub fn set_carry(mut self, c: bool) -> Self { self.carry = Some(c); self }
-    pub fn set_half(mut self, h: bool) -> Self { self.half = Some(h); self }
-    pub fn set_sub(mut self, s: bool) -> Self { self.sub = Some(s); self }
+    pub fn set_zero(&mut self, z: bool) -> &mut Self { self.zero = z; self }
+    pub fn set_carry(&mut self, c: bool) -> &mut Self { self.carry = c; self }
+    pub fn set_half(&mut self, h: bool) -> &mut Self { self.half = h; self }
+    pub fn set_sub(&mut self, s: bool) -> &mut Self { self.sub = s; self }
 
-    pub fn carry(&self) -> bool { self.carry.expect("unexpected carry flag read") }
-    pub fn half(&self) -> bool { self.half.expect("unexpected half flag read") }
-    pub fn sub(&self) -> bool { self.sub.expect("unexpected sub flag read") }
-    pub fn zero(&self) -> bool { self.zero.expect("unexpected zero flag read") }
+    pub fn carry(&self) -> bool { self.carry }
+    pub fn half(&self) -> bool { self.half }
+    pub fn sub(&self) -> bool { self.sub }
+    pub fn zero(&self) -> bool { self.zero }
 }
 
 impl<'a> State<'a> {
-    pub fn new(bus: &'a mut dyn Bus, regs: &'a mut Registers, stack: &'a mut Vec<Value>) -> Self {
+    pub fn new(bus: &'a mut dyn Bus, (regs, cache, prefix): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool)) -> Self {
         Self {
             mem: bus.status(),
             bus,
+            flags: None,
             regs,
-            cache: stack
+            cache,
+            prefix
         }
     }
 
@@ -126,7 +146,14 @@ impl<'a> State<'a> {
 
     pub fn write(&mut self, value: Value) {
         let addr = self.mem.write();
-        // self.bus.write(addr, value);
+        match value {
+            Value::U8(v) => self.bus.write(addr,v),
+            Value::U16(v) => {
+                let [low, high] = v.to_le_bytes();
+                self.bus.write(addr, low);
+                self.bus.write(addr + 1, high);
+            }
+        }
     }
 
     pub fn clear(&mut self) {
@@ -168,19 +195,12 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn set_flags(&mut self, flags: Flags) {
-        if let Some(z) = flags.zero { self.regs.set_zero(z); }
-        if let Some(h) = flags.half { self.regs.set_half(h); }
-        if let Some(c) = flags.carry { self.regs.set_carry(c); }
-        if let Some(s) = flags.sub { self.regs.set_sub(s); }
-    }
-
-    pub fn flags(&self) -> Flags {
-        Flags::default()
-            .set_carry(self.regs.carry())
-            .set_sub(self.regs.sub())
-            .set_half(self.regs.half())
-            .set_zero(self.regs.zero())
+    /// Init flags
+    pub fn flags(&mut self) -> &mut Flags {
+        if self.flags.is_none() {
+            self.flags = Some(Flags::get(self.regs));
+        }
+        self.flags.as_mut().unwrap()
     }
 
     pub fn req_read(&mut self, addr: u16) {

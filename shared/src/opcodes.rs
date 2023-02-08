@@ -7,6 +7,7 @@ pub enum Error {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u16)]
 pub enum Opcode {
     Nop             = 0x0,
     LdBCd16         = 0x1,
@@ -236,7 +237,7 @@ pub enum Opcode {
     Andd8           = 0xe6,
     Rst20H          = 0xe7,
     AddSPr8         = 0xe8,
-    JpIndHL         = 0xe9,
+    JpHL            = 0xe9,
     LdInda16A       = 0xea,
     Xord8           = 0xee,
     Rst28H          = 0xef,
@@ -253,7 +254,9 @@ pub enum Opcode {
     Ei              = 0xfb,
     Cpd8            = 0xfe,
     Rst38H          = 0xff,
+    CB(CBOpcode)    = 0x100
 }
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum CBOpcode {
     RlcB            = 0x0,
@@ -514,10 +517,11 @@ pub enum CBOpcode {
     Set7A           = 0xff
 }
 
-impl TryFrom<u8> for Opcode {
+impl TryFrom<(u8, bool)> for Opcode {
     type Error = Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
+    fn try_from((value, prefix): (u8, bool)) -> Result<Self, Self::Error> {
+        if prefix { return Ok(Opcode::CB(CBOpcode::from(value))) }
         Ok(match value {
             0x0 => Opcode::Nop,
             0x1 => Opcode::LdBCd16,
@@ -747,7 +751,7 @@ impl TryFrom<u8> for Opcode {
             0xe6 => Opcode::Andd8,
             0xe7 => Opcode::Rst20H,
             0xe8 => Opcode::AddSPr8,
-            0xe9 => Opcode::JpIndHL,
+            0xe9 => Opcode::JpHL,
             0xea => Opcode::LdInda16A,
             0xee => Opcode::Xord8,
             0xef => Opcode::Rst28H,

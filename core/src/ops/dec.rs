@@ -14,20 +14,24 @@ pub fn sp(state: &mut State) -> Flow {
     CONTINUE
 }
 
-pub fn inc(state: &mut State) -> Flow {
-    let v = state.pop();
-    state.push(match v {
-            Value::U8(v) => Value::U8(v - 1),
-            Value::U16(_) => panic!("invalid dec")
-        });
+pub fn dec(state: &mut State) -> Flow {
+    let v = state.pop().u8() - 1;
+    state.push(v.into());
+    state.flags()
+        .set_zero(v == 0)
+        .set_sub(true)
+        .set_half((v & 0x10) != 0);
     CONTINUE
 }
 
-pub fn inc16(state: &mut State) -> Flow {
-    let v = state.pop();
-    state.push(match v {
-            Value::U16(v) => Value::U16(v - 1),
-            Value::U8(_) => panic!("invalid dec")
-        });
+pub fn dec16(state: &mut State) -> Flow {
+    let v = state.pop().u16() - 1;
+    state.push(v.into());
+    CONTINUE
+}
+
+pub fn hl(state: &mut State) -> Flow {
+    let hl = state.register(Reg::HL).u16() - 1;
+    state.set_register(Reg::HL, hl.into());
     CONTINUE
 }

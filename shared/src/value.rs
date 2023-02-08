@@ -7,6 +7,21 @@ pub enum Value {
     U16(u16)
 }
 
+impl Value {
+    pub fn u8(self) -> u8 {
+        match self {
+            Value::U8(n) => n,
+            _ => { panic!("Wrong value size, expected U8") }
+        }
+    }
+    pub fn u16(self) -> u16 {
+        match self {
+            Value::U16(n) => n,
+            _ => { panic!("Wrong value size, expected U16") }
+        }
+    }
+}
+
 impl From<u8> for Value {
     fn from(value: u8) -> Self {
         Self::U8(value)

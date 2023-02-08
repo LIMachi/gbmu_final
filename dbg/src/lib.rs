@@ -76,8 +76,5 @@ impl<E: Emulator> Debugger<E> {
         }
     }
 
-    pub fn info(&self) {
-
-    }
 }
 
