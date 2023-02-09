@@ -21,7 +21,7 @@ pub fn sub(state: &mut State) -> Flow {
         .set_sub(true)
         .set_half((a & 0xF) < (n & 0xF))
         .set_carry(o);
-    state.push(r.into());
+    state.push(r);
     CONTINUE
 }
 
@@ -36,7 +36,7 @@ pub fn sbc(state: &mut State) -> Flow {
         .set_sub(true)
         .set_half(((a & 0xF) < (n & 0xF) + cr))
         .set_carry(o || c);
-    state.push(r.into());
+    state.push(r);
     CONTINUE
 }
 
@@ -48,7 +48,7 @@ pub fn add(state: &mut State) -> Flow {
         .set_sub(false)
         .set_half(((a & 0xF) + (n & 0xF)) & 0x10 != 0)
         .set_carry(o);
-    state.push(r.into());
+    state.push(r);
     CONTINUE
 }
 
@@ -60,7 +60,7 @@ pub fn add_sp(state: &mut State) -> Flow {
         .set_sub(false)
         .set_half((n & 0xF) + (r & 0xF) > 0xF)
         .set_carry((n & 0xFF) + (r & 0xFF) > 0xFF);
-    state.push(r.into());
+    state.push(r);
     CONTINUE
 }
 
@@ -69,7 +69,7 @@ pub fn add_hl(state: &mut State) -> Flow {
     let hl = state.register(Reg::HL).u16();
     let n = state.pop().u16();
     let (r, c) = hl.overflowing_add(n);
-    state.set_register(Reg::HL, r.into());
+    state.set_register(Reg::HL, r);
     state.flags()
         .set_sub(false)
         .set_half(((hl & 0xFFF) + (n & 0xFFF)) & 0x1000 != 0)
@@ -87,7 +87,7 @@ pub fn adc(state: &mut State) -> Flow {
         .set_sub(false)
         .set_half(((a & 0xF) + (n & 0xF) + cr) & 0x10 != 0)
         .set_carry(o);
-    state.push(r.into());
+    state.push(r);
     CONTINUE
 }
 
@@ -95,7 +95,7 @@ pub fn xor(state: &mut State) -> Flow {
     let a = state.register(Reg::A).u8();
     let o = state.pop().u8();
     let r = a.bitxor(o);
-    state.set_register(Reg::A, r.into());
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(false)
         .set_half(false)
@@ -107,7 +107,7 @@ pub fn or(state: &mut State) -> Flow {
     let a = state.register(Reg::A).u8();
     let o = state.pop().u8();
     let r = a.bitor(o);
-    state.set_register(Reg::A, r.into());
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(false)
         .set_half(false)
@@ -119,7 +119,7 @@ pub fn and(state: &mut State) -> Flow {
     let a = state.register(Reg::A).u8();
     let o = state.pop().u8();
     let r = a.bitand(o);
-    state.set_register(Reg::A, r.into());
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(false)
         .set_half(true)
@@ -132,7 +132,7 @@ pub fn cpl(state: &mut State) -> Flow {
     state.flags()
         .set_sub(true)
         .set_half(true);
-    state.set_register(Reg::A, a.into());
+    state.set_register(Reg::A, a);
     CONTINUE
 }
 

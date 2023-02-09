@@ -54,8 +54,8 @@ pub fn req_write_u8(state: &mut State) -> Flow {
 pub fn split(state: &mut State) -> Flow {
     let addr = state.pop().u16();
     let [low, high] = addr.to_le_bytes();
-    state.push(low.into());
-    state.push(high.into());
+    state.push(low);
+    state.push(high);
     CONTINUE
 }
 

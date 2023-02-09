@@ -22,5 +22,9 @@ debug = ["core/log_opcode"]
 path = "../shared"
 [dependencies.core]
 path = "../core"
+[dependencies.bus]
+path = "../bus"
+[dependencies.mem]
+path = "../mem"
 [dependencies.dbg]
 path = "../dbg"

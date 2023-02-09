@@ -1,9 +1,9 @@
 use std::borrow::Borrow;
 use wgpu::Instance;
 use winit::{
-    window::{Window},
-    event_loop::{EventLoop, ControlFlow, EventLoopWindowTarget},
-    event::{Event}
+    event::Event,
+    event_loop::{ControlFlow, EventLoop, EventLoopWindowTarget},
+    window::Window
 };
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoopBuilder;
@@ -13,7 +13,7 @@ use dbg::Emulator;
 mod render;
 mod app;
 
-use render::{Handle, windows::Windows, EguiContext};
+use render::{EguiContext, Handle, windows::Windows};
 
 pub struct App {
     event_loop: Option<EventLoop<()>>,

@@ -15,5 +15,7 @@ members = [
     "apu",
     "bus",
     "dbg",
-    "shared"
+    "shared",
+    "ppu",
+    "mem"
 ]

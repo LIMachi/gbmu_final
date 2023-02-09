@@ -5,35 +5,23 @@ mod ops;
 mod registers;
 mod decode;
 
-use std::fmt;
-use std::fmt::{Formatter, LowerHex, Write};
+use std::fmt::{LowerHex, Write};
 use log::{info, warn};
 
 use registers::*;
-use shared::cpu::{Value, Opcode, CBOpcode, Reg};
+use shared::cpu::{Value, Opcode, CBOpcode, Reg, MemStatus, Bus, regs};
 pub use cpu::Cpu;
 use crate::ops::alu::add;
 
-pub trait Bus {
-    fn status(&self) -> MemStatus;
-    fn update(&mut self, status: MemStatus);
-    fn tick(&mut self);
-    fn get_range(&self, start: u16, len: u16) -> Vec<u8>;
-    fn write(&mut self, addr: u16, value: u8);
+trait RWStatus {
+    fn read(&mut self) -> u8;
+    fn write(&mut self) -> u16;
+    fn req_read(&mut self, addr: u16);
+    fn req_write(&mut self, addr: u16);
 }
 
-#[derive(Copy, Debug, Clone, Eq, PartialEq)]
-pub enum MemStatus {
-    Read(u8),
-    Write(u16),
-    Ready,
-    ReqRead(u16),
-    ReqWrite(u16),
-    Idle
-}
-
-impl MemStatus {
-    pub fn read(&mut self) -> u8 {
+impl RWStatus for MemStatus {
+    fn read(&mut self) -> u8 {
         let v = match self {
             MemStatus::Read(v) => *v,
             _ => panic!("unexpected mem read")
@@ -42,7 +30,7 @@ impl MemStatus {
         v
     }
 
-    pub fn write(&mut self) -> u16 {
+    fn write(&mut self) -> u16 {
         let addr = match self {
             MemStatus::Write(addr) => { *addr },
             _ => panic!("unexpected mem write")
@@ -51,14 +39,14 @@ impl MemStatus {
         addr
     }
 
-    pub fn req_read(&mut self, addr: u16) {
+    fn req_read(&mut self, addr: u16) {
         *self = match self {
             MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqRead(addr) },
             _ => panic!("invalid state")
         }
     }
 
-    pub fn req_write(&mut self, addr: u16) {
+    fn req_write(&mut self, addr: u16) {
         *self = match self {
             MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqWrite(addr) },
             MemStatus::Read(_) => {
@@ -69,6 +57,7 @@ impl MemStatus {
         }
     }
 }
+
 #[derive(Default, Copy, Clone)]
 pub struct Flags {
     zero: bool,
@@ -164,20 +153,23 @@ impl<'a> State<'a> {
         self.cache.get(0).map(|x| *x)
     }
 
-    pub fn push(&mut self, value: Value) {
-        self.cache.push(value);
+    pub fn push<V: Into<Value>>(&mut self, value: V) {
+        self.cache.push(value.into());
     }
 
     pub fn pop(&mut self) -> Value {
         self.cache.pop().expect("stack empty")
     }
 
-    pub fn register(&self, register: Reg) -> Value {
-        self.regs.read(register)
+    pub fn register<R: Into<Reg>>(&mut self, register: R) -> Value {
+        match register.into() {
+            Reg::ST => self.pop(),
+            r => self.regs.read(r)
+        }
     }
 
-    pub fn set_register(&mut self, register: Reg, value: Value) {
-        match (register, value) {
+    pub fn set_register<R: Into<Reg>, V: Into<Value>>(&mut self, register: R, value: V) {
+        match (register.into(), value.into()) {
             (Reg::A, Value::U8(v)) => self.regs.set_a(v),
             (Reg::B, Value::U8(v)) => self.regs.set_b(v),
             (Reg::C, Value::U8(v)) => self.regs.set_c(v),
@@ -191,6 +183,7 @@ impl<'a> State<'a> {
             (Reg::HL, Value::U16(v)) => self.regs.set_hl(v),
             (Reg::SP, Value::U16(v)) => self.regs.set_sp(v),
             (Reg::PC, Value::U16(v)) => self.regs.set_pc(v),
+            (Reg::ST, v) => self.push(v),
             _ => panic!("reg and value size mismatch")
         }
     }

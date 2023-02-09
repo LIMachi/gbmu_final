@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 thiserror = "1.0.38"
-anyhow = "1.0.68"
 log = "0.4.17"
 
 [dependencies.shared]

@@ -16,7 +16,7 @@ pub fn sp(state: &mut State) -> Flow {
 
 pub fn dec(state: &mut State) -> Flow {
     let v = state.pop().u8() - 1;
-    state.push(v.into());
+    state.push(v);
     state.flags()
         .set_zero(v == 0)
         .set_sub(true)
@@ -26,12 +26,12 @@ pub fn dec(state: &mut State) -> Flow {
 
 pub fn dec16(state: &mut State) -> Flow {
     let v = state.pop().u16() - 1;
-    state.push(v.into());
+    state.push(v);
     CONTINUE
 }
 
 pub fn hl(state: &mut State) -> Flow {
     let hl = state.register(Reg::HL).u16() - 1;
-    state.set_register(Reg::HL, hl.into());
+    state.set_register(Reg::HL, hl);
     CONTINUE
 }

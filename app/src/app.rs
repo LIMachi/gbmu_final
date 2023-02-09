@@ -1,18 +1,17 @@
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::fs::File;
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
-
 use log::error;
 
+use shared::rom::Rom;
 use shared::cpu::*;
 use shared::Target;
 
 pub struct FakeBus {
     ram: Vec<u8>,
     rom: Vec<u8>,
-    status: core::MemStatus
+    status: MemStatus
 }
 
 impl FakeBus {
@@ -20,27 +19,27 @@ impl FakeBus {
         Self {
             ram: vec![0; u16::MAX as usize + 1],
             rom,
-            status: core::MemStatus::ReqRead(0x100u16)
+            status: MemStatus::ReqRead(0x100u16)
         }
     }
 }
 
-impl core::Bus for FakeBus {
-    fn status(&self) -> core::MemStatus {
+impl Bus for FakeBus {
+    fn status(&self) -> MemStatus {
         self.status
     }
 
-    fn update(&mut self, status: core::MemStatus) {
+    fn update(&mut self, status: MemStatus) {
         self.status = status;
     }
 
     fn tick(&mut self) {
         self.status = match self.status {
-            core::MemStatus::ReqRead(addr) => {
-                core::MemStatus::Read(self.rom[addr as usize])
+            MemStatus::ReqRead(addr) => {
+                MemStatus::Read(self.rom[addr as usize])
             },
-            core::MemStatus::ReqWrite(addr) => {
-                core::MemStatus::Write(addr)
+            MemStatus::ReqWrite(addr) => {
+                MemStatus::Write(addr)
             },
             st => st
         }
@@ -58,7 +57,7 @@ impl core::Bus for FakeBus {
 }
 
 pub struct Emu {
-    pub bus: FakeBus,
+    pub bus: bus::Bus,
     pub cpu: core::Cpu,
     running: bool,
 }
@@ -83,19 +82,16 @@ impl dbg::ReadAccess for Emulator {
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        use core::Bus;
+        use shared::cpu::Bus;
         self.emu.as_ref().borrow().bus.get_range(st, len)
     }
-
 }
 
 impl Emu {
     pub fn new() -> Self {
-        let mut v = Vec::new();
-        let mut file = File::open("roms/29459/29459.gbc").expect("not found");
-        file.read_to_end(&mut v).expect("failed to read");
-        println!("{:#X?}", &v[0x15c..0x168]);
-        let mut bus = FakeBus::new(v);
+        let rom = Rom::load("roms/29459/29459.gbc").expect("failed to load rom");
+        let mbc = mem::mbc::mbc0::Controller::new(&rom);
+        let mut bus = bus::Bus::new().with_memory_controller(mbc);
         let mut cpu = core::Cpu::new(Target::GB);
         Self {
             bus,
@@ -105,12 +101,12 @@ impl Emu {
     }
 
     pub fn cycle(&mut self) {
-        use core::Bus;
-        self.bus.tick();
+        use shared::cpu::Bus;
         if !self.running {
             return ;
         }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
+            self.bus.tick();
             self.cpu.cycle(&mut self.bus);
         })) {
             Ok(_) => {},

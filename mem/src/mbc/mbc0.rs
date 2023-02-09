@@ -1,0 +1,74 @@
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::io::{Read, Write};
+use std::path::PathBuf;
+use shared::{mem::*, rom::Rom};
+
+struct Mbc {
+    sav: Option<PathBuf>,
+    rom: Vec<u8>,
+    ram: Vec<u8>
+}
+
+impl Mem for Mbc {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
+        match absolute {
+            ROM..=SROM_END => self.rom[absolute as usize],
+            SRAM..=SRAM_END => self.ram[addr as usize],
+            _ => unreachable!()
+        }
+    }
+}
+
+impl Mbc {
+    pub const ROM_SIZE: usize = 32768;
+
+    pub fn new(rom: &Rom) -> Self {
+        // TODO check battery flag in rom
+        let (sav, ram) = if rom.header.cartridge.capabilities().save() {
+            let sav = rom.location.clone().join(&rom.filename).with_extension("sav");
+            let ram = if let Some(mut f) = std::fs::File::open(&sav).ok() {
+                let mut v = Vec::with_capacity(rom.header.ram_size.size());
+                f.read_to_end(&mut v).expect("failed to read save");
+                v
+            } else { vec![0xAF; rom.header.ram_size.size()] };
+            (Some(sav), ram)
+        } else { (None, vec![0xAF; rom.header.ram_size.size()]) };
+        Self {
+            sav,
+            rom: rom.raw().clone(),
+            ram
+        }
+    }
+}
+
+impl Drop for Mbc {
+    fn drop(&mut self) {
+        if self.ram.is_empty() { return }
+        if let Some(sav) = &self.sav {
+            std::fs::File::create(&sav).ok()
+                .map(|mut f| f.write_all(&self.ram).expect("failed to write savefile"));
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Controller {
+    inner: Rc<RefCell<Mbc>>
+}
+
+impl Controller {
+    pub fn new(rom: &Rom) -> Self {
+        Self { inner: Rc::new(RefCell::new(Mbc::new(rom))) }
+    }
+}
+
+impl MemoryController for Controller {
+    fn register(&self, bus: &mut impl MemoryBus) {
+        bus.set_rom(self.inner.clone());
+        bus.set_srom(self.inner.clone());
+        if self.inner.borrow().ram.len() > 0 {
+            bus.set_sram(self.inner.clone());
+        }
+    }
+}

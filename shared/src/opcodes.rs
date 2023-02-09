@@ -772,6 +772,7 @@ impl TryFrom<(u8, bool)> for Opcode {
         })
     }
 }
+
 impl From<u8> for CBOpcode {
     fn from(value: u8) -> Self {
         match value {

@@ -1,72 +1,86 @@
 use super::*;
 
 pub fn a(state: &mut State) -> Flow {
-    state.push(state.register(Reg::A));
+    let v = state.register(Reg::A);
+    state.push(v);
     CONTINUE
 }
 
 pub fn b(state: &mut State) -> Flow {
-    state.push(state.register(Reg::B));
+    let v = state.register(Reg::B);
+    state.push(v);
     CONTINUE
 }
 
 pub fn c(state: &mut State) -> Flow {
-    state.push(state.register(Reg::C));
+    let v = state.register(Reg::C);
+    state.push(v);
     CONTINUE
 }
 
 pub fn d(state: &mut State) -> Flow {
-    state.push(state.register(Reg::D));
+    let v = state.register(Reg::D);
+    state.push(v);
     CONTINUE
 }
 
 pub fn e(state: &mut State) -> Flow {
-    state.push(state.register(Reg::E));
+    let v = state.register(Reg::E);
+    state.push(v);
     CONTINUE
 }
 
 pub fn f(state: &mut State) -> Flow {
-    state.push(state.register(Reg::F));
+    let v = state.register(Reg::F);
+    state.push(v);
     CONTINUE
 }
 
 pub fn h(state: &mut State) -> Flow {
-    state.push(state.register(Reg::H));
+    let v = state.register(Reg::H);
+    state.push(v);
     CONTINUE
 }
 
 pub fn l(state: &mut State) -> Flow {
-    state.push(state.register(Reg::L));
+    let v = state.register(Reg::L);
+    state.push(v);
     CONTINUE
 }
 
 pub fn af(state: &mut State) -> Flow {
-    state.push(state.register(Reg::AF));
+    let v = state.register(Reg::AF);
+    state.push(v);
     CONTINUE
 }
 
 pub fn bc(state: &mut State) -> Flow {
-    state.push(state.register(Reg::BC));
+    let v = state.register(Reg::BC);
+    state.push(v);
     CONTINUE
 }
 
 pub fn de(state: &mut State) -> Flow {
-    state.push(state.register(Reg::DE));
+    let v = state.register(Reg::DE);
+    state.push(v);
     CONTINUE
 }
 
 pub fn hl(state: &mut State) -> Flow {
-    state.push(state.register(Reg::HL));
+    let v = state.register(Reg::HL);
+    state.push(v);
     CONTINUE
 }
 
 pub fn sp(state: &mut State) -> Flow {
-    state.push(state.register(Reg::SP));
+    let v = state.register(Reg::SP);
+    state.push(v);
     CONTINUE
 }
 
 pub fn pc(state: &mut State) -> Flow {
-    state.push(state.register(Reg::PC));
+    let v = state.register(Reg::PC);
+    state.push(v);
     CONTINUE
 }
 

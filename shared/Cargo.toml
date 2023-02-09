@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 egui = "0.20.1"
 thiserror = "1.0.38"
+log = "0.4.17"
