@@ -17,6 +17,7 @@ impl<E: Emulator> Ui for Ninja<E> {
     fn draw(&mut self, ctx: &egui::Context) {
         use egui::{FontId, TextStyle::*, FontFamily::Proportional};
         let mut style = (*ctx.style()).clone();
+        style.visuals.dark_mode = true;
         style.text_styles = [
             (Heading, FontId::new(30.0, Proportional)),
             (Body, FontId::new(16.0,FontFamily::Monospace)), //because outline text
@@ -26,16 +27,16 @@ impl<E: Emulator> Ui for Ninja<E> {
         ].into();
         ctx.set_style(style);
         CentralPanel::default().show(ctx, |ui: &mut egui::Ui| {
-            egui::Frame::group(ui.style())
-                .fill(Color32::DARK_GREEN)
-                .show(ui, |ui: &mut egui::Ui| {
-                    ui.style_mut().visuals.override_text_color = Some(Color32::WHITE);
-                    ui.label("Registers");
-                });
-            egui::Frame::group(ui.style())
-                .fill(Color32::LIGHT_BLUE)
-                .show(ui, |ui: &mut egui::Ui| {
-                    ui.style_mut().visuals.override_text_color = Some(Color32::BLACK);
+            let frame = egui::Frame {
+                stroke: egui::Stroke {
+                    width: 2.,
+                    color: egui::Color32::BLACK,
+                },
+                ..egui::Frame::default()
+            };
+                //.fill(Color32::GRAY)
+                frame.show(ui, |ui: &mut egui::Ui| {
+                    ui.style_mut().visuals.override_text_color = Some(Color32::GREEN);
                     ui.columns(10, |uis: &mut [egui::Ui]| {
                         uis[0].add(Register("A", self.emu.cpu_register(Reg::A)));
                         uis[1].add(Register("F", self.emu.cpu_register(Reg::F)));
