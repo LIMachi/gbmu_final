@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 use shared::{egui::Context, Ui, cpu::*};
 
+mod disassembler;
 mod render;
 mod dbg_opcodes;
 
