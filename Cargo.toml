@@ -1,5 +1,5 @@
 [workspace.package]
-name = "gmbu"
+name = "gbmu"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,13 +9,16 @@ edition = "2021"
 [workspace]
 resolver="2"
 members = [
-    "core",
-    "lcd",
-    "app",
-    "apu",
-    "bus",
-    "dbg",
-    "shared",
-    "ppu",
-    "mem"
+    "crates/core",
+    "crates/lcd",
+    "crates/app",
+    "crates/apu",
+    "crates/bus",
+    "crates/dbg",
+    "crates/shared",
+    "crates/ppu",
+    "crates/mem"
 ]
+
+[patch.crates-io]
+egui_wgpu_backend = { path = "patches/egui_wgpu_backend" }
