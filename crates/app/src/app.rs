@@ -1,4 +1,4 @@
-use std::borrow::BorrowMut;
+use std::borrow::{Borrow, BorrowMut};
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use std::io::Read;
@@ -94,7 +94,9 @@ impl dbg::Schedule for Emulator {
     }
 
     fn pause(&mut self) {
-        self.schedule_break(Break::Instructions(1));
+        if self.emu.as_ref().borrow().running {
+            self.schedule_break(Break::Instructions(1));
+        }
     }
 
     fn play(&mut self) {

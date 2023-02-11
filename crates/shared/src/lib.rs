@@ -34,6 +34,10 @@ impl Break {
             _ => false
         }
     }
+
+    pub fn address(addr: u16) -> Self {
+        Self::Register(registers::Reg::PC, addr.into())
+    }
 }
 
 pub mod cpu {

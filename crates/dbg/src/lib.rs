@@ -10,9 +10,7 @@ mod render;
 use disassembly::Disassembly;
 use shared::egui::{TextureHandle, TextureId, TextureOptions};
 
-pub trait Emulator: ReadAccess + Schedule {
-    fn shared(&self) -> usize { 0 }
-}
+pub trait Emulator: ReadAccess + Schedule { }
 
 impl<E: ReadAccess + Schedule> Emulator for E { }
 
