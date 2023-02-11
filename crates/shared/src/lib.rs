@@ -1,19 +1,44 @@
 pub use egui; //re export egui
 
+pub mod utils;
 pub mod mem;
 mod opcodes;
 mod registers;
 mod value;
 pub mod rom;
 
+pub enum Events {
+
+}
+
 pub enum Target {
     GB,
     GBC
 }
 
+pub trait Cpu {
+    fn register(&self, reg: registers::Reg) -> value::Value;
+}
+
+pub enum Break {
+    Instructions(usize),
+    Register(registers::Reg, value::Value)
+}
+
+impl Break {
+    pub fn tick(&mut self, runner: &impl Cpu) -> bool {
+        match self {
+            Break::Instructions(n) if *n <= 1 => true,
+            Break::Instructions(n) => { *n = *n - 1; false },
+            Break::Register(r, v) if runner.register(*r) == *v => true,
+            _ => false
+        }
+    }
+}
+
 pub mod cpu {
     pub use super::opcodes::*;
-    pub use super::registers::{Reg, regs};
+    pub use super::registers::{Reg, regs, Flags};
     pub use super::value::Value;
 
 
@@ -38,6 +63,7 @@ pub mod cpu {
 
 
 pub trait Ui {
+    fn init(&mut self, ctx: &mut egui::Context) { }
     fn draw(&mut self, ctx: &egui::Context) { }
 }
 

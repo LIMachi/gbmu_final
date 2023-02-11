@@ -2,6 +2,20 @@
 #[repr(u8)]
 pub enum Reg { ST, A, F, AF, B, C, BC, D, E, DE, H, L, HL, SP, PC }
 
+pub trait Flags {
+    fn zero(&self) -> bool;
+    fn sub(&self) -> bool;
+    fn half(&self) -> bool;
+    fn carry(&self) -> bool;
+}
+
+impl Flags for u8 {
+    fn zero(&self) -> bool { (self >> 7) & 1 == 1 }
+    fn sub(&self) -> bool { (self >> 6) & 1 == 1 }
+    fn half(&self) -> bool { (self >> 5) & 1 == 1 }
+    fn carry(&self) -> bool { (self >> 4) & 1 == 1 }
+}
+
 pub mod regs {
     pub const A: u8 = 1;
     pub const F: u8 = 2;

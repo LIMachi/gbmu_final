@@ -3,6 +3,7 @@ use shared::cpu::{Reg, Value};
 const HIGH: usize = 1;
 const LOW: usize = 0;
 
+#[derive(Clone)]
 pub struct Registers {
     a: u8,
     f: u8,

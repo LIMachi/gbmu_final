@@ -12,6 +12,8 @@ pub trait Mem {
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         warn!("write ignored on {absolute:#04X}: address is read only");
     }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> { vec![] }
 }
 
 impl<T: Mem> Mem for Rc<RefCell<T>> {
@@ -22,16 +24,34 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         self.as_ref().borrow_mut().write(addr, value, absolute)
     }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        self.as_ref().borrow().get_range(st, len)
+    }
 }
+//
+// impl Mem for Box<dyn Mem + 'static> {
+//     fn read(&self, addr: u16, absolute: u16) -> u8 {
+//         self.as_ref().read(addr, absolute)
+//     }
+//
+//     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+//         self.as_mut().write(addr, value, absolute)
+//     }
+//
+//     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+//         self.as_ref().get_range(st, len)
+//     }
+// }
 
 pub trait MemoryBus {
-    fn set_rom(&mut self, rom: Rc<RefCell<dyn Mem>>);
-    fn set_srom(&mut self, rom: Rc<RefCell<dyn Mem>>);
-    fn set_sram(&mut self, rom: Rc<RefCell<dyn Mem>>);
+    fn with_mbc<C: MBCController>(self, controller: &C) -> Self;
 }
 
-pub trait MemoryController {
-    fn register(&self, bus: &mut impl MemoryBus);
+pub trait MBCController {
+    fn rom(&self) -> Rc<RefCell<dyn Mem>>;
+    fn srom(&self) -> Rc<RefCell<dyn Mem>>;
+    fn sram(&self) -> Rc<RefCell<dyn Mem>>;
 }
 
 pub const ROM: u16 = 0x0;

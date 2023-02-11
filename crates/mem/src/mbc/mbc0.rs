@@ -15,7 +15,17 @@ impl Mem for Mbc {
         match absolute {
             ROM..=SROM_END => self.rom[absolute as usize],
             SRAM..=SRAM_END => self.ram[addr as usize],
-            _ => unreachable!()
+            a => unreachable!("unexpected addr {a:#06X}")
+        }
+    }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        let s = st as usize;
+        let end = s + len as usize;
+        match st {
+            ROM..=SROM_END => self.rom[s..end].to_vec(),
+            SRAM..=SRAM_END => self.ram[s..end].to_vec(),
+            _ => vec![]
         }
     }
 }
@@ -44,6 +54,7 @@ impl Mbc {
 
 impl Drop for Mbc {
     fn drop(&mut self) {
+        log::info!("dumping ram to save file");
         if self.ram.is_empty() { return }
         if let Some(sav) = &self.sav {
             std::fs::File::create(&sav).ok()
@@ -63,12 +74,8 @@ impl Controller {
     }
 }
 
-impl MemoryController for Controller {
-    fn register(&self, bus: &mut impl MemoryBus) {
-        bus.set_rom(self.inner.clone());
-        bus.set_srom(self.inner.clone());
-        if self.inner.borrow().ram.len() > 0 {
-            bus.set_sram(self.inner.clone());
-        }
-    }
+impl MBCController for Controller {
+    fn rom(&self) -> Rc<RefCell<dyn Mem>> { self.inner.clone() }
+    fn srom(&self) -> Rc<RefCell<dyn Mem>> { self.inner.clone() }
+    fn sram(&self) -> Rc<RefCell<dyn Mem>> { self.inner.clone() }
 }

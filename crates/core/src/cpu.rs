@@ -6,8 +6,12 @@ pub struct Cpu {
     instructions: Vec<Vec<Op>>,
     regs: Registers,
     cache: Vec<Value>,
-    just_finished: bool,
+    pub just_finished: bool,
     prefixed: bool
+}
+
+impl shared::Cpu for Cpu {
+    fn register(&self, reg: Reg) -> Value { self.regs.read(reg) }
 }
 
 impl Cpu {
@@ -22,9 +26,7 @@ impl Cpu {
         }
     }
 
-    pub fn registers(&self) -> &Registers {
-        &self.regs
-    }
+    pub fn registers(&self) -> &Registers { &self.regs }
 
     pub fn cycle(&mut self, bus: &mut dyn Bus) {
         let prefixed = self.prefixed;
@@ -35,7 +37,7 @@ impl Cpu {
             let opcode = state.read();
             if let Ok(opcode) = Opcode::try_from((opcode, prefixed)) {
                 #[cfg(feature = "log_opcode")]
-                log::info!("[0x{:x}] instruction {opcode:?}", state.register(Reg::PC));
+                log::debug!("[0x{:x}] instruction {opcode:?}", state.register(Reg::PC));
                 self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
             } else {
                 self.instructions = vec![vec![inc::pc]];
@@ -43,7 +45,7 @@ impl Cpu {
             }
         }
         for op in self.instructions.pop().expect("this can never be empty") {
-            if op(&mut state) == BREAK { // assuming pc is already set to next instruction, else kaboom
+            if op(&mut state) == BREAK {
                 state.clear();
                 self.instructions.clear();
                 break;

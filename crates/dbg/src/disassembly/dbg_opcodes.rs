@@ -265,7 +265,7 @@ pub fn dbg_opcodes(opcode: Opcode) -> (usize, &'static str) {
         Opcode::Ei           => (1, "EI"),
         Opcode::Cpd8         => (2, "CP u8"),
         Opcode::Rst38H       => (1, "RST 38H"),
-        Opcode::CB(cb) => (0, "PREFIX")
+        Opcode::CB(cb) => (2, dbg_cb_opcodes(cb))
     }
 }
 

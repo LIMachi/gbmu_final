@@ -22,3 +22,4 @@ members = [
 
 [patch.crates-io]
 egui_wgpu_backend = { path = "patches/egui_wgpu_backend" }
+egui_winit_platform = { path = "patches/egui_winit_platform"}

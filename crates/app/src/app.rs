@@ -1,12 +1,14 @@
+use std::borrow::BorrowMut;
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
-use log::error;
+use log::{error, warn};
 
 use shared::rom::Rom;
 use shared::cpu::*;
-use shared::Target;
+use shared::{Break, Target};
+use shared::mem::MemoryBus;
 
 pub struct FakeBus {
     ram: Vec<u8>,
@@ -60,6 +62,7 @@ pub struct Emu {
     pub bus: bus::Bus,
     pub cpu: core::Cpu,
     running: bool,
+    breakpoints: Vec<Break>,
 }
 
 #[derive(Clone)]
@@ -71,9 +74,7 @@ impl Emulator {
     pub fn new() -> Self {
         Self { emu: Rc::new(RefCell::new(Emu::new())) }
     }
-    pub fn cycle(&mut self) {
-        self.emu.borrow_mut().cycle();
-    }
+    pub fn cycle(&mut self) { self.emu.as_ref().borrow_mut().cycle(); }
 }
 
 impl dbg::ReadAccess for Emulator {
@@ -87,16 +88,39 @@ impl dbg::ReadAccess for Emulator {
     }
 }
 
+impl dbg::Schedule for Emulator {
+    fn schedule_break(&mut self, bp: Break) -> &mut Self {
+        self.emu.as_ref().borrow_mut().breakpoints.push(bp); self
+    }
+
+    fn pause(&mut self) {
+        self.schedule_break(Break::Instructions(1));
+    }
+
+    fn play(&mut self) {
+        self.emu.as_ref().borrow_mut().running = true;
+    }
+
+    fn reset(&mut self) {
+        warn!("RESET");
+        let running = self.emu.as_ref().borrow().running;
+        let mut emu = Emu::new();
+        emu.running = running;
+        self.emu.replace(emu);
+    }
+}
+
 impl Emu {
     pub fn new() -> Self {
         let rom = Rom::load("roms/29459/29459.gbc").expect("failed to load rom");
         let mbc = mem::mbc::mbc0::Controller::new(&rom);
-        let mut bus = bus::Bus::new().with_memory_controller(mbc);
+        let mut bus = bus::Bus::new().with_mbc(&mbc);
         let mut cpu = core::Cpu::new(Target::GB);
         Self {
             bus,
             cpu,
-            running: true
+            breakpoints: vec![],
+            running: false
         }
     }
 
@@ -108,6 +132,11 @@ impl Emu {
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
             self.bus.tick();
             self.cpu.cycle(&mut self.bus);
+            if self.cpu.just_finished {
+                self.running = self.breakpoints
+                    .drain_filter(|x| x.tick(&self.cpu))
+                    .next().is_none();
+            }
         })) {
             Ok(_) => {},
             Err(e) => {

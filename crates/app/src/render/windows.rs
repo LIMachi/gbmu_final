@@ -15,13 +15,13 @@ pub enum Handle {
     SpriteSheet
 }
 
-pub struct Windows {
+pub struct Windows<E> {
     instance: Instance,
     handles: HashMap<Handle, WindowId>,
-    windows: HashMap<WindowId, Box<dyn Context>>
+    windows: HashMap<WindowId, Box<dyn Context<Event = E>>>
 }
 
-impl Windows {
+impl<E> Windows<E> {
     pub fn new() -> Self {
         Self {
             instance: Instance::new(InstanceDescriptor { backends: wgpu::Backends::PRIMARY, ..Default::default() }),
@@ -45,7 +45,10 @@ impl Windows {
             .map(|x| x.data())
     }
 
-    pub fn handle_events(&mut self, event: &Event<'_, ()>, flow: &mut ControlFlow) {
+    pub fn handle_events(&mut self, event: &Event<'_, E>, flow: &mut ControlFlow) {
+        for (_, mut win) in &mut self.windows {
+            win.handle(event);
+        }
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, window_id }  => {
                 flow.set_exit(); },
@@ -65,8 +68,8 @@ impl Windows {
         }
     }
 
-    pub fn create<C: 'static + Sized + Context, F: 'static + FnOnce(&Instance, Window, &EventLoop<()>) -> C>
-    (&mut self, event_loop: &EventLoop<()>, window: Window, handle: Handle, mut builder: F) {
+    pub fn create<C: 'static + Sized + Context<Event = E>, F: 'static + FnOnce(&Instance, Window, &EventLoop<E>) -> C>
+    (&mut self, event_loop: &EventLoop<E>, window: Window, handle: Handle, mut builder: F) {
         let id = window.id();
         window.request_redraw();
         let ctx = Box::new(builder(&self.instance, window, event_loop));

@@ -81,7 +81,6 @@ impl<'a> Drop for State<'a> {
             MemStatus::ReqRead(_) | MemStatus::ReqWrite(_) => { },
             e => {
                 if e != MemStatus::Idle && e!= MemStatus::Ready { warn!("{e:?} I/O result wasn't used this cycle") };
-                info!("req read pc: {:x?}", self.regs.pc());
                 self.mem = MemStatus::ReqRead(self.regs.pc());
             },
         };
@@ -94,7 +93,6 @@ impl<'a> Drop for State<'a> {
         self.bus.update(self.mem);
     }
 }
-
 
 impl Flags {
     pub fn get(r: &Registers) -> Self {
