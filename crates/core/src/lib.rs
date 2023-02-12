@@ -80,7 +80,8 @@ impl<'a> Drop for State<'a> {
         match self.mem {
             MemStatus::ReqRead(_) | MemStatus::ReqWrite(_) => { },
             e => {
-                if e != MemStatus::Idle && e!= MemStatus::Ready { warn!("{e:?} I/O result wasn't used this cycle") };
+                if e != MemStatus::Idle && e!= MemStatus::Ready { // warn!("{e:?} I/O result wasn't used this cycle")
+                };
                 self.mem = MemStatus::ReqRead(self.regs.pc());
             },
         };

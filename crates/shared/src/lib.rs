@@ -1,7 +1,10 @@
-pub use egui; //re export egui
+use std::borrow::BorrowMut;
+pub use egui;
+pub use winit;
 
 pub mod utils;
 pub mod mem;
+pub mod io;
 mod opcodes;
 mod registers;
 mod value;
@@ -72,3 +75,13 @@ pub trait Ui {
 }
 
 impl Ui for () { }
+
+pub trait Render<E> {
+
+    fn init(&mut self, window: &winit::window::Window);
+    fn render(&mut self);
+    fn resize(&mut self, w: u32, h: u32);
+    fn handle(&mut self, event: &winit::event::Event<E>);
+}
+
+

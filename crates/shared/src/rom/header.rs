@@ -1,10 +1,14 @@
 use std::ops::BitXor;
 use log::warn;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Console {
     GBC,
     Other
+}
+
+impl Console {
+    pub fn requires_gbc(&self) -> bool { self == &Console::GBC }
 }
 
 impl From<u8> for Console {
@@ -66,14 +70,6 @@ impl Capabilities {
 }
 
 #[derive(Debug)]
-pub enum MBC {
-    MBC1,
-    MBC2,
-    MBC3,
-    MBC5
-}
-
-#[derive(Debug)]
 #[repr(u8)]
 pub enum Cartridge {
     ROM,
@@ -99,6 +95,15 @@ pub enum Cartridge {
     ROM_MBC5_MR_SRAM,
     ROM_MBC5_MR_SRAM_BATT,
     UNSUPPORTED
+}
+
+pub enum Mbc {
+    MBC0,
+    MBC1,
+    MBC2,
+    MBC3,
+    MBC5,
+    Unknown
 }
 
 impl Cartridge {
@@ -129,6 +134,34 @@ impl Cartridge {
             Cartridge::ROM_MBC5_MR_SRAM        => Capabilities(MR | SRAM),
             Cartridge::ROM_MBC5_MR_SRAM_BATT   => Capabilities(MR | SRAM | BATT),
             Cartridge::UNSUPPORTED             => Capabilities(NONE)
+        }
+    }
+
+    pub fn mbc(&self) -> Mbc {
+        match self {
+            Cartridge::ROM                     => Mbc::MBC0,
+            Cartridge::ROM_RAM_MBC1            => Mbc::MBC1,
+            Cartridge::ROM_MBC1                => Mbc::MBC1,
+            Cartridge::ROM_RAM_MBC1_BATT       => Mbc::MBC1,
+            Cartridge::ROM_MBC2                => Mbc::MBC2,
+            Cartridge::ROM_MBC2_BATT           => Mbc::MBC2,
+            Cartridge::ROM_RAM                 => Mbc::MBC0,
+            Cartridge::ROM_RAM_BATT            => Mbc::MBC0,
+            Cartridge::ROM_MMM01               => Mbc::Unknown,
+            Cartridge::ROM_MMM01_SRAM          => Mbc::Unknown,
+            Cartridge::ROM_MMM01_SRAM_BATT     => Mbc::Unknown,
+            Cartridge::ROM_MBC3_TMR_BATT       => Mbc::MBC3,
+            Cartridge::ROM_RAM_MBC3_TMR_BATT   => Mbc::MBC3,
+            Cartridge::ROM_MBC3                => Mbc::MBC3,
+            Cartridge::ROM_RAM_MBC3            => Mbc::MBC3,
+            Cartridge::ROM_RAM_MBC3_BATT       => Mbc::MBC3,
+            Cartridge::ROM_MBC5                => Mbc::MBC5,
+            Cartridge::ROM_RAM_MBC5            => Mbc::MBC5,
+            Cartridge::ROM_RAM_MBC5_BATT       => Mbc::MBC5,
+            Cartridge::ROM_MBC5_MR             => Mbc::MBC5,
+            Cartridge::ROM_MBC5_MR_SRAM        => Mbc::MBC5,
+            Cartridge::ROM_MBC5_MR_SRAM_BATT   => Mbc::MBC5,
+            Cartridge::UNSUPPORTED             => Mbc::Unknown
         }
     }
 }

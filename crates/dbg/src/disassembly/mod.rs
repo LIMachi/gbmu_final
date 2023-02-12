@@ -48,6 +48,7 @@ impl OpRange {
             if op == Opcode::PrefixCB { prefix = true; continue; }
             prefix = false;
             let (sz, info) = dbg_opcodes::dbg_opcodes(op);
+            if off + sz > range.len() { break }
             let code = &range[off..(off + sz)];
             let mut str = format!("{:#06X}: ", pc + off as u16);
             // for o in code { str.push_str(format!("{o:02X}  ").as_str()); }
@@ -83,7 +84,7 @@ impl Disassembly {
         }
         ui.columns(3, |ui: &mut [Ui]| {
             let ops = &self.range.as_ref().unwrap().ops;
-            for mut l in 0..90.min(ops.len() - 1) {
+            for mut l in 0..90.min(ops.len()) {
                 let ui = &mut ui[l / 30];
                 let text = if ops[l].0 <= pc && ops[l + 1].0 > pc {
                     egui::RichText::new(&ops[l].1)

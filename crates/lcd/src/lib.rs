@@ -1,15 +1,46 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use pixels::wgpu::PresentMode;
+use shared::winit as winit;
+
+#[derive(Default)]
+pub struct Lcd {
+    pixels: Option<Pixels>
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+impl Lcd {
+    pub const WIDTH: u32 = 160;
+    pub const HEIGHT: u32 = 144;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    pub fn init(&mut self, window: &winit::window::Window) {
+        let sz = window.inner_size();
+        let surf = SurfaceTexture::new(sz.width, sz.height, window);
+        self.pixels = PixelsBuilder::new(Lcd::WIDTH, Lcd::HEIGHT, surf)
+            .present_mode(PresentMode::Immediate)
+            .build()
+            .ok();
+    }
+
+    pub fn resize(&mut self, width: u32, height: u32) {
+        if let Some(ref mut pixels) = self.pixels {
+            pixels.resize_surface(width, height).ok();
+        }
+    }
+
+    pub fn render(&mut self) {
+        if let Some(ref mut pixels) = self.pixels {
+            for y in 0..Lcd::HEIGHT as usize {
+                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 0] = 0xFF;
+                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 1] = 0xFF;
+                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 2] = 0x00;
+                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 3] = 0xFF;
+            }
+            for x in 0..Lcd::WIDTH as usize {
+                pixels.get_frame_mut()[x * 4 + 0] = 0xFF;
+                pixels.get_frame_mut()[x * 4 + 1] = 0xFF;
+                pixels.get_frame_mut()[x * 4 + 2] = 0x00;
+                pixels.get_frame_mut()[x * 4 + 3] = 0xFF;
+            }
+            pixels.render().ok();
+        }
     }
 }
-use pixels::Pixels;

@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use wgpu::{InstanceDescriptor};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow};
 use winit::window::{WindowId};
@@ -10,9 +9,9 @@ use super::*;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Handle {
     Main, // debugger / library
+    Debug,
     Game,
-    Keybindings,
-    SpriteSheet
+    Keybindings
 }
 
 pub struct Windows<E> {
@@ -24,7 +23,7 @@ pub struct Windows<E> {
 impl<E> Windows<E> {
     pub fn new() -> Self {
         Self {
-            instance: Instance::new(InstanceDescriptor { backends: wgpu::Backends::PRIMARY, ..Default::default() }),
+            instance: Instance::new(wgpu::Backends::PRIMARY),
             handles: Default::default(),
             windows: Default::default()
         }
@@ -71,7 +70,6 @@ impl<E> Windows<E> {
     pub fn create<C: 'static + Sized + Context<Event = E>, F: 'static + FnOnce(&Instance, Window, &EventLoop<E>) -> C>
     (&mut self, event_loop: &EventLoop<E>, window: Window, handle: Handle, mut builder: F) {
         let id = window.id();
-        window.request_redraw();
         let ctx = Box::new(builder(&self.instance, window, event_loop));
         self.handles.insert(handle, id);
         self.windows.insert(id, ctx);

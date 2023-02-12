@@ -1,13 +1,14 @@
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
+use mem::{Hram, Oam};
 use shared::{cpu::MemStatus, mem::*};
+use shared::io::{IO, IOReg};
+use shared::utils::Cell;
+
+mod io;
 
 pub struct Empty {}
-
-impl Empty {
-    fn boxed() -> Box<Self> { Box::new(Self { }) }
-}
 impl Mem for Empty {}
 
 pub struct Bus {
@@ -18,27 +19,27 @@ pub struct Bus {
     ram: Rc<RefCell<dyn Mem>>,
     echo: Rc<RefCell<dyn Mem>>, // Fuck off
     oam: Rc<RefCell<dyn Mem>>,
-    io: Rc<RefCell<dyn Mem>>,
     hram: Rc<RefCell<dyn Mem>>,
     un_1: Rc<RefCell<dyn Mem>>,
-    ie: Rc<RefCell<dyn Mem>>,
+    io: io::IORegs,
+    ie: IOReg,
     status: MemStatus
 }
 
 impl Bus {
     pub fn new() -> Self {
         Self {
-            rom: Rc::new(RefCell::new(Empty { })),
-            srom: Rc::new(RefCell::new(Empty { })),
-            sram: Rc::new(RefCell::new(Empty { })),
-            vram: Rc::new(RefCell::new(Empty { })),
-            ram: Rc::new(RefCell::new(Empty { })),
-            echo: Rc::new(RefCell::new(Empty { })),
-            oam: Rc::new(RefCell::new(Empty { })),
-            io: Rc::new(RefCell::new(Empty { })),
-            hram: Rc::new(RefCell::new(Empty { })),
-            un_1: Rc::new(RefCell::new(Empty { })),
-            ie: Rc::new(RefCell::new(Empty { })),
+            rom: Empty { }.cell(),
+            srom: Empty { }.cell(),
+            sram: Empty { }.cell(),
+            vram: Empty { }.cell(),
+            ram: Empty { }.cell(),
+            echo: Empty { }.cell(),
+            oam: Oam::new().cell(),
+            io: io::IORegs::init(),
+            hram: Hram::new().cell(),
+            un_1: Empty { }.cell(),
+            ie: IOReg::rw(),
             status: MemStatus::ReqRead(0x100)
         }
     }
@@ -52,9 +53,9 @@ impl Bus {
             RAM..=RAM_END => self.ram.borrow().read(addr - RAM, addr),
             OAM..=OAM_END => self.oam.borrow().read(addr - OAM, addr),
             UN_1..=UN_1_END => self.un_1.borrow().read(addr - UN_1, addr),
-            IO..=IO_END => self.io.borrow().read(addr - IO, addr),
+            IO..=IO_END => self.io.read(addr - IO, addr),
             HRAM..=HRAM_END => self.hram.borrow().read(addr - HRAM, addr),
-            END => self.ie.borrow().read(addr - END, addr),
+            END => self.ie.read(),
             _=> unreachable!()
         }
     }
@@ -68,20 +69,46 @@ impl Bus {
             RAM..=RAM_END => self.ram.as_ref().borrow_mut().write(addr - RAM, value, addr),
             OAM..=OAM_END => self.oam.as_ref().borrow_mut().write(addr - OAM, value, addr),
             UN_1..=UN_1_END => self.un_1.as_ref().borrow_mut().write(addr - UN_1, value, addr),
-            IO..=IO_END => self.io.as_ref().borrow_mut().write(addr - IO, value, addr),
+            IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.as_ref().borrow_mut().write(addr - HRAM, value, addr),
-            END => self.rom.as_ref().borrow_mut().write(addr - END, value, addr),
+            END => self.ie.write(value),
             _=> unreachable!()
         }
     }
 }
 
 impl MemoryBus for Bus {
-    fn with_mbc<C: MBCController>(mut self, controller: &C) -> Self {
+    fn with_mbc<C: MBCController>(mut self, controller: &mut C) -> Self {
         self.rom = controller.rom();
         self.srom = controller.srom();
         self.sram = controller.sram();
+        controller.configure(&mut self);
         self
+    }
+
+    fn with_ppu<P: PPU>(mut self, ppu: &mut P) -> Self {
+        ppu.with_vram(self.vram.clone());
+        ppu.configure(&mut self);
+        self
+    }
+
+    fn with_wram<R: IODevice + Mem + 'static>(mut self, mut ram: R) -> Self {
+        self.ram = ram.configure(&mut self).cell();
+        self
+    }
+
+    fn with_vram<R: IODevice + Mem + 'static>(mut self, mut ram: R) -> Self {
+        self.vram = ram.configure(&mut self).cell();
+        self
+    }
+}
+
+impl IOBus for Bus {
+    fn io(&self, io: IO) -> IOReg {
+        match io {
+            IO::IE => self.ie.clone(),
+            io => self.io.io(io)
+        }
     }
 }
 
@@ -114,7 +141,7 @@ impl shared::cpu::Bus for Bus {
             RAM..=RAM_END => self.ram.as_ref().borrow_mut().get_range(start, len),
             OAM..=OAM_END => self.oam.as_ref().borrow_mut().get_range(start, len),
             UN_1..=UN_1_END => self.un_1.as_ref().borrow_mut().get_range(start, len),
-            IO..=IO_END => self.io.as_ref().borrow_mut().get_range(start, len),
+            IO..=IO_END => self.io.get_range(start, len),
             HRAM..=HRAM_END => self.hram.as_ref().borrow_mut().get_range(start, len),
             END => self.rom.as_ref().borrow_mut().get_range(start, len),
             _=> unreachable!()

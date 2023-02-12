@@ -4,7 +4,7 @@ use winit::dpi::PhysicalSize;
 use winit::event::Event;
 
 mod egui_context;
-mod pixels;
+mod raw_context;
 
 pub mod windows;
 
@@ -24,4 +24,5 @@ pub trait Context {
 }
 
 pub use egui_context::EguiContext;
+pub use raw_context::RawContext;
 pub use windows::Handle;

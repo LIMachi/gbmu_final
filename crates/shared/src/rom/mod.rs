@@ -4,6 +4,8 @@ use std::io::{Read, Result};
 
 mod header;
 
+pub use header::{Capabilities, Mbc};
+
 pub struct Rom {
     pub filename: String,
     pub location: PathBuf,

@@ -1,1 +1,57 @@
-pub struct Oam { }
+use shared::mem::Mem;
+
+#[derive(Default, Copy, Clone)]
+pub struct Sprite {
+    y: u8,
+    x: u8,
+    tile: u8,
+    flags: u8
+}
+
+impl Mem for Sprite {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
+        match addr {
+            0 => self.y,
+            1 => self.x,
+            2 => self.tile,
+            3 => self.flags,
+            _ => unreachable!()
+        }
+    }
+
+    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        match addr {
+            0 => self.y = value,
+            1 => self.x = value,
+            2 => self.tile = value,
+            3 => self.flags = value,
+            _ => unreachable!()
+        }
+    }
+}
+
+pub struct Oam {
+    pub sprites: [Sprite; 40]
+}
+
+impl Mem for Oam {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
+        match addr {
+            0..160 => self.sprites[(addr / 40) as usize].read(addr % 40, absolute),
+            _ => unreachable!()
+        }
+    }
+
+    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        match addr {
+            0..160 => self.sprites[(addr / 40) as usize].write(addr % 40, value, absolute),
+            _ => unreachable!()
+        }
+    }
+}
+
+impl Oam {
+    pub fn new() -> Self {
+        Self { sprites: [Sprite::default(); 40] }
+    }
+}

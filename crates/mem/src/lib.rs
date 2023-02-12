@@ -1,4 +1,5 @@
-use shared::mem;
+#![feature(trait_upcasting)]
+#![feature(exclusive_range_pattern)]
 
 mod hram;
 mod oam;

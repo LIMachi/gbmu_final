@@ -2,7 +2,7 @@ use std::any::Any;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use log::error;
-use wgpu::{Device, Queue, SurfaceConfiguration};
+use wgpu::{CompositeAlphaMode, Device, PresentMode, Queue, SurfaceConfiguration, TextureFormat, TextureUsages};
 use winit::event_loop::{ControlFlow, EventLoopProxy};
 use shared::{Ui, egui};
 
@@ -24,7 +24,7 @@ pub struct EguiContext<E: 'static, U: Ui> {
 
 impl<E, U: 'static + Ui> EguiContext<E, U> {
     pub fn new(instance: &Instance, window: Window, evt: &EventLoop<E>, mut data: U) -> Self {
-        let surface = unsafe { instance.create_surface(&window).expect("can't create surface") };
+        let surface = unsafe { instance.create_surface(&window) };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
@@ -38,7 +38,14 @@ impl<E, U: 'static + Ui> EguiContext<E, U> {
             },
             None)).expect("no matching device");
         let size = window.inner_size();
-        let config = surface.get_default_config(&adapter, size.width as u32, size.height as u32).expect("unsupported");
+        let config = SurfaceConfiguration {
+            usage: TextureUsages::RENDER_ATTACHMENT,
+            format: TextureFormat::Bgra8Unorm,
+            width: size.width,
+            height: size.height,
+            present_mode: PresentMode::AutoNoVsync,
+            alpha_mode: CompositeAlphaMode::Auto
+        };
 
         surface.configure(&device, &config);
         let rpass = RenderPass::new(&device, config.format, 1);
@@ -132,6 +139,11 @@ impl<E: 'static, U: 'static + Ui> Context for EguiContext<E, U> {
     }
 
     fn handle(&mut self, event: &Event<Self::Event>) {
-        self.platform.handle_event(event);
+        match event {
+            Event::WindowEvent { window_id, .. } if window_id == &self.window.id() => {
+                self.platform.handle_event(event);
+            },
+            _ => {}
+        }
     }
 }

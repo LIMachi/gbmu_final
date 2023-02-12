@@ -4,10 +4,12 @@ use std::cell::{Ref, RefCell};
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use log::{error, warn};
+use mem::{mbc, Vram, Wram};
 
 use shared::rom::Rom;
 use shared::cpu::*;
-use shared::{Break, Target};
+use shared::{Break, Target, Ui};
+use shared::winit::{window::Window, event::Event};
 use shared::mem::MemoryBus;
 
 pub struct FakeBus {
@@ -59,10 +61,16 @@ impl Bus for FakeBus {
 }
 
 pub struct Emu {
+    pub lcd: lcd::Lcd,
     pub bus: bus::Bus,
     pub cpu: core::Cpu,
+    pub mbc: mbc::Controller,
     running: bool,
     breakpoints: Vec<Break>,
+}
+
+impl Default for Emu {
+    fn default() -> Self { Emu::new(Emu::POKEMON) }
 }
 
 #[derive(Clone)]
@@ -71,10 +79,31 @@ pub struct Emulator {
 }
 
 impl Emulator {
+
     pub fn new() -> Self {
-        Self { emu: Rc::new(RefCell::new(Emu::new())) }
+        let emu = Rc::new(RefCell::new(Emu::default()));
+        Self { emu }
     }
-    pub fn cycle(&mut self) { self.emu.as_ref().borrow_mut().cycle(); }
+    pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock) }
+
+    pub fn is_running(&self) -> bool { self.emu.as_ref().borrow().running }
+}
+
+impl<E> shared::Render<E> for Emulator {
+    fn init(&mut self, window: &Window) {
+        self.emu.as_ref().borrow_mut().lcd.init(window);
+    }
+    fn render(&mut self) {
+        self.emu.as_ref().borrow_mut().lcd.render();
+    }
+
+    fn resize(&mut self, w: u32, h: u32) {
+        self.emu.as_ref().borrow_mut().lcd.resize(w, h);
+    }
+
+    fn handle(&mut self, event: &Event<E>) {
+
+    }
 }
 
 impl dbg::ReadAccess for Emulator {
@@ -106,45 +135,55 @@ impl dbg::Schedule for Emulator {
     fn reset(&mut self) {
         warn!("RESET");
         let running = self.emu.as_ref().borrow().running;
-        let mut emu = Emu::new();
+        let mut emu = Emu::default();
         emu.running = running;
         self.emu.replace(emu);
     }
 }
 
 impl Emu {
-    pub fn new() -> Self {
-        let rom = Rom::load("roms/29459/29459.gbc").expect("failed to load rom");
-        let mbc = mem::mbc::mbc0::Controller::new(&rom);
-        let mut bus = bus::Bus::new().with_mbc(&mbc);
+    pub const CLOCK_PER_SECOND: u32 = 4_194_304;
+    pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
+
+    pub const POKEMON: &'static str = "roms/29459/29459.gbc";
+
+    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Self {
+        let rom = Rom::load(path.as_ref()).expect("failed to load rom");
+        let mut mbc = mem::mbc::Controller::new(&rom);
+        let mut bus = bus::Bus::new()
+            .with_mbc(&mut mbc)
+            .with_wram(Wram::new(rom.header.kind.requires_gbc()))
+            .with_vram(Vram::new(rom.header.kind.requires_gbc()));
         let mut cpu = core::Cpu::new(Target::GB);
         Self {
+            lcd: lcd::Lcd::default(),
             bus,
             cpu,
+            mbc,
             breakpoints: vec![],
             running: false
         }
     }
 
-    pub fn cycle(&mut self) {
-        use shared::cpu::Bus;
-        if !self.running {
-            return ;
-        }
+    pub fn cycle(&mut self, clock: u8) -> bool {
+        if !self.running { return false; }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
-            self.bus.tick();
-            self.cpu.cycle(&mut self.bus);
-            if self.cpu.just_finished {
-                self.running = self.breakpoints
-                    .drain_filter(|x| x.tick(&self.cpu))
-                    .next().is_none();
+            use shared::cpu::Bus;
+            if clock == 0 { // OR clock == 2 && cpu.double_speed()
+                self.bus.tick();
+                self.cpu.cycle(&mut self.bus);
+                if self.cpu.just_finished {
+                    self.running = self.breakpoints.drain_filter(|x| x.tick(&self.cpu)).next().is_none();
+                }
             }
         })) {
             Ok(_) => {},
             Err(e) => {
                 error!("{e:?}");
                 self.running = false;
+                return false;
             }
         }
+        true
     }
 }

@@ -2,6 +2,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::rc::Rc;
 use log::warn;
+use crate::io::{IO, IOReg};
 
 pub trait Mem {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
@@ -44,11 +45,30 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
 //     }
 // }
 
-pub trait MemoryBus {
-    fn with_mbc<C: MBCController>(self, controller: &C) -> Self;
+pub trait IODevice {
+    fn configure(self, bus: &dyn IOBus) -> Self;
 }
 
-pub trait MBCController {
+pub trait MemoryBus {
+    fn with_mbc<C: MBCController>(self, controller: &mut C) -> Self;
+    fn with_ppu<P: PPU>(self, ppu: &mut P) -> Self;
+    fn with_wram<R: IODevice + Mem + 'static>(self, ram: R) -> Self;
+    fn with_vram<R: IODevice + Mem + 'static>(self, ram: R) -> Self;
+}
+
+pub trait IOBus {
+    fn io(&self, io: IO) -> IOReg;
+}
+
+pub trait Device {
+    fn configure(&mut self, bus: &dyn IOBus) { }
+}
+
+pub trait PPU: Device {
+    fn with_vram(&mut self, vram: Rc<RefCell<dyn Mem>>);
+}
+
+pub trait MBCController: Device {
     fn rom(&self) -> Rc<RefCell<dyn Mem>>;
     fn srom(&self) -> Rc<RefCell<dyn Mem>>;
     fn sram(&self) -> Rc<RefCell<dyn Mem>>;
@@ -63,6 +83,8 @@ pub const VRAM_END: u16 = 0x9FFF;
 pub const SRAM: u16 = 0xA000;
 pub const SRAM_END: u16 = 0xBFFF;
 pub const RAM: u16 = 0xC000;
+pub const WRAM_HALF_END: u16 = 0xCFFF;
+pub const WRAM_HALF: u16 = 0xD000;
 pub const RAM_END: u16 = 0xDFFF;
 pub const ECHO: u16 = 0xE000;
 pub const ECHO_END: u16 = 0xFDFF;
