@@ -34,4 +34,8 @@ impl Rom {
     pub fn raw(&self) -> Vec<u8> {
         self.content.clone()
     }
+
+    pub fn find_roms<P: AsRef<std::path::Path>>(path: P) -> Vec<Self> {
+        vec![]
+    }
 }

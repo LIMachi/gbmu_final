@@ -1,29 +1,23 @@
 use std::any::Any;
 use std::collections::HashMap;
-use std::fmt::Debug;
-use winit::event::{Event, WindowEvent};
+use std::ops::Deref;
+use winit::event::{WindowEvent};
 use winit::event_loop::{ControlFlow};
 use winit::window::{WindowId};
 use super::*;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum Handle {
-    Main, // debugger / library
-    Debug,
-    Game,
-    Keybindings
-}
-
-pub struct Windows<E> {
+pub struct Windows {
     instance: Instance,
+    proxy: Proxy,
     handles: HashMap<Handle, WindowId>,
-    windows: HashMap<WindowId, Box<dyn Context<Event = E>>>
+    windows: HashMap<WindowId, Box<dyn Context>>
 }
 
-impl<E> Windows<E> {
-    pub fn new() -> Self {
+impl Windows {
+    pub fn new(proxy: Proxy) -> Self {
         Self {
             instance: Instance::new(wgpu::Backends::PRIMARY),
+            proxy,
             handles: Default::default(),
             windows: Default::default()
         }
@@ -44,13 +38,21 @@ impl<E> Windows<E> {
             .map(|x| x.data())
     }
 
-    pub fn handle_events(&mut self, event: &Event<'_, E>, flow: &mut ControlFlow) {
+    pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow) {
         for (_, mut win) in &mut self.windows {
             win.handle(event);
         }
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, window_id }  => {
-                flow.set_exit(); },
+                if let Some((&h, &id)) = self.handles.iter().find(|(_, v)| v == &window_id) {
+                    if self.windows.contains_key(window_id) && self.windows.len() == 1 || h == Handle::Main {
+                        flow.set_exit();
+                    } else {
+                        self.handles.remove(&h);
+                        self.windows.remove(window_id);
+                    }
+                }
+            },
             Event::WindowEvent { event: WindowEvent::Resized(sz), window_id } => {
                 self.windows.get_mut(&window_id).unwrap().resize(*sz);
             },
@@ -67,10 +69,19 @@ impl<E> Windows<E> {
         }
     }
 
-    pub fn create<C: 'static + Sized + Context<Event = E>, F: 'static + FnOnce(&Instance, Window, &EventLoop<E>) -> C>
-    (&mut self, event_loop: &EventLoop<E>, window: Window, handle: Handle, mut builder: F) {
+    pub fn create(&mut self, kind: WindowType, event_loop: &EventLoopWindowTarget<Events>) {
+        let handle = kind.handle();
+        if self.handles.contains_key(&handle) {
+            log::warn!("window {handle:?} already opened. Please don't do that.");
+            return ;
+        }
+        let proxy = self.proxy.clone();
+        let window = kind.build(event_loop);
         let id = window.id();
-        let ctx = Box::new(builder(&self.instance, window, event_loop));
+
+        let ctx_builder = kind.ctx();
+        let ctx = ctx_builder(&self.instance, window, proxy);
+
         self.handles.insert(handle, id);
         self.windows.insert(id, ctx);
     }

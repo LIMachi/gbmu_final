@@ -33,23 +33,6 @@ enum Texture {
     Step
 }
 
-trait ImageLoader {
-    fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&mut self, name: S, path: P) -> TextureHandle;
-    fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle;
-}
-
-impl ImageLoader for Context {
-    fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&mut self, name: S, path: P) -> TextureHandle {
-        let img = shared::utils::image::load_image_from_path(path.as_ref()).unwrap();
-        self.load_texture(name, img, TextureOptions::LINEAR)
-    }
-
-    fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle {
-        let img = shared::utils::image::load_svg_from_path::<W, H>(path.as_ref()).unwrap();
-        self.load_texture(name, img, TextureOptions::LINEAR)
-    }
-}
-
 /// Ninja: Debugger internal code name.
 struct Ninja<E: Emulator> {
     emu: E,

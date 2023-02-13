@@ -1,26 +1,22 @@
 use std::any::Any;
 use super::*;
-use shared::Render;
-use winit::{event_loop::EventLoopProxy};
 
-pub struct RawContext<E: 'static, Data: 'static + Render<E>> {
+pub struct RawContext<Data: 'static + Render> {
     inner: Data,
-    proxy: EventLoopProxy<E>,
+    proxy: Proxy,
     window: Window
 }
 
-impl<E: 'static, Data: 'static + Render<E>> RawContext<E, Data> {
-    pub fn builder(mut data: Data) -> Box<dyn FnOnce(&Instance, Window, &EventLoop<E>) -> Self> {
-        Box::new(move |instance, window, event| {
+impl<Data: 'static + Render> RawContext<Data> {
+    pub fn builder(mut data: Data) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
+        Box::new(move |instance, window, proxy| {
             data.init(&window);
-            Self { inner: data, proxy: event.create_proxy(), window }
+            Box::new(Self { inner: data, proxy, window })
         })
     }
 }
 
-impl<E: 'static, Data: 'static + Render<E>> Context for RawContext<E, Data> {
-    type Event = E;
-
+impl<Data: 'static + Render> Context for RawContext<Data> {
     fn inner(&mut self) -> &mut Window {
         &mut self.window
     }
@@ -37,7 +33,7 @@ impl<E: 'static, Data: 'static + Render<E>> Context for RawContext<E, Data> {
         Box::new(&mut self.inner)
     }
 
-    fn handle(&mut self, event: &Event<Self::Event>) {
+    fn handle(&mut self, event: &Event) {
         self.inner.handle(event);
     }
 }

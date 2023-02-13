@@ -10,10 +10,6 @@ mod registers;
 mod value;
 pub mod rom;
 
-pub enum Events {
-
-}
-
 pub enum Target {
     GB,
     GBC
@@ -75,13 +71,3 @@ pub trait Ui {
 }
 
 impl Ui for () { }
-
-pub trait Render<E> {
-
-    fn init(&mut self, window: &winit::window::Window);
-    fn render(&mut self);
-    fn resize(&mut self, w: u32, h: u32);
-    fn handle(&mut self, event: &winit::event::Event<E>);
-}
-
-

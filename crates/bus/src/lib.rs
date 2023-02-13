@@ -97,7 +97,7 @@ impl MemoryBus for Bus {
         self
     }
 
-    fn with_vram<R: IODevice + Mem + 'static>(mut self, mut ram: R) -> Self {
+    fn with_vram<R: IODevice + Mem + 'static>(mut self, ram: R) -> Self {
         self.vram = ram.configure(&mut self).cell();
         self
     }

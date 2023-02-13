@@ -2,7 +2,8 @@ use super::{Emulator, Ninja, Disassembly};
 use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}, Break};
 use shared::cpu::{Reg, Value, Opcode, Flags};
 use shared::egui::{Frame, Id, LayerId, SidePanel, Stroke};
-use crate::{Context, ImageLoader, Texture};
+use shared::utils::image::ImageLoader;
+use crate::{Context, Texture};
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
