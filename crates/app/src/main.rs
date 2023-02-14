@@ -53,10 +53,11 @@ impl App {
     }
 
     pub fn handle_events(&mut self, event: &Event, target: &EventLoopWindowTarget<Events>, flow: &mut ControlFlow) {
-        self.windows.handle_events(event, flow);
         match event {
-            Event::UserEvent(Events::Load(path)) => {
-                // TODO make emu load rom at path
+            Event::UserEvent(Events::Play(_)) => {
+                if !self.windows.is_open(Handle::Game) {
+                    self.open(WindowType::Game(self.emu.clone()), target);
+                }
             },
             Event::UserEvent(Events::Open(handle)) => {
               self.open(match handle {
@@ -68,6 +69,7 @@ impl App {
             },
             _ => {}
         }
+        self.windows.handle_events(event, flow);
     }
 
     pub fn run<F: 'static + FnMut(&mut App)>(mut self, mut handler: F) -> ! {
@@ -91,19 +93,15 @@ impl App {
 
 fn main() {
     env_logger::init();
-
-    let app = App::new();
-
+    let mut app = App::new();
+    let menu = WindowType::Main(Menu::new(app.proxy()));
     let mut st = Chrono::new();
     let mut current = std::time::Instant::now();
     let mut s = 0;
     let mut acc = 0.0;
     let mut cycles = 0;
     let mut clock = Clock::new(4);
-    let menu = Menu::new(app.proxy());
-    app.create(WindowType::Main(menu))
-        // .create(Handle::Game, RawContext::builder(emu.clone()))
-        // .create(Handle::Debug, EguiContext::builder(dbg.clone()))
+    app.create(menu)
         .run(move |app| {
             if app.emu.is_running() {
                 if st.paused() {
@@ -121,6 +119,8 @@ fn main() {
                     }
                     acc -= Emu::CYCLE_TIME;
                 }
+            } else {
+                st.pause();
             }
             if s != st.elapsed().as_secs() {
                 s = st.elapsed().as_secs();

@@ -64,7 +64,9 @@ impl WindowType {
     }
 }
 
+#[derive(Debug)]
 pub enum Events {
+    Play(Rom),
     Load(String),
     Open(Handle),
     Close(Handle)
@@ -81,6 +83,8 @@ pub const BREAK: Flow = Flow::Break(());
 pub trait Context {
     fn inner(&mut self) -> &mut Window;
     fn redraw(&mut self) -> Flow;
+    fn request_redraw(&mut self);
+
     fn resize(&mut self, physical: PhysicalSize<u32>);
     fn data(&mut self) -> Box<&mut dyn std::any::Any>;
 
@@ -92,10 +96,11 @@ pub trait Render {
     fn init(&mut self, window: &Window);
     fn render(&mut self);
     fn resize(&mut self, w: u32, h: u32);
-    fn handle(&mut self, event: &Event);
+    fn handle(&mut self, event: &Event, proxy: &Proxy, window: &Window);
 }
 
 pub use egui_context::EguiContext;
 pub use raw_context::RawContext;
+use shared::rom::Rom;
 use crate::emulator::Emulator;
 use crate::Menu;

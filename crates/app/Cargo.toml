@@ -14,6 +14,13 @@ egui_winit_platform = "0.17.0"
 pollster = "0.2.5"
 wgpu = "0.14.0"
 egui_wgpu_backend = "0.21.0"
+walkdir = "2.3.2"
+toml = "0.7.2"
+anyhow = "1.0.69"
+
+[dependencies.serde]
+version = "1.0.152"
+features = ["derive"]
 
 [features]
 debug = ["core/log_opcode"]

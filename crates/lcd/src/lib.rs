@@ -15,7 +15,6 @@ impl Lcd {
         let sz = window.inner_size();
         let surf = SurfaceTexture::new(sz.width, sz.height, window);
         self.pixels = PixelsBuilder::new(Lcd::WIDTH, Lcd::HEIGHT, surf)
-            .present_mode(PresentMode::Immediate)
             .build()
             .ok();
     }

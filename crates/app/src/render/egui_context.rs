@@ -3,6 +3,7 @@ use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use log::error;
 use wgpu::{CompositeAlphaMode, Device, PresentMode, Queue, SurfaceConfiguration, TextureFormat, TextureUsages};
+use winit::event::WindowEvent;
 use shared::{Ui, egui};
 
 pub use super::*;
@@ -42,7 +43,7 @@ impl<U: 'static + Ui> EguiContext<U> {
             format: TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
-            present_mode: PresentMode::AutoNoVsync,
+            present_mode: PresentMode::default(),
             alpha_mode: CompositeAlphaMode::Auto
         };
 
@@ -120,6 +121,10 @@ impl<U: 'static + Ui> Context for EguiContext<U> {
         CONTINUE
     }
 
+    fn request_redraw(&mut self) {
+        self.window.request_redraw();
+    }
+
     fn resize(&mut self, physical: PhysicalSize<u32>) {
         if physical.width > 0 && physical.height > 0 {
             self.config.width = physical.width;
@@ -138,6 +143,14 @@ impl<U: 'static + Ui> Context for EguiContext<U> {
         match event {
             Event::WindowEvent { window_id, .. } if window_id == &self.window.id() => {
                 self.platform.handle_event(event);
+            },
+            Event::WindowEvent { event: wevent, .. } => {
+                match wevent {
+                    WindowEvent::CursorEntered { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::CursorMoved { ..} => {
+                        self.platform.handle_event(event);
+                    },
+                    _ => {}
+                }
             },
             _ => {}
         }

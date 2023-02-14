@@ -6,10 +6,12 @@ mod header;
 
 pub use header::{Capabilities, Mbc};
 
+#[derive(Debug, Clone)]
 pub struct Rom {
     pub filename: String,
     pub location: PathBuf,
     pub header: header::Header,
+    pub cover: Option<String>,
     content: Vec<u8>,
 }
 
@@ -27,7 +29,8 @@ impl Rom {
             filename: f,
             location,
             header: h,
-            content: v
+            content: v,
+            cover: None
         })
     }
 

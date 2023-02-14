@@ -25,6 +25,10 @@ impl<Data: 'static + Render> Context for RawContext<Data> {
         self.inner.render(); CONTINUE
     }
 
+    fn request_redraw(&mut self) {
+        self.window.request_redraw();
+    }
+
     fn resize(&mut self, physical: PhysicalSize<u32>) {
         self.inner.resize(physical.width, physical.height);
     }
@@ -34,6 +38,6 @@ impl<Data: 'static + Render> Context for RawContext<Data> {
     }
 
     fn handle(&mut self, event: &Event) {
-        self.inner.handle(event);
+        self.inner.handle(event, &self.proxy, &self.window);
     }
 }

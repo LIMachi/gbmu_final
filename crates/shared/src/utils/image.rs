@@ -4,12 +4,12 @@ use egui::{Context, TextureHandle, TextureOptions};
 use egui_extras::image::{FitTo, load_svg_bytes_with_size};
 
 pub trait ImageLoader {
-    fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&mut self, name: S, path: P) -> TextureHandle;
+    fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&self, name: S, path: P) -> TextureHandle;
     fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle;
 }
 
 impl ImageLoader for Context {
-    fn load_image<S: Into<String>, P: AsRef<Path>>(&mut self, name: S, path: P) -> TextureHandle {
+    fn load_image<S: Into<String>, P: AsRef<Path>>(&self, name: S, path: P) -> TextureHandle {
         let img = load_image_from_path(path.as_ref()).unwrap();
         self.load_texture(name, img, TextureOptions::LINEAR)
     }

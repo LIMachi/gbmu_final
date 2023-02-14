@@ -17,6 +17,17 @@ pub trait MemoryController {
 trait Mbc: MemoryController + Mem {}
 impl<M: MemoryController + Mem> Mbc for M { }
 
+pub struct Unplugged { }
+
+impl MemoryController for Unplugged {
+    fn new(rom: &Rom, ram: Vec<u8>) -> Self where Self: Sized {
+        Self { }
+    }
+    fn ram_dump(&self) -> Vec<u8> { vec![] }
+}
+
+impl Mem for Unplugged { }
+
 #[derive(Clone)]
 pub struct Controller {
     sav: Option<PathBuf>,
@@ -49,13 +60,17 @@ impl Controller {
             inner
         }
     }
+
+    pub fn unplugged() -> Self {
+        Self { sav: None, inner: Unplugged { }.cell() }
+    }
 }
 
 impl Drop for Controller {
     fn drop(&mut self) {
         let ram = self.inner.as_ref().borrow_mut().ram_dump();
-        log::info!("dumping ram to save file");
         if ram.is_empty() { return }
+        log::info!("dumping ram to save file");
         if let Some(sav) = &self.sav {
             use std::io::Write;
             std::fs::File::create(&sav).ok()

@@ -38,6 +38,10 @@ impl Windows {
             .map(|x| x.data())
     }
 
+    pub fn is_open(&self, handle: Handle) -> bool {
+        self.handles.contains_key(&handle)
+    }
+
     pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow) {
         for (_, mut win) in &mut self.windows {
             win.handle(event);
@@ -65,7 +69,7 @@ impl Windows {
 
     pub fn update(&mut self) {
         for mut window in self.windows.values_mut() {
-            window.inner().request_redraw();
+            window.request_redraw();
         }
     }
 

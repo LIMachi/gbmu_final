@@ -20,7 +20,7 @@ impl From<u8> for Console {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Gameboy {
     DMG,
     Super
@@ -69,7 +69,7 @@ impl Capabilities {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum Cartridge {
     ROM,
@@ -196,10 +196,10 @@ impl From<u8> for Cartridge {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RomSize(u8);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RamSize(u8);
 
 impl RomSize {
@@ -241,7 +241,7 @@ impl RamSize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Header {
     pub logo: Vec<u8>,
     pub title: String,

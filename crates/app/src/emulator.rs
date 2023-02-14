@@ -4,6 +4,7 @@ use std::cell::{RefCell};
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use log::{error, warn};
+use winit::event::WindowEvent;
 use mem::{mbc, Vram, Wram};
 
 use shared::rom::Rom;
@@ -11,57 +12,11 @@ use shared::cpu::*;
 use shared::{Break, Target, Ui};
 use shared::winit::{window::Window};
 use shared::mem::MemoryBus;
+use crate::{Events, Proxy};
 use crate::render::{Render, Event};
 
-pub struct FakeBus {
-    ram: Vec<u8>,
-    rom: Vec<u8>,
-    status: MemStatus
-}
-
-impl FakeBus {
-    pub fn new(rom: Vec<u8>) -> Self {
-        Self {
-            ram: vec![0; u16::MAX as usize + 1],
-            rom,
-            status: MemStatus::ReqRead(0x100u16)
-        }
-    }
-}
-
-impl Bus for FakeBus {
-    fn status(&self) -> MemStatus {
-        self.status
-    }
-
-    fn update(&mut self, status: MemStatus) {
-        self.status = status;
-    }
-
-    fn tick(&mut self) {
-        self.status = match self.status {
-            MemStatus::ReqRead(addr) => {
-                MemStatus::Read(self.rom[addr as usize])
-            },
-            MemStatus::ReqWrite(addr) => {
-                MemStatus::Write(addr)
-            },
-            st => st
-        }
-    }
-
-    fn get_range(&self, start: u16, len: u16) -> Vec<u8> {
-        let st = start as usize;
-        let end = st + (len as usize);
-        self.rom[st..end].to_vec()
-    }
-
-    fn write(&mut self, addr: u16, value: u8) {
-        self.ram[addr as usize] = value;
-    }
-}
-
 pub struct Emu {
+    rom: Option<Rom>,
     pub lcd: lcd::Lcd,
     pub bus: bus::Bus,
     pub cpu: core::Cpu,
@@ -71,7 +26,23 @@ pub struct Emu {
 }
 
 impl Default for Emu {
-    fn default() -> Self { Emu::new(Emu::POKEMON) }
+    fn default() -> Self {
+        let mut mbc = mbc::Controller::unplugged();
+        let mut bus = bus::Bus::new()
+            .with_mbc(&mut mbc)
+            .with_wram(Wram::new(false))
+            .with_vram(Vram::new(false));
+        let mut cpu = core::Cpu::new(Target::GB);
+        Self {
+            rom: None,
+            lcd: lcd::Lcd::default(),
+            bus,
+            cpu,
+            mbc,
+            breakpoints: vec![],
+            running: false
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -88,6 +59,10 @@ impl Emulator {
     pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock) }
 
     pub fn is_running(&self) -> bool { self.emu.as_ref().borrow().running }
+
+    pub fn stop(&mut self) {
+        self.emu.replace(Emu::default());
+    }
 }
 
 impl Render for Emulator {
@@ -102,8 +77,18 @@ impl Render for Emulator {
         self.emu.as_ref().borrow_mut().lcd.resize(w, h);
     }
 
-    fn handle(&mut self, event: &Event) {
-
+    fn handle(&mut self, event: &Event, _: &Proxy, window: &Window) {
+        match event {
+            Event::UserEvent(Events::Play(rom)) => {
+                let mut emu = Emu::new(rom.clone(), true);
+                self.emu.replace(emu);
+                self.init(window);
+            },
+            Event::WindowEvent { window_id, event } if window_id == &window.id() && event == &WindowEvent::CloseRequested => {
+                self.stop();
+            },
+            _ => {}
+        }
     }
 }
 
@@ -135,8 +120,9 @@ impl dbg::Schedule for Emulator {
     fn reset(&mut self) {
         warn!("RESET");
         let running = self.emu.as_ref().borrow().running;
-        let mut emu = Emu::default();
-        emu.running = running;
+        let emu = self.emu.as_ref().borrow().rom.clone()
+            .map(|rom| Emu::new(rom, running))
+            .unwrap_or_else(|| Emu::default());
         self.emu.replace(emu);
     }
 }
@@ -145,10 +131,7 @@ impl Emu {
     pub const CLOCK_PER_SECOND: u32 = 4_194_304;
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub const POKEMON: &'static str = "roms/29459/29459.gbc";
-
-    pub fn new<P: AsRef<std::path::Path>>(path: P) -> Self {
-        let rom = Rom::load(path.as_ref()).expect("failed to load rom");
+    pub fn new(rom: Rom, running: bool) -> Self {
         let mut mbc = mem::mbc::Controller::new(&rom);
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
@@ -160,8 +143,9 @@ impl Emu {
             bus,
             cpu,
             mbc,
+            rom: Some(rom),
             breakpoints: vec![],
-            running: false
+            running
         }
     }
 
