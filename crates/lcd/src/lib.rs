@@ -1,10 +1,12 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use pixels::wgpu::PresentMode;
+use shared::utils::Cell;
 use shared::winit as winit;
 
 #[derive(Default)]
 pub struct Lcd {
-    pixels: Option<Pixels>
+    pixels: Rc<RefCell<Option<Pixels>>>
 }
 
 impl Lcd {
@@ -14,32 +16,39 @@ impl Lcd {
     pub fn init(&mut self, window: &winit::window::Window) {
         let sz = window.inner_size();
         let surf = SurfaceTexture::new(sz.width, sz.height, window);
-        self.pixels = PixelsBuilder::new(Lcd::WIDTH, Lcd::HEIGHT, surf)
-            .build()
-            .ok();
+        self.pixels.replace( PixelsBuilder::new(Lcd::WIDTH, Lcd::HEIGHT, surf).build().ok());
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if let Some(ref mut pixels) = self.pixels {
+        if let Some(pixels) = self.pixels.as_ref().borrow_mut().as_mut() {
             pixels.resize_surface(width, height).ok();
         }
     }
 
     pub fn render(&mut self) {
-        if let Some(ref mut pixels) = self.pixels {
-            for y in 0..Lcd::HEIGHT as usize {
-                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 0] = 0xFF;
-                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 1] = 0xFF;
-                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 2] = 0x00;
-                pixels.get_frame_mut()[y * 4 * Lcd::WIDTH as usize + 3] = 0xFF;
-            }
-            for x in 0..Lcd::WIDTH as usize {
-                pixels.get_frame_mut()[x * 4 + 0] = 0xFF;
-                pixels.get_frame_mut()[x * 4 + 1] = 0xFF;
-                pixels.get_frame_mut()[x * 4 + 2] = 0x00;
-                pixels.get_frame_mut()[x * 4 + 3] = 0xFF;
-            }
+        if let Some(pixels) = self.pixels.as_ref().borrow_mut().as_mut() {
             pixels.render().ok();
+        }
+    }
+
+    pub fn framebuffer(&self) -> Rc<RefCell<dyn Framebuffer>> {
+        self.pixels.clone()
+    }
+}
+
+pub trait Framebuffer {
+    fn set(&mut self, x: usize, y: usize, pixel: [u8; 3]);
+}
+
+impl Framebuffer for Option<Pixels> {
+    fn set(&mut self, x: usize, y: usize, pixel: [u8; 3]) {
+        if let Some(mut pixels) = self.as_mut() {
+            let frame = pixels.get_frame_mut();
+            let f = (Lcd::WIDTH * 4) as usize;
+            frame[x + y * f] = pixel[0];
+            frame[x + 1 + y * f] = pixel[1];
+            frame[x + 2 + y * f] = pixel[2];
+            frame[x + 3 + y * f] = 0xFF;
         }
     }
 }

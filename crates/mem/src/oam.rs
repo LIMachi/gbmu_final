@@ -2,10 +2,10 @@ use shared::mem::Mem;
 
 #[derive(Default, Copy, Clone)]
 pub struct Sprite {
-    y: u8,
-    x: u8,
-    tile: u8,
-    flags: u8
+    pub y: u8,
+    pub x: u8,
+    pub tile: u8,
+    pub flags: u8
 }
 
 impl Mem for Sprite {

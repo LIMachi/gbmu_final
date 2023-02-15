@@ -2,7 +2,7 @@
 #![feature(exclusive_range_pattern)]
 
 mod hram;
-mod oam;
+pub mod oam;
 mod vram;
 mod wram;
 

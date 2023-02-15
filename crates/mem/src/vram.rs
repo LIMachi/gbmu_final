@@ -1,7 +1,7 @@
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus, IODevice, Mem};
 
-const BANK_SIZE: u16 = 0x1000;
+const BANK_SIZE: u16 = 0x2000;
 
 enum Storage {
     DMG([u8; BANK_SIZE as usize]),
@@ -13,6 +13,13 @@ impl Storage {
         match self {
             Storage::DMG(_) => false,
             Storage::CGB(_) => true
+        }
+    }
+
+    fn read_bank(&self, addr: u16, bank: u8) -> u8 {
+        match self {
+            Storage::DMG(bank) => bank[addr as usize],
+            Storage::CGB(banks) => banks[addr as usize + (bank as usize & 0x1) * BANK_SIZE as usize]
         }
     }
 }
@@ -59,6 +66,10 @@ impl Vram {
             mem: if cgb { Storage::CGB([0; BANK_SIZE as usize * 2]) } else { Storage::DMG([0; BANK_SIZE as usize]) },
             bank: IOReg::default()
         }
+    }
+
+    pub fn read_bank(&self, addr: u16, bank: u8) -> u8 {
+        self.mem.read_bank(addr, bank)
     }
 }
 

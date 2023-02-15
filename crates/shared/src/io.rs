@@ -1,6 +1,50 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::mem::{IOBus, Mem};
+use crate::utils::Cell;
+
+pub struct LCDC(pub u8);
+
+/// 7	LCD and PPU enable	0=Off, 1=On
+// 6	Window tile map area	0=9800-9BFF, 1=9C00-9FFF
+// 5	Window enable	0=Off, 1=On
+// 4	BG and Window tile data area	0=8800-97FF, 1=8000-8FFF
+// 3	BG tile map area	0=9800-9BFF, 1=9C00-9FFF
+// 2	OBJ size	0=8x8, 1=8x16
+// 1	OBJ enable	0=Off, 1=On
+// 0	BG and Window enable/priority	0=Off, 1=On
+impl LCDC {
+    pub fn enabled(&self) -> bool {
+        (self.0 & 0x80) != 0
+    }
+    pub fn win_area(&self) -> bool {
+        (self.0 & 0x40) != 0
+    }
+
+    pub fn win_enable(&self) -> bool {
+        (self.0 & 0x20) != 0
+    }
+
+    pub fn relative_addr(&self) -> bool {
+        (self.0 & 0x10) == 0
+    }
+
+    pub fn bg_area(&self) -> bool {
+        (self.0 & 0x08) != 0
+    }
+
+    pub fn obj_size(&self) -> u8 {
+        if (self.0 & 0x4) == 0 { 0x8 } else { 0x10 }
+    }
+
+    pub fn obj_enable(&self) -> bool {
+        (self.0 & 0x2) != 0
+    }
+
+    pub fn priority(&self) -> bool {
+        (self.0 & 0x1) != 0
+    }
+}
 
 #[repr(u16)]
 pub enum IO {
@@ -249,6 +293,10 @@ impl IO {
 pub enum Access { W, R, RW, U }
 pub enum AccessMode { Generic(Access), Custom([Access; 8]) }
 
+impl Default for AccessMode {
+    fn default() -> Self { Self::Generic(Access::U) }
+}
+
 impl AccessMode {
     pub fn rmask(&self) -> u8 {
         match self {
@@ -318,11 +366,16 @@ impl HReg {
             wmask: access.wmask()
         }
     }
+
+    pub fn direct_write(&mut self, value: u8) {
+        self.v = value;
+    }
 }
 
 impl Mem for HReg {
-    fn read(&self, _: u16, _: u16) -> u8 {
-        self.v & self.rmask
+    fn read(&self, _: u16, absolute: u16) -> u8 {
+        let v = self.v & self.rmask;
+        v
     }
 
     fn write(&mut self, _: u16, value: u8, _: u16) {
@@ -346,7 +399,6 @@ impl Mem for IOReg {
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        // log::info!("request write on {addr:#06X} with {value:#04X} [{absolute:#06X}]");
         if addr != 0 { panic!("IO reg is only 1 byte") }
         self.0.borrow_mut().write(addr, value, absolute);
     }
@@ -357,13 +409,13 @@ impl IOReg {
     pub fn wronly() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::wronly())))) }
     pub fn rw() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::rw())))) }
     pub fn custom(bits: [Access; 8]) -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::Custom(bits))))) }
+    pub fn with_access(mode: AccessMode) -> Self { IOReg(HReg::new(mode).cell()) }
 
     pub fn value(&self) -> u8 { self.0.borrow().v }
 
     pub fn direct_write(&mut self, value: u8) {
-        self.0.as_ref().borrow_mut().v = value;
+        self.0.as_ref().borrow_mut().direct_write(value);
     }
 
     pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }
-    pub fn write(&mut self, value: u8) { Mem::write(self, 0, value, 0); }
 }

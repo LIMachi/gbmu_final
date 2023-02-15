@@ -64,7 +64,6 @@ pub mod cpu {
     }
 }
 
-
 pub trait Ui {
     fn init(&mut self, ctx: &mut egui::Context) { }
     fn draw(&mut self, ctx: &egui::Context) { }

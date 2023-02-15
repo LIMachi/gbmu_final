@@ -35,7 +35,7 @@ impl Bus {
             vram: Empty { }.cell(),
             ram: Empty { }.cell(),
             echo: Empty { }.cell(),
-            oam: Oam::new().cell(),
+            oam: Empty { }.cell(),
             io: io::IORegs::init(),
             hram: Hram::new().cell(),
             un_1: Empty { }.cell(),
@@ -71,7 +71,7 @@ impl Bus {
             UN_1..=UN_1_END => self.un_1.as_ref().borrow_mut().write(addr - UN_1, value, addr),
             IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.as_ref().borrow_mut().write(addr - HRAM, value, addr),
-            END => self.ie.write(value),
+            END => self.ie.write(0, value, addr),
             _=> unreachable!()
         }
     }
@@ -87,8 +87,9 @@ impl MemoryBus for Bus {
     }
 
     fn with_ppu<P: PPU>(mut self, ppu: &mut P) -> Self {
-        ppu.with_vram(self.vram.clone());
-        ppu.configure(&mut self);
+        ppu.configure(&self);
+        self.vram = ppu.vram();
+        self.oam = ppu.oam();
         self
     }
 

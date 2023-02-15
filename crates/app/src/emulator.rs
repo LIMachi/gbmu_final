@@ -3,8 +3,9 @@ use std::rc::Rc;
 use std::cell::{RefCell};
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
-use log::{error, warn};
+use log::{error, log, warn};
 use winit::event::WindowEvent;
+use lcd::Lcd;
 use mem::{mbc, Vram, Wram};
 
 use shared::rom::Rom;
@@ -20,6 +21,7 @@ pub struct Emu {
     pub lcd: lcd::Lcd,
     pub bus: bus::Bus,
     pub cpu: core::Cpu,
+    pub ppu: ppu::Controller,
     pub mbc: mbc::Controller,
     running: bool,
     breakpoints: Vec<Break>,
@@ -28,16 +30,19 @@ pub struct Emu {
 impl Default for Emu {
     fn default() -> Self {
         let mut mbc = mbc::Controller::unplugged();
+        let lcd = Lcd::default();
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
             .with_vram(Vram::new(false));
         let mut cpu = core::Cpu::new(Target::GB);
+        let mut ppu = ppu::Controller::new(false, &lcd);
         Self {
             rom: None,
-            lcd: lcd::Lcd::default(),
+            lcd,
             bus,
             cpu,
+            ppu,
             mbc,
             breakpoints: vec![],
             running: false
@@ -67,6 +72,7 @@ impl Emulator {
 
 impl Render for Emulator {
     fn init(&mut self, window: &Window) {
+        log::info!("init LCD");
         self.emu.as_ref().borrow_mut().lcd.init(window);
     }
     fn render(&mut self) {
@@ -132,16 +138,19 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(rom: Rom, running: bool) -> Self {
+        let lcd = Lcd::default();
         let mut mbc = mem::mbc::Controller::new(&rom);
+        let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), &lcd);
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(rom.header.kind.requires_gbc()))
-            .with_vram(Vram::new(rom.header.kind.requires_gbc()));
+            .with_ppu(&mut ppu);
         let mut cpu = core::Cpu::new(Target::GB);
         Self {
-            lcd: lcd::Lcd::default(),
+            lcd,
             bus,
             cpu,
+            ppu,
             mbc,
             rom: Some(rom),
             breakpoints: vec![],
@@ -152,8 +161,9 @@ impl Emu {
     pub fn cycle(&mut self, clock: u8) -> bool {
         if !self.running { return false; }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
+            self.ppu.tick();
             if clock == 0 { // OR clock == 2 && cpu.double_speed()
-                self.bus.tick();
+                self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
                 if self.cpu.just_finished {
                     self.running = self.breakpoints.drain_filter(|x| x.tick(&self.cpu)).next().is_none();

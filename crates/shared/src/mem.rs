@@ -65,7 +65,8 @@ pub trait Device {
 }
 
 pub trait PPU: Device {
-    fn with_vram(&mut self, vram: Rc<RefCell<dyn Mem>>);
+    fn vram(&self) -> Rc<RefCell<dyn Mem>>;
+    fn oam(&self) -> Rc<RefCell<dyn Mem>>;
 }
 
 pub trait MBCController: Device {
