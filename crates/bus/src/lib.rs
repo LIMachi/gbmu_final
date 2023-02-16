@@ -1,12 +1,15 @@
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
-use mem::{Hram, Oam};
+use mem::Hram;
 use shared::{cpu::MemStatus, mem::*};
 use shared::io::{IO, IOReg};
 use shared::utils::Cell;
 
 mod io;
+mod dma;
+
+pub use dma::Dma;
 
 pub struct Empty {}
 impl Mem for Empty {}
@@ -28,6 +31,9 @@ pub struct Bus {
 
 impl Bus {
     pub fn new() -> Self {
+        let regs = io::IORegs::init()
+            .watch(IO::DMA)
+            .watch(IO::LCDC);
         Self {
             rom: Empty { }.cell(),
             srom: Empty { }.cell(),
@@ -36,9 +42,9 @@ impl Bus {
             ram: Empty { }.cell(),
             echo: Empty { }.cell(),
             oam: Empty { }.cell(),
-            io: io::IORegs::init(),
             hram: Hram::new().cell(),
             un_1: Empty { }.cell(),
+            io: regs,
             ie: IOReg::rw(),
             status: MemStatus::ReqRead(0x100)
         }
@@ -93,13 +99,9 @@ impl MemoryBus for Bus {
         self
     }
 
-    fn with_wram<R: IODevice + Mem + 'static>(mut self, mut ram: R) -> Self {
-        self.ram = ram.configure(&mut self).cell();
-        self
-    }
-
-    fn with_vram<R: IODevice + Mem + 'static>(mut self, ram: R) -> Self {
-        self.vram = ram.configure(&mut self).cell();
+    fn with_wram<R: Device + Mem + 'static>(mut self, mut wram: R) -> Self {
+        wram.configure(&mut self);
+        self.ram = wram.cell();
         self
     }
 }
@@ -127,7 +129,7 @@ impl shared::cpu::Bus for Bus {
             MemStatus::ReqRead(addr) => MemStatus::Read(self.read(addr)),
             MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
             st => st
-        }
+        };
     }
 
     /// Debug function

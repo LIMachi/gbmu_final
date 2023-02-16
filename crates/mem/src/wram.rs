@@ -14,8 +14,8 @@ pub struct Wram {
 impl Mem for Wram {
     fn read(&self, addr: u16, _: u16) -> u8 {
         let (bank, addr) = match addr as usize {
-            0..=BANK_SIZE => (0, addr as usize),
-            BANK_SIZE..=WRAM_SIZE => (self.bank(), addr as usize - BANK_SIZE),
+            0..BANK_SIZE => (0, addr as usize),
+            BANK_SIZE..WRAM_SIZE => (self.bank(), addr as usize - BANK_SIZE),
             _ => unreachable!()
         };
         self.banks[bank][addr]
@@ -23,8 +23,8 @@ impl Mem for Wram {
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         let (bank, addr) = match addr as usize {
-            0..=BANK_SIZE => (0, addr as usize),
-            BANK_SIZE..=WRAM_SIZE => (self.bank(), addr as usize - BANK_SIZE),
+            0..BANK_SIZE => (0, addr as usize),
+            BANK_SIZE..WRAM_SIZE => (self.bank(), addr as usize - BANK_SIZE),
             _ => unreachable!()
         };
         self.banks[bank][addr] = value;
@@ -59,10 +59,9 @@ impl Wram {
     }
 }
 
-impl IODevice for Wram {
-    fn configure(mut self, bus: &dyn IOBus) -> Self {
+impl Device for Wram {
+    fn configure(&mut self, bus: &dyn IOBus) {
         self.svbk = bus.io(IO::SVBK);
         self.svbk.direct_write(1);
-        self
     }
 }

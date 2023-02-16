@@ -354,6 +354,7 @@ impl Access {
 
 pub(crate) struct HReg {
     pub(crate) v: u8,
+    dirty: bool,
     rmask: u8,
     wmask: u8
 }
@@ -362,6 +363,7 @@ impl HReg {
     pub fn new(access: AccessMode) -> Self {
         HReg {
             v: 0,
+            dirty: false,
             rmask: access.rmask(),
             wmask: access.wmask()
         }
@@ -370,6 +372,7 @@ impl HReg {
     pub fn direct_write(&mut self, value: u8) {
         self.v = value;
     }
+    pub fn reset_dirty(&mut self) { self.dirty = false; }
 }
 
 impl Mem for HReg {
@@ -380,6 +383,7 @@ impl Mem for HReg {
 
     fn write(&mut self, _: u16, value: u8, _: u16) {
         self.v = self.v | (value & self.wmask);
+        self.dirty = true;
     }
 }
 
@@ -418,4 +422,7 @@ impl IOReg {
     }
 
     pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }
+
+    pub fn reset_dirty(&mut self) { self.0.as_ref().borrow_mut().reset_dirty(); }
+    pub fn dirty(&self) -> bool { self.0.as_ref().borrow().dirty }
 }

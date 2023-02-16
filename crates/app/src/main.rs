@@ -1,11 +1,9 @@
-#![feature(drain_filter)]
-
 use winit::{
     event_loop::{ControlFlow, EventLoopWindowTarget}
 };
-use winit::event::WindowEvent;
 use winit::event_loop::EventLoopBuilder;
 
+mod log;
 mod render;
 mod emulator;
 pub mod app;
@@ -13,6 +11,7 @@ pub mod app;
 use app::Menu;
 use dbg::Debugger;
 use render::{windows::Windows, WindowType};
+use shared::breakpoints::Breakpoints;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::emulator::Emu;
@@ -27,7 +26,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let mut emu = emulator::Emulator::new();
+        let mut emu = emulator::Emulator::new(Breakpoints::default());
         let dbg = Debugger::new(emu.clone());
         let e = EventLoopBuilder::with_user_event()
             .build();
@@ -92,7 +91,7 @@ impl App {
 }
 
 fn main() {
-    env_logger::init();
+    log::init();
     let mut app = App::new();
     let menu = WindowType::Main(Menu::new(app.proxy()));
     let mut st = Chrono::new();

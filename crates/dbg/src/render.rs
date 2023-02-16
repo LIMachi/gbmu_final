@@ -1,9 +1,72 @@
+use std::str::FromStr;
+use egui_extras::Column;
 use super::{Emulator, Ninja, Disassembly};
-use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}, Break};
+use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}};
+use shared::breakpoints::{Breakpoint, Breakpoints};
 use shared::cpu::{Reg, Value, Opcode, Flags};
 use shared::egui::{Frame, Id, LayerId, SidePanel, Stroke};
 use shared::utils::image::ImageLoader;
 use crate::{Context, Texture};
+
+pub struct Data {
+    raw: String,
+    value: Value,
+    reg: Reg
+}
+
+trait Converter {
+    fn convert(str: &str) -> Self;
+}
+
+impl Converter for u8 {
+    fn convert(raw: &str) -> Self {
+        let str = raw.trim_start_matches("0x").trim_start_matches("0X");
+        if str != raw {
+            u8::from_str_radix(str, 16).unwrap_or(0)
+        } else {
+            u8::from_str(str).unwrap_or(0)
+        }
+    }
+}
+
+impl Converter for u16 {
+    fn convert(raw: &str) -> Self {
+        let str = raw.trim_start_matches("0x").trim_start_matches("0X");
+        if str != raw {
+            u16::from_str_radix(str, 16).unwrap_or(0)
+        } else {
+            u16::from_str(str).unwrap_or(0)
+        }
+    }
+}
+
+impl Data {
+    fn breakpoint(&self) -> Breakpoint {
+        Breakpoint::register(self.reg, self.value)
+    }
+
+    fn parse(&mut self) {
+        self.value = match self.value {
+            Value::U8(_) =>  Value::U8(u8::convert(&self.raw)),
+            Value::U16(_) =>  Value::U16(u16::convert(&self.raw)),
+        };
+    }
+
+    fn update(&mut self) {
+        match (self.reg, self.value) {
+            (Reg::PC | Reg::ST | Reg::HL | Reg::SP | Reg::AF | Reg::BC | Reg::DE, Value::U16(v)) => {},
+            (Reg::PC | Reg::ST | Reg::HL | Reg::SP | Reg::AF | Reg::BC | Reg::DE, Value::U8(v)) => { self.value = Value::U16(v as u16); },
+            (_, Value::U16(v)) => { self.value = Value::U8(0); },
+            _ => {}
+        }
+    }
+}
+
+impl Default for Data {
+    fn default() -> Self {
+        Self { reg: Reg::PC, raw: "".to_string(), value: Value::U16(0) }
+    }
+}
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
@@ -26,6 +89,7 @@ impl<E: Emulator> Ui for Ninja<E> {
         self.textures.insert(Texture::Play, ctx.load_svg::<40, 40>("play", "assets/icons/play.svg"));
         self.textures.insert(Texture::Pause, ctx.load_svg::<40, 40>("pause", "assets/icons/pause.svg"));
         self.textures.insert(Texture::Step, ctx.load_svg::<32, 32>("step", "assets/icons/step.svg"));
+        self.textures.insert(Texture::Reset, ctx.load_svg::<40, 40>("reset", "assets/icons/reset.svg"));
     }
 
     fn draw(&mut self, ctx: &egui::Context) {
@@ -53,17 +117,55 @@ impl<E: Emulator> Ui for Ninja<E> {
                                 ui.spacing_mut().item_spacing.x = 16.;
                                 let sz: egui::Vec2 = (32., 32.).into();
                                 let pause = egui::ImageButton::new(self.tex(Texture::Pause), (40., 40.)).frame(false);
-                                let reset = egui::ImageButton::new(self.tex(Texture::Pause), (40., 40.)).frame(false);
+                                let reset = egui::ImageButton::new(self.tex(Texture::Reset), (40., 40.)).frame(false);
 
                                 let play = egui::ImageButton::new(self.tex(Texture::Play), (40., 40.)).frame(false);
                                 let step = egui::ImageButton::new(self.tex(Texture::Step), sz).frame(false);
                                 if ui.add(reset).clicked() { self.emu.reset(); };
-                                if ui.add(step).clicked() { self.emu.schedule_break(Break::Instructions(1)).play(); };
+                                if ui.add(step).clicked() { self.step() };
                                 if ui.add(play).clicked() { self.emu.play(); };
-                                if ui.add(pause.clone()).clicked() { self.emu.pause(); };
+                                if ui.add(pause.clone()).clicked() { self.pause(); };
                             });
                         });
                 });
+                egui::Frame::group(ui.style())
+                    .show(ui, |ui: &mut egui::Ui| {
+                        ui.horizontal(|ui| {
+                            ui.menu_button(self.render_data.reg.name(), |ui| {
+                                use Reg::*;
+                                for r in [A, B, C, D, E, H, L, AF, BC, DE, HL, SP, PC] {
+                                    if ui.selectable_value(&mut self.render_data.reg, r, r.name()).clicked() {
+                                        self.render_data.update();
+                                        ui.close_menu();
+                                    }
+                                }
+                            });
+                            if ui.add(egui::TextEdit::singleline(&mut self.render_data.raw).desired_width(64.)).changed() {
+                                self.render_data.parse();
+                            }
+                            if ui.button("BREAK").clicked() {
+                                self.schedule(self.render_data.breakpoint());
+                            }
+                        });
+                    });
+                let mut table = egui_extras::TableBuilder::new(ui)
+                    .columns(Column::remainder(), 3)
+                    .striped(true)
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
+                table
+                    .body(|mut body| {
+                        self.breakpoints().drain_filter(|bp| {
+                            if bp.temp() { return false };
+                            let mut rem = false;
+                            let (r, v) = bp.display();
+                            body.row(30.0, |mut row| {
+                                row.col(|ui| { if ui.button("-").clicked() { rem = true; } });
+                                row.col(|ui| { ui.checkbox(&mut bp.enabled, ""); });
+                                row.col(|ui| { ui.label(format!("{r:?} == {v:#06x}")); });
+                            });
+                            rem
+                        });
+                    });
             });
         CentralPanel::default()
             .show(ctx, |ui: &mut egui::Ui| {

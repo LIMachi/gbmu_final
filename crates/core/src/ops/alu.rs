@@ -17,11 +17,11 @@ pub fn sub(state: &mut State) -> Flow {
     let n = state.pop().u8();
     let a = state.register(Reg::A).u8();
     let (r, o) = a.overflowing_sub(n);
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(true)
         .set_half((a & 0xF) < (n & 0xF))
         .set_carry(o);
-    state.push(r);
     CONTINUE
 }
 
@@ -31,12 +31,11 @@ pub fn sbc(state: &mut State) -> Flow {
     let a = state.register(Reg::A).u8();
     let (r, o) = a.overflowing_sub(n);
     let (r, c) = r.overflowing_sub(cr);
-
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(true)
         .set_half(((a & 0xF) < (n & 0xF) + cr))
         .set_carry(o || c);
-    state.push(r);
     CONTINUE
 }
 
@@ -44,11 +43,11 @@ pub fn add(state: &mut State) -> Flow {
     let n = state.pop().u8();
     let a = state.register(Reg::A).u8();
     let (r, o) = a.overflowing_add(n);
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(false)
         .set_half(((a & 0xF) + (n & 0xF)) & 0x10 != 0)
         .set_carry(o);
-    state.push(r);
     CONTINUE
 }
 
@@ -83,11 +82,11 @@ pub fn adc(state: &mut State) -> Flow {
     let a = state.register(Reg::A).u8();
     let (r, o) = a.overflowing_add(n);
     let (r, c) = r.overflowing_add(cr);
+    state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(false)
         .set_half(((a & 0xF) + (n & 0xF) + cr) & 0x10 != 0)
         .set_carry(o);
-    state.push(r);
     CONTINUE
 }
 

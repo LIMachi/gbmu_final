@@ -1,3 +1,5 @@
+#![feature(drain_filter)]
+
 use std::borrow::BorrowMut;
 pub use egui;
 pub use winit;
@@ -9,6 +11,7 @@ mod opcodes;
 mod registers;
 mod value;
 pub mod rom;
+pub mod breakpoints;
 
 pub enum Target {
     GB,
@@ -16,27 +19,8 @@ pub enum Target {
 }
 
 pub trait Cpu {
+    fn done(&self) -> bool;
     fn register(&self, reg: registers::Reg) -> value::Value;
-}
-
-pub enum Break {
-    Instructions(usize),
-    Register(registers::Reg, value::Value)
-}
-
-impl Break {
-    pub fn tick(&mut self, runner: &impl Cpu) -> bool {
-        match self {
-            Break::Instructions(n) if *n <= 1 => true,
-            Break::Instructions(n) => { *n = *n - 1; false },
-            Break::Register(r, v) if runner.register(*r) == *v => true,
-            _ => false
-        }
-    }
-
-    pub fn address(addr: u16) -> Self {
-        Self::Register(registers::Reg::PC, addr.into())
-    }
 }
 
 pub mod cpu {

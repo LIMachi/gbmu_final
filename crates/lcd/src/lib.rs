@@ -45,10 +45,10 @@ impl Framebuffer for Option<Pixels> {
         if let Some(mut pixels) = self.as_mut() {
             let frame = pixels.get_frame_mut();
             let f = (Lcd::WIDTH * 4) as usize;
-            frame[x + y * f] = pixel[0];
-            frame[x + 1 + y * f] = pixel[1];
-            frame[x + 2 + y * f] = pixel[2];
-            frame[x + 3 + y * f] = 0xFF;
+            frame[x * 4 + 0 + y * f] = pixel[0];
+            frame[x * 4 + 1 + y * f] = pixel[1];
+            frame[x * 4 + 2 + y * f] = pixel[2];
+            frame[x * 4 + 3 + y * f] = 0xFF;
         }
     }
 }

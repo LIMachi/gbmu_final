@@ -48,13 +48,13 @@ impl Mem for Mbc5 {
             RAM_ENABLE..=RAM_ENABLE_END => self.enabled_ram = (value & 0xF) == 0xA,
             ROM_BANK..=ROM_BANK_END => self.rom_bank = (self.rom_bank & 0x100) | value as usize,
             ROM_BANK_H..=ROM_BANK_H_END => self.rom_bank = ((value as usize & 0x1) << 8) | (self.rom_bank & 0xFF),
-            RAM_BANK..=RAM_BANK_END => self.ram_bank = value,
+            RAM_BANK..=RAM_BANK_END => self.ram_bank = value & 0xF,
             SRAM..=SRAM_END => {
                 let addr = addr as usize + self.ram_bank as usize * BANK_SIZE;
-                if addr > self.ram.len() { panic!("out of bounds cartridge ram read at {absolute}"); }
+                if addr > self.ram.len() { panic!("out of bounds cartridge ram write at [{}] {addr:#06X} {absolute:#06X}", self.ram_bank); }
                 self.ram[addr] = value;
             },
-            _ => unreachable!()
+            _ => unreachable!("mbc not supposed to write at {addr:#06X} [{absolute:#06X}]")
         }
     }
 
@@ -63,11 +63,13 @@ impl Mem for Mbc5 {
         match st {
             ROM..=ROM_END => self.rom[s..((st + len) as usize).min(BANK_SIZE)].to_vec(),
             SROM..=SROM_END => {
-                let st = s + BANK_SIZE * self.rom_bank as usize;
-                let end = (st + len as usize).min((self.rom_bank + 1) as usize * BANK_SIZE);
+                let s = s - SROM as usize;
+                let end = (s + len as usize).min(BANK_SIZE) + self.rom_bank * BANK_SIZE;
+                let st = s + self.rom_bank * BANK_SIZE;
                 self.rom[st..end].to_vec()
             },
             SRAM..=SRAM_END => {
+                let s = s - SRAM as usize;
                 let st = s + RAM_SIZE * self.ram_bank as usize;
                 let end = (st + len as usize).min((self.ram_bank + 1) as usize * RAM_SIZE);
                 self.ram[st..end].to_vec()

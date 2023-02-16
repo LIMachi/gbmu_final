@@ -6,23 +6,24 @@ pub struct Cpu {
     instructions: Vec<Vec<Op>>,
     regs: Registers,
     cache: Vec<Value>,
-    pub just_finished: bool,
-    prefixed: bool
+    prefixed: bool,
+    finished: bool
 }
 
 impl shared::Cpu for Cpu {
+    fn done(&self) -> bool { self.finished }
     fn register(&self, reg: Reg) -> Value { self.regs.read(reg) }
 }
 
 impl Cpu {
 
-    pub fn new(target: Target) -> Self {
+    pub fn new(cgb: bool) -> Self {
         Self {
             instructions: Vec::new(),
-            regs: match target { Target::GB => Registers::GB, Target::GBC => Registers::GBC },
+            regs: if cgb { Registers::GBC } else { Registers::GB },
             cache: Vec::new(),
-            just_finished: false,
-            prefixed: false
+            prefixed: false,
+            finished: false
         }
     }
 
@@ -33,7 +34,6 @@ impl Cpu {
         self.prefixed = false;
         let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed));
         if self.instructions.is_empty() {
-            self.just_finished = false;
             let opcode = state.read();
             if let Ok(opcode) = Opcode::try_from((opcode, prefixed)) {
                 #[cfg(feature = "log_opcode")]
@@ -51,7 +51,8 @@ impl Cpu {
                 break;
             }
         }
-        if self.instructions.is_empty() { self.just_finished = true }
-        // State drop will update bus
+        self.finished = self.instructions.is_empty() && !*state.prefix;
     }
+
+    pub fn reset_finished(&mut self) { self.finished = false; }
 }

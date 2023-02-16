@@ -6,12 +6,10 @@ use crate::io::{IO, IOReg};
 
 pub trait Mem {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
-        warn!("read ignored on {absolute:#04X}: address is not mapped");
         0xFF
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        warn!("write ignored on {absolute:#04X}: address is read only");
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> { vec![] }
@@ -45,18 +43,14 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
 //     }
 // }
 
-pub trait IODevice {
-    fn configure(self, bus: &dyn IOBus) -> Self;
-}
-
 pub trait MemoryBus {
     fn with_mbc<C: MBCController>(self, controller: &mut C) -> Self;
     fn with_ppu<P: PPU>(self, ppu: &mut P) -> Self;
-    fn with_wram<R: IODevice + Mem + 'static>(self, ram: R) -> Self;
-    fn with_vram<R: IODevice + Mem + 'static>(self, ram: R) -> Self;
+    fn with_wram<R: Device + Mem + 'static>(self, ram: R) -> Self;
 }
 
 pub trait IOBus {
+    fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
     fn io(&self, io: IO) -> IOReg;
 }
 

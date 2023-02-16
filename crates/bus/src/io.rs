@@ -1,13 +1,15 @@
 use shared::io::{IO, IOReg};
-use shared::mem::Mem;
+use shared::mem::{Device, IOBus, Mem};
 
 pub struct IORegs {
+    watch: Vec<u16>,
     range: Vec<IOReg>
 }
 
 impl IORegs {
     pub fn init() -> Self {
         Self {
+            watch: vec![],
             range: (0..128).into_iter().map(|i| {
                 let access = IO::try_from(0xFF00 + i)
                     .map(|x| x.access()).unwrap_or(Default::default());
@@ -19,6 +21,11 @@ impl IORegs {
     pub fn io(&self, io: IO) -> IOReg {
         self.range[io as u16 as usize - shared::mem::IO as usize].clone()
     }
+
+    pub fn watch(mut self, io: IO) -> Self {
+        self.watch.push(io as u16);
+        self
+    }
 }
 
 impl Mem for IORegs {
@@ -27,6 +34,9 @@ impl Mem for IORegs {
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        if self.watch.contains(&absolute) {
+            eprintln!("triggered watch: write on {absolute:#06X} with {value:#04X}");
+        }
         self.range.get_mut(addr as usize).map(|mut x| x.write(0, value, absolute)).expect(format!("write outside of IOReg range {addr:#06X}").as_str());
     }
 

@@ -41,18 +41,14 @@ impl RWStatus for MemStatus {
 
     fn req_read(&mut self, addr: u16) {
         *self = match self {
-            MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqRead(addr) },
-            _ => panic!("invalid state")
+            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => { MemStatus::ReqRead(addr) },
+            s => panic!("invalid state {s:?}")
         }
     }
 
     fn req_write(&mut self, addr: u16) {
         *self = match self {
-            MemStatus::Idle | MemStatus::Ready => { MemStatus::ReqWrite(addr) },
-            MemStatus::Read(_) => {
-                warn!("unused read");
-                MemStatus::ReqWrite(addr)
-            },
+            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => { MemStatus::ReqWrite(addr) },
             s => panic!("invalid state {s:?}")
         }
     }
@@ -174,6 +170,7 @@ impl<'a> State<'a> {
             (Reg::C, Value::U8(v)) => self.regs.set_c(v),
             (Reg::D, Value::U8(v)) => self.regs.set_d(v),
             (Reg::E, Value::U8(v)) => self.regs.set_e(v),
+            (Reg::F, Value::U8(v)) => self.regs.set_f(v),
             (Reg::H, Value::U8(v)) => self.regs.set_h(v),
             (Reg::L, Value::U8(v)) => self.regs.set_l(v),
             (Reg::AF, Value::U16(v)) => self.regs.set_af(v),

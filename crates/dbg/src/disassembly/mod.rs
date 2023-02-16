@@ -1,97 +1,163 @@
-use std::collections::HashMap;
+use std::collections::VecDeque;
+use egui_extras::{Column, TableBuilder};
 use shared::cpu::{CBOpcode, Opcode, Reg};
 use shared::egui;
-use shared::egui::{Color32, Layout, Response, TextureHandle, TextureId, TextureOptions, Ui, Widget};
-use shared::egui::WidgetText::RichText;
+use shared::egui::{Color32, Ui, Widget};
+use shared::utils::Cell;
 use crate::Emulator;
 
 mod dbg_opcodes;
 
+#[derive(Clone)]
+struct Op {
+    size: usize,
+    instruction: String,
+    data: Vec<u8>
+}
+
+impl Op {
+    fn new(size: usize, instruction: String, data: Vec<u8>) -> Self {
+        Self { size, instruction, data }
+    }
+
+    pub fn parse(range: &[u8]) -> Self {
+        let opcode = range[0];
+        let op = match (opcode, false).try_into() {
+            Ok(Opcode::PrefixCB) => { (range[1], true).try_into().unwrap() },
+            Ok(opcode) => opcode,
+            Err(e) => Opcode::Nop
+        };
+        let (sz, info) = dbg_opcodes::dbg_opcodes(op);
+        Self::new(sz, info.to_string(), range[0..sz].to_vec())
+    }
+}
+
+impl Default for Op {
+    fn default() -> Self {
+        Op::new(1, dbg_opcodes::dbg_opcodes(Opcode::Nop).1.to_string(), vec![])
+    }
+}
+
 struct OpRange {
     st: u16,
     len: usize,
-    ops: Vec<(u16, String)>
+    ops: VecDeque<Op>
 }
-//
-// fn get_dbg_range(&self, start: u16, len: u16) -> Vec<(u16, Vec<u8>, &'static str)> {
-//     let mut v = Vec::new();
-//     let mut bc = false;
-//     let mut i = start;
-//     while i < start + len {
-//         let op = *self.rom.get(i as usize).unwrap_or(&0x00u8);
-//         v.push(if !bc {
-//             bc = op == 0xCB;
-//             let (len, label) = Opcode::try_from(op).map_or_else(|_| {(1, "Invalid")}, |op|{dbg_opcodes(op)});
-//             let ti = i;
-//             i += len as u16;
-//             (i, label)
-//         } else {
-//             let op = CBOpcode::try_from(op).unwrap();
-//             let label = dbg_cb_opcodes(op);
-//             bc = false;
-//             i += 1;
-//             (i, label)
-//         });
-//     }
-//     v
-// }
-
 
 impl OpRange {
-    pub fn new(pc: u16, range: Vec<u8>) -> Self {
+    pub fn empty() -> Self {
+        Self { st: 0, len: 0, ops: VecDeque::with_capacity(8) }
+    }
+
+    pub fn pop(&mut self) -> Option<(u16, Op)> {
+        self.ops.pop_front().map(|x| {
+            let pc = self.st;
+            self.st += x.size as u16;
+            self.len -= x.size;
+            (pc, x)
+        })
+    }
+
+    pub fn push(&mut self, op: Op) {
+        self.ops.push_back(op);
+    }
+
+    pub fn replace(&mut self, pc: u16, range: Vec<u8>) {
+        self.ops.clear();
         let mut off = 0;
-        let mut ops = Vec::with_capacity(range.len());
-        let mut prefix = false;
-        while off < range.len() {
-            let opcode = if prefix { range[off + 1] } else { range[off] };
-            let mut op = (opcode, prefix).try_into().unwrap_or(Opcode::Nop);
-            if op == Opcode::PrefixCB { prefix = true; continue; }
-            prefix = false;
-            let (sz, info) = dbg_opcodes::dbg_opcodes(op);
-            if off + sz > range.len() { break }
-            let code = &range[off..(off + sz)];
-            let mut str = format!("{:#06X}: ", pc + off as u16);
-            // for o in code { str.push_str(format!("{o:02X}  ").as_str()); }
-            // for s in code.len()..6 { str.push_str("    "); }
-            str.push_str(format!("{info}").as_str());
-            for s in info.len()..14 { str.push_str(" "); }
-            for o in code { str.push_str(format!(" {o:02X}").as_str()); }
-            for _ in code.len()..3 { str.push_str("   "); }
-            ops.push((pc + off as u16, str));
-            off += sz;
+        while self.ops.len() < 8 && off < range.len() {
+            let op = Op::parse(&range[off..]);
+            off += op.size;
+            self.ops.push_back(op);
         }
-        Self { st: pc, len: off, ops }
+        for i in self.ops.len()..8 {
+            self.ops.push_back(Op::default());
+        }
+        self.st = pc;
+        self.len = off;
+    }
+
+    pub fn next_pc(&self) -> u16 {
+        self.st + self.len as u16
     }
 
     pub fn contains(&self, pc: u16) -> bool {
-        pc >= self.st && pc <= (self.st + self.len as u16)
+        pc >= self.st && pc < (self.st + self.len as u16)
     }
 }
 
-
 pub struct Disassembly {
-    pc: u16,
-    range: Option<OpRange>
+    history: VecDeque<(u16, Op)>,
+    range: OpRange
 }
 
 impl Disassembly {
-    pub fn new() -> Self { Self { pc: 0x0, range: None } }
+    pub fn new() -> Self { Self { history: VecDeque::from(vec![(0, Op::default()); 3]), range: OpRange::empty() } }
 
     pub fn render<E: Emulator>(&mut self, emu: &E, ui: &mut Ui) {
         let pc = emu.cpu_register(Reg::PC).u16();
-        if self.range.as_ref().map(|x| !x.contains(pc)).unwrap_or(true) {
-            self.range = Some(OpRange::new(pc, emu.get_range(pc, 256)));
-        }
-        ui.columns(3, |ui: &mut [Ui]| {
-            let ops = &self.range.as_ref().unwrap().ops;
-            for mut l in 0..90.min(ops.len()) {
-                let ui = &mut ui[l / 30];
-                let text = if ops[l].0 <= pc && ops[l + 1].0 > pc {
-                    egui::RichText::new(&ops[l].1)
-                        .background_color(Color32::DARK_GREEN)
-                } else { egui::RichText::new(&ops[l].1) };
-                ui.label(text);
+        if pc != self.range.st {
+            if let Some(v) = self.range.pop() {
+                self.history.pop_front();
+                self.history.push_back(v);
             }
-        });
+            if self.range.contains(pc) {
+                let pc = self.range.next_pc();
+                self.range.push(Op::parse(&emu.get_range(pc, 4)));
+            } else {
+                self.range.replace(pc, emu.get_range(pc, 32));
+            }
+        }
+        let mut table = TableBuilder::new(ui)
+            .columns(Column::remainder(), 3)
+            .striped(true)
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
+        table
+            .header(20., |mut header| {
+                header.col(|ui| {
+                    ui.strong(egui::RichText::new("Address").color(Color32::GOLD));
+                });
+                header.col(|ui| {
+                    ui.strong(egui::RichText::new("Instruction").color(Color32::GOLD));
+                });
+                header.col(|ui| {
+                    ui.strong(egui::RichText::new("Parameters").color(Color32::GOLD));
+                });
+            })
+            .body(|mut body| {
+                for (pc, op) in &self.history {
+                    body.row(30.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label(egui::RichText::new(format!("{:#06X}", pc)).color(Color32::DARK_GRAY));
+                        });
+                        row.col(|ui| {
+                            ui.label(egui::RichText::new(&op.instruction).color(Color32::DARK_GRAY));
+                        });
+                        row.col(|ui| {
+                            let mut code = String::new();
+                            for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
+                            ui.label(egui::RichText::new(code).color(Color32::DARK_GRAY));
+                        });
+                    });
+                }
+                let mut addr = pc;
+                for op in &self.range.ops {
+                    let color = if addr == pc { Color32::WHITE } else { Color32::DARK_GRAY };
+                    body.row(30.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label(egui::RichText::new(format!("{:#06X}", addr)).color(color));
+                        });
+                        row.col(|ui| {
+                            ui.label(egui::RichText::new(&op.instruction).color(color));
+                        });
+                        row.col(|ui| {
+                            let mut code = String::new();
+                            for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
+                            ui.label(egui::RichText::new(code).color(color));
+                        });
+                        addr += op.size as u16;
+                    });
+                }
+            });
     }
 }

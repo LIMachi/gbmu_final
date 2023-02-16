@@ -237,7 +237,7 @@ impl RamSize {
     }
 
     pub fn size(&self) -> usize {
-        self.banks() as usize * RomSize::BANK_SIZE as usize
+        self.banks() as usize * RamSize::BANK_SIZE as usize
     }
 }
 

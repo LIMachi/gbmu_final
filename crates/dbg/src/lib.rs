@@ -1,24 +1,24 @@
-use std::cell::{Ref, RefCell};
+#![feature(drain_filter)]
+
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
-use std::path::Path;
 use std::rc::Rc;
-use shared::{egui::Context, Ui, cpu::*, Break};
+use shared::{egui::Context, Ui, cpu::*, breakpoints::{Breakpoint, Breakpoints}};
 
 mod disassembly;
 mod render;
 
 use disassembly::Disassembly;
-use shared::egui::{TextureHandle, TextureId, TextureOptions};
+use shared::egui::{TextureHandle, TextureId};
 
 pub trait Emulator: ReadAccess + Schedule { }
 
 impl<E: ReadAccess + Schedule> Emulator for E { }
 
 pub trait Schedule {
-    fn schedule_break(&mut self, bp: Break) -> &mut Self;
-    fn pause(&mut self);
-    fn play(&mut self);
-    fn reset(&mut self);
+    fn breakpoints(&self) -> Breakpoints;
+    fn play(&self);
+    fn reset(&self);
 }
 
 pub trait ReadAccess {
@@ -30,22 +30,27 @@ pub trait ReadAccess {
 enum Texture {
     Play,
     Pause,
-    Step
+    Step,
+    Reset
 }
 
 /// Ninja: Debugger internal code name.
 struct Ninja<E: Emulator> {
     emu: E,
+    render_data: render::Data,
     disassembly: Disassembly,
-    textures: HashMap<Texture, TextureHandle>
+    textures: HashMap<Texture, TextureHandle>,
+    breakpoints: Breakpoints
 }
 
 impl<E: Emulator> Ninja<E> {
     pub fn new(emu: E) -> Self {
         Self {
             textures: Default::default(),
+            render_data: Default::default(),
+            disassembly: Disassembly::new(),
+            breakpoints: emu.breakpoints(),
             emu,
-            disassembly: Disassembly::new()
         }
     }
 
@@ -53,6 +58,12 @@ impl<E: Emulator> Ninja<E> {
         self.textures.get(&tex).unwrap().id()
     }
 
+    pub fn pause(&self) { self.breakpoints.pause(); }
+    pub fn step(&self) { self.breakpoints.step(); self.emu.play(); }
+    pub fn schedule(&self, bp: Breakpoint) { self.breakpoints.schedule(bp); }
+    pub fn breakpoints(&self) -> RefMut<Vec<Breakpoint>> {
+        self.breakpoints.bp_mut()
+    }
 }
 
 #[derive(Clone)]

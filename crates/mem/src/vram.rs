@@ -1,5 +1,5 @@
 use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus, IODevice, Mem};
+use shared::mem::{Device, IOBus, Mem};
 
 const BANK_SIZE: u16 = 0x2000;
 
@@ -73,9 +73,8 @@ impl Vram {
     }
 }
 
-impl IODevice for Vram {
-    fn configure(mut self, bus: &dyn IOBus) -> Self {
+impl Device for Vram {
+    fn configure(&mut self, bus: &dyn IOBus) {
         self.bank = bus.io(IO::VBK);
-        self
     }
 }

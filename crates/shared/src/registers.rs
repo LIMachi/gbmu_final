@@ -2,6 +2,28 @@
 #[repr(u8)]
 pub enum Reg { ST, A, F, AF, B, C, BC, D, E, DE, H, L, HL, SP, PC }
 
+impl Reg {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Reg::ST => "",
+            Reg::A => "A",
+            Reg::F => "F",
+            Reg::B => "B",
+            Reg::C => "C",
+            Reg::D => "D",
+            Reg::E => "E",
+            Reg::H => "H",
+            Reg::L => "L",
+            Reg::AF => "AF",
+            Reg::BC => "BC",
+            Reg::DE => "DE",
+            Reg::HL => "HL",
+            Reg::PC => "PC",
+            Reg::SP => "SP",
+        }
+    }
+}
+
 pub trait Flags {
     fn zero(&self) -> bool;
     fn sub(&self) -> bool;

@@ -5,14 +5,17 @@ use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use log::{error, log, warn};
 use winit::event::WindowEvent;
+use bus::Dma;
 use lcd::Lcd;
 use mem::{mbc, Vram, Wram};
+use shared::breakpoints::Breakpoints;
 
 use shared::rom::Rom;
 use shared::cpu::*;
-use shared::{Break, Target, Ui};
+use shared::Ui;
 use shared::winit::{window::Window};
-use shared::mem::MemoryBus;
+use shared::mem::{IOBus, MemoryBus};
+use shared::utils::Cell;
 use crate::{Events, Proxy};
 use crate::render::{Render, Event};
 
@@ -23,28 +26,30 @@ pub struct Emu {
     pub cpu: core::Cpu,
     pub ppu: ppu::Controller,
     pub mbc: mbc::Controller,
-    running: bool,
-    breakpoints: Vec<Break>,
+    pub dma: bus::Dma,
+    running: bool
 }
 
 impl Default for Emu {
     fn default() -> Self {
-        let mut mbc = mbc::Controller::unplugged();
         let lcd = Lcd::default();
+        let mut mbc = mbc::Controller::unplugged();
+        let mut dma = Dma::default();
+        let mut ppu = ppu::Controller::new(false, &lcd);
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
-            .with_vram(Vram::new(false));
-        let mut cpu = core::Cpu::new(Target::GB);
-        let mut ppu = ppu::Controller::new(false, &lcd);
+            .with_ppu(&mut ppu)
+            .configure(&mut dma);
+        let mut cpu = core::Cpu::new(false);
         Self {
             rom: None,
             lcd,
-            bus,
-            cpu,
             ppu,
             mbc,
-            breakpoints: vec![],
+            cpu,
+            dma,
+            bus,
             running: false
         }
     }
@@ -52,16 +57,16 @@ impl Default for Emu {
 
 #[derive(Clone)]
 pub struct Emulator {
+    breakpoints: Breakpoints,
     emu: Rc<RefCell<Emu>>
 }
 
 impl Emulator {
 
-    pub fn new() -> Self {
-        let emu = Rc::new(RefCell::new(Emu::default()));
-        Self { emu }
+    pub fn new(breakpoints: Breakpoints) -> Self {
+        Self { emu: Emu::default().cell(), breakpoints }
     }
-    pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock) }
+    pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints) }
 
     pub fn is_running(&self) -> bool { self.emu.as_ref().borrow().running }
 
@@ -109,25 +114,18 @@ impl dbg::ReadAccess for Emulator {
 }
 
 impl dbg::Schedule for Emulator {
-    fn schedule_break(&mut self, bp: Break) -> &mut Self {
-        self.emu.as_ref().borrow_mut().breakpoints.push(bp); self
+    fn breakpoints(&self) -> Breakpoints {
+        self.breakpoints.clone()
     }
 
-    fn pause(&mut self) {
-        if self.emu.as_ref().borrow().running {
-            self.schedule_break(Break::Instructions(1));
-        }
-    }
-
-    fn play(&mut self) {
+    fn play(&self) {
         self.emu.as_ref().borrow_mut().running = true;
     }
 
-    fn reset(&mut self) {
+    fn reset(&self) {
         warn!("RESET");
-        let running = self.emu.as_ref().borrow().running;
         let emu = self.emu.as_ref().borrow().rom.clone()
-            .map(|rom| Emu::new(rom, running))
+            .map(|rom| Emu::new(rom, false))
             .unwrap_or_else(|| Emu::default());
         self.emu.replace(emu);
     }
@@ -138,37 +136,40 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(rom: Rom, running: bool) -> Self {
+        log::info!("starting emu (cgb required: {})", rom.header.kind.requires_gbc());
         let lcd = Lcd::default();
         let mut mbc = mem::mbc::Controller::new(&rom);
+        let mut dma = Dma::default();
         let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), &lcd);
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(rom.header.kind.requires_gbc()))
-            .with_ppu(&mut ppu);
-        let mut cpu = core::Cpu::new(Target::GB);
+            .with_ppu(&mut ppu)
+            .configure(&mut dma);
+        let mut cpu = core::Cpu::new(rom.header.kind.requires_gbc());
         Self {
             lcd,
             bus,
             cpu,
             ppu,
             mbc,
+            dma,
             rom: Some(rom),
-            breakpoints: vec![],
             running
         }
     }
 
-    pub fn cycle(&mut self, clock: u8) -> bool {
+    pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) -> bool {
         if !self.running { return false; }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
-            self.ppu.tick();
             if clock == 0 { // OR clock == 2 && cpu.double_speed()
                 self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
-                if self.cpu.just_finished {
-                    self.running = self.breakpoints.drain_filter(|x| x.tick(&self.cpu)).next().is_none();
-                }
             }
+            self.ppu.tick();
+            self.dma.tick(&mut self.bus);
+            self.running &= bp.tick(&self.cpu);
+            self.cpu.reset_finished();
         })) {
             Ok(_) => {},
             Err(e) => {

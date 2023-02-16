@@ -1,16 +1,14 @@
 use super::*;
 
 pub fn pc(state: &mut State) -> Flow {
-    if let Value::U16(v) = state.register(Reg::PC) {
-        state.set_register(Reg::PC, Value::U16(v - 1));
-    }
+    let pc = state.register(Reg::PC).u16() - 1;
+    state.set_register(Reg::PC, pc);
     CONTINUE
 }
 
 pub fn sp(state: &mut State) -> Flow {
-    if let Value::U16(v) = state.register(Reg::PC) {
-        state.set_register(Reg::PC, Value::U16(v - 1));
-    }
+    let sp = state.register(Reg::SP).u16() - 1;
+    state.set_register(Reg::SP, sp);
     CONTINUE
 }
 

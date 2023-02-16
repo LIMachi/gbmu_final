@@ -101,6 +101,7 @@ pub trait Render {
 
 pub use egui_context::EguiContext;
 pub use raw_context::RawContext;
+use shared::cpu::Reg;
 use shared::rom::Rom;
 use crate::emulator::Emulator;
 use crate::Menu;
