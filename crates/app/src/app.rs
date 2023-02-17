@@ -76,7 +76,7 @@ impl Menu {
         let sender = self.sender.clone();
         let walk = walkdir::WalkDir::new(path);
         std::thread::spawn(move || {
-            for path in walk.max_depth(3).follow_links(true) {
+            for path in walk.max_depth(5).follow_links(true) {
                 match path {
                     Ok(entry) => {
                         if !entry.file_type().is_file() { continue }

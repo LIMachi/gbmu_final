@@ -103,3 +103,9 @@ pub const FIXED_8: Op = fixed::<0x8>;
 pub const FIXED_18: Op = fixed::<0x18>;
 pub const FIXED_28: Op = fixed::<0x28>;
 pub const FIXED_38: Op = fixed::<0x38>;
+
+pub const INT_VBLANK: Op = fixed::<0x40>;
+pub const INT_STAT  : Op = fixed::<0x48>;
+pub const INT_TIMER : Op = fixed::<0x50>;
+pub const INT_SERIAL: Op = fixed::<0x58>;
+pub const INT_JOY   : Op = fixed::<0x60>;

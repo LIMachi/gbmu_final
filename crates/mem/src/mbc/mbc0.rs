@@ -36,6 +36,6 @@ impl super::MemoryController for Mbc0 {
     }
 
     fn ram_dump(&self) -> Vec<u8> {
-        todo!()
+        vec![]
     }
 }

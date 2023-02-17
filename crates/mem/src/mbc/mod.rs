@@ -12,9 +12,15 @@ pub mod mbc5;
 pub trait MemoryController {
     fn new(rom: &Rom, ram: Vec<u8>) -> Self where Self: Sized;
     fn ram_dump(&self) -> Vec<u8>;
+
+    fn rom_bank_low(&self) -> u8 { 0 }
+    fn rom_bank_high(&self) -> u8 { 0 }
+    fn ram_bank(&self) -> u8 { 0 }
 }
 
-trait Mbc: MemoryController + Mem {}
+trait Mbc: MemoryController + Mem {
+}
+
 impl<M: MemoryController + Mem> Mbc for M { }
 
 pub struct Unplugged { }
@@ -64,6 +70,10 @@ impl Controller {
     pub fn unplugged() -> Self {
         Self { sav: None, inner: Unplugged { }.cell() }
     }
+
+    pub fn rom_bank_low(&self) -> u8 { self.inner.borrow().rom_bank_low() }
+    pub fn rom_bank_high(&self) -> u8 { self.inner.borrow().rom_bank_high() }
+    pub fn ram_bank(&self) -> u8 { self.inner.borrow().ram_bank() }
 }
 
 impl Drop for Controller {

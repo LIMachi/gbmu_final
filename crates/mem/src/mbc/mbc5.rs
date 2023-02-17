@@ -22,9 +22,6 @@ pub struct Mbc5 {
     ram_bank: u8
 }
 
-impl Mbc5 {
-}
-
 impl Mem for Mbc5 {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         match absolute {
@@ -85,12 +82,24 @@ impl MemoryController for Mbc5 {
             rom: rom.raw(),
             ram,
             enabled_ram: false,
-            rom_bank: 0,
+            rom_bank: 1,
             ram_bank: 0
         }
     }
 
     fn ram_dump(&self) -> Vec<u8> {
         self.ram.clone()
+    }
+
+    fn rom_bank_low(&self) -> u8 {
+        (self.rom_bank & 0xFF) as u8
+    }
+
+    fn rom_bank_high(&self) -> u8 {
+        (self.rom_bank >> 8) as u8
+    }
+
+    fn ram_bank(&self) -> u8 {
+        self.ram_bank
     }
 }

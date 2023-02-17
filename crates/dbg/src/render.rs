@@ -2,16 +2,35 @@ use std::str::FromStr;
 use egui_extras::Column;
 use super::{Emulator, Ninja, Disassembly};
 use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}};
-use shared::breakpoints::{Breakpoint, Breakpoints};
-use shared::cpu::{Reg, Value, Opcode, Flags};
-use shared::egui::{Frame, Id, LayerId, SidePanel, Stroke};
+use shared::breakpoints::{Breakpoint};
+use shared::cpu::{Reg, Value, Flags};
+use shared::egui::{ScrollArea, SidePanel, Stroke};
+use shared::io::IO;
 use shared::utils::image::ImageLoader;
-use crate::{Context, Texture};
+use crate::{Bus, Context, Texture};
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Kind {
+    Reg(Reg),
+    Cycles,
+    Instructions
+}
+
+impl Kind {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Kind::Reg(r) => r.name(),
+            Kind::Cycles => "Cycles",
+            Kind::Instructions => "Ins",
+        }
+    }
+}
 
 pub struct Data {
     raw: String,
     value: Value,
-    reg: Reg
+    reg: Kind,
+    count: usize
 }
 
 trait Converter {
@@ -39,24 +58,29 @@ impl Converter for u16 {
         }
     }
 }
-
 impl Data {
     fn breakpoint(&self) -> Breakpoint {
-        Breakpoint::register(self.reg, self.value)
+        match self.reg {
+            Kind::Reg(reg) =>  Breakpoint::register(reg, self.value),
+            Kind::Cycles => Breakpoint::cycles(self.count),
+            Kind::Instructions => Breakpoint::instructions(self.count),
+        }
+
+
     }
 
     fn parse(&mut self) {
-        self.value = match self.value {
-            Value::U8(_) =>  Value::U8(u8::convert(&self.raw)),
-            Value::U16(_) =>  Value::U16(u16::convert(&self.raw)),
+        match (self.value, self.reg) {
+            (_, Kind::Cycles | Kind::Instructions) => { self.count = usize::from_str(&self.raw).unwrap_or(0); }
+            (Value::U8(v), _) => { self.value = Value::U8(u8::convert(&self.raw)); },
+            (Value::U16(v), _) => { self.value = Value::U16(u16::convert(&self.raw)); },
         };
     }
 
     fn update(&mut self) {
         match (self.reg, self.value) {
-            (Reg::PC | Reg::ST | Reg::HL | Reg::SP | Reg::AF | Reg::BC | Reg::DE, Value::U16(v)) => {},
-            (Reg::PC | Reg::ST | Reg::HL | Reg::SP | Reg::AF | Reg::BC | Reg::DE, Value::U8(v)) => { self.value = Value::U16(v as u16); },
-            (_, Value::U16(v)) => { self.value = Value::U8(0); },
+            (Kind::Reg(r), Value::U16(v)) if r == Reg::A || r == Reg::B || r == Reg::C || r == Reg::D || r == Reg::E || r == Reg::F || r == Reg::H || r == Reg::L => { self.value = Value::U8(v as u8); },
+            (Kind::Reg(r), Value::U8(v)) if r == Reg::AF || r == Reg::BC || r == Reg::DE || r == Reg::HL || r == Reg::PC || r == Reg::SP => { self.value = Value::U16(v as u16); },
             _ => {}
         }
     }
@@ -64,11 +88,11 @@ impl Data {
 
 impl Default for Data {
     fn default() -> Self {
-        Self { reg: Reg::PC, raw: "".to_string(), value: Value::U16(0) }
+        Self { reg: Kind::Reg(Reg::PC), count: 0, raw: "".to_string(), value: Value::U16(0) }
     }
 }
 
-const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
+pub const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 pub struct Register(&'static str, Value);
 
@@ -82,6 +106,28 @@ impl Widget for Register {
             });
         }).response
     }
+}
+
+fn io_table(ui: &mut egui::Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str) {
+    ScrollArea::vertical()
+        .id_source("ScrollArea_".to_owned() + source)
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.push_id("IOTable_".to_owned() + source, |ui| {
+                egui_extras::TableBuilder::new(ui)
+                    .striped(true)
+                    .columns(Column::exact(100.), 2)
+                    .auto_shrink([false, false])
+                    .body(|mut body| {
+                        for io in ios {
+                            body.row(16., |mut row| {
+                                row.col(|ui| { ui.label(io.name()); });
+                                row.col(|ui| { ui.label(format!("{:#04X}", bus.read(*io as u16))); });
+                            })
+                        }
+                    });
+            });
+        });
 }
 
 impl<E: Emulator> Ui for Ninja<E> {
@@ -98,17 +144,21 @@ impl<E: Emulator> Ui for Ninja<E> {
         style.visuals.override_text_color = Some(Color32::WHITE);
         style.text_styles = [
             (Heading, FontId::new(30.0, Proportional)),
-            (Body, FontId::new(14.0,FontFamily::Monospace)),
-            (Monospace, FontId::new(14.0, Proportional)),
+            (Body, FontId::new(12.0,FontFamily::Monospace)),
+            (Monospace, FontId::new(10.0, FontFamily::Monospace)),
             (Button, FontId::new(14.0, Proportional)),
             (Small, FontId::new(10.0, Proportional)),
         ].into();
         ctx.set_style(style.clone());
         let rect = ctx.available_rect();
+        SidePanel::left("left")
+            .show(ctx, |ui| {
+                let emu = self.emu.bus();
+                let bus = emu.bus();
+                self.viewer.render(ui, &bus);
+            });
         SidePanel::right("right")
             .show(ctx, |ui: &mut egui::Ui| {
-                let w = rect.width() - 840.;
-                ui.set_width(w);
                 ui.with_layout(Layout::right_to_left(Align::TOP), |ui: &mut egui::Ui| {
                     egui::Frame::group(ui.style())
                         .fill(DARK_BLACK)
@@ -133,7 +183,7 @@ impl<E: Emulator> Ui for Ninja<E> {
                         ui.horizontal(|ui| {
                             ui.menu_button(self.render_data.reg.name(), |ui| {
                                 use Reg::*;
-                                for r in [A, B, C, D, E, H, L, AF, BC, DE, HL, SP, PC] {
+                                for r in [Kind::Reg(A), Kind::Reg(B), Kind::Reg(C), Kind::Reg(D), Kind::Reg(E), Kind::Reg(H), Kind::Reg(L), Kind::Reg(AF), Kind::Reg(BC), Kind::Reg(DE), Kind::Reg(HL), Kind::Reg(SP), Kind::Reg(PC), Kind::Cycles, Kind::Instructions] {
                                     if ui.selectable_value(&mut self.render_data.reg, r, r.name()).clicked() {
                                         self.render_data.update();
                                         ui.close_menu();
@@ -208,8 +258,55 @@ impl<E: Emulator> Ui for Ninja<E> {
                     ui.spacing_mut().item_spacing.y = 0.;
                     egui::Frame::group(ui.style())
                         .fill(DARK_BLACK)
-                        .show(ui, |ui: &mut egui::Ui| {
-                            self.disassembly.render(&self.emu, ui);
+                        .show(ui, |ui| {
+                            ui.push_id("disassembly", |ui| { self.disassembly.render(&self.emu, ui); });
+                        });
+                    egui::Frame::group(ui.style())
+                        .fill(DARK_BLACK)
+                        .show(ui, |ui| {
+                            let emu = self.emu.bus();
+                            let bus = emu.bus();
+                            egui_extras::TableBuilder::new(ui)
+                                .columns(Column::exact(200.), 4)
+                                //.cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                                .header(32., |mut header| {
+                                    header.col(|ui| { ui.label("IO"); });
+                                    header.col(|ui| { ui.label("Memory"); });
+                                    header.col(|ui| { ui.label("Audio"); });
+                                    header.col(|ui| { ui.label("Video"); });
+                                })
+                                .body(|mut body| {
+                                    body.row(240., |mut row| {
+                                        const CPU: &[IO] = &[IO::JOYP, IO::DIV, IO::TAC, IO::TIMA, IO::TMA, IO::IF, IO::IE, IO::SB, IO::SC];
+                                        const MEM: &[IO] = &[IO::KEY1, IO::DMA, IO::VBK, IO::SVBK, IO::HDMA1, IO::HDMA2, IO::HDMA3, IO::HDMA4, IO::HDMA5];
+                                        const AUDIO: &[IO] = &[IO::WaveRam0];
+                                        const VIDEO: &[IO] = &[IO::LCDC, IO::STAT, IO::SCX, IO::SCY, IO::LY, IO::LYC, IO::DMA, IO::WX, IO::WY, IO::BGP, IO::OBP0, IO::OBP1, IO::BCPS, IO::BCPD, IO::OPRI, IO::OCPS];
+                                        row.col(|ui| { io_table(ui, CPU, bus.as_ref(), "CPU"); });
+                                        row.col(|ui| { io_table(ui, MEM, bus.as_ref(), "MEM");
+                                            ui.push_id("BANK_TABLE", |ui| {
+                                                egui_extras::TableBuilder::new(ui)
+                                                    .columns(Column::exact(100.), 2)
+                                                    .auto_shrink([false, false])
+                                                    .body(|mut body| {
+                                                        body.row(16., |mut row| {
+                                                            row.col(|ui| { ui.label("ROM_H"); });
+                                                            row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().rom_bank_high())); });
+                                                        });
+                                                        body.row(16., |mut row| {
+                                                            row.col(|ui| { ui.label("ROM_L"); });
+                                                            row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().rom_bank_low())); });
+                                                        });
+                                                        body.row(16., |mut row| {
+                                                            row.col(|ui| { ui.label("RAM"); });
+                                                            row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().ram_bank())); });
+                                                        });
+                                                    });
+                                            });
+                                        });
+                                        row.col(|ui| { io_table(ui, AUDIO, bus.as_ref(), "AUDIO"); });
+                                        row.col(|ui| { io_table(ui, VIDEO, bus.as_ref(), "VIDEO"); });
+                                    });
+                                });
                         });
                 });
             });

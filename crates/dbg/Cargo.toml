@@ -11,6 +11,8 @@ egui_extras = "0.21.0"
 
 [dependencies.core]
 path = "../core"
+[dependencies.mem]
+path = "../mem"
 
 [dependencies.shared]
 path = "../shared"

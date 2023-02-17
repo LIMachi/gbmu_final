@@ -1,18 +1,32 @@
-use shared::cpu::Bus;
 use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus};
+use shared::mem::{Device, IOBus, OAM};
 
 #[derive(Default)]
 pub struct Dma {
-    reg: IOReg
+    reg: IOReg,
+    st: u16,
+    p: usize,
 }
 
 impl Dma {
-    pub fn tick(&mut self, bus: &mut dyn Bus) {
+    pub fn new() -> Self {
+        Self {
+            reg: Default::default(),
+            st: 0,
+            p: 160
+        }
+    }
+
+    pub fn tick(&mut self, bus: &mut dyn IOBus) {
         if self.reg.dirty() {
-            log::info!("start DMA routine");
             self.reg.reset_dirty();
-            // TODO trigger dma routine.
+            self.p = 0;
+            self.st = (self.reg.value() as u16) << 8;
+        }
+        if self.p != 160 {
+            let v = bus.read(self.st + self.p as u16);
+            bus.write(OAM + self.p as u16, v);
+            self.p += 1;
         }
     }
 }

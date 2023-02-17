@@ -47,7 +47,7 @@ impl Wram {
         Self {
             banks,
             cgb,
-            svbk: IOReg::default()
+            svbk: IOReg::unset()
         }
     }
 
@@ -61,7 +61,9 @@ impl Wram {
 
 impl Device for Wram {
     fn configure(&mut self, bus: &dyn IOBus) {
-        self.svbk = bus.io(IO::SVBK);
+        if self.cgb {
+            self.svbk = bus.io(IO::SVBK);
+        }
         self.svbk.direct_write(1);
     }
 }

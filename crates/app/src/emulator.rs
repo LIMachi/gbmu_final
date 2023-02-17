@@ -1,17 +1,20 @@
 use std::borrow::{Borrow, BorrowMut};
 use std::rc::Rc;
-use std::cell::{RefCell};
+use std::cell::{Ref, RefCell};
 use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use log::{error, log, warn};
 use winit::event::WindowEvent;
 use bus::Dma;
+use dbg::BusWrapper;
 use lcd::Lcd;
 use mem::{mbc, Vram, Wram};
+use mem::mbc::Controller;
 use shared::breakpoints::Breakpoints;
 
 use shared::rom::Rom;
 use shared::cpu::*;
+use shared::io::IO;
 use shared::Ui;
 use shared::winit::{window::Window};
 use shared::mem::{IOBus, MemoryBus};
@@ -27,6 +30,7 @@ pub struct Emu {
     pub ppu: ppu::Controller,
     pub mbc: mbc::Controller,
     pub dma: bus::Dma,
+    pub timer: bus::Timer,
     running: bool
 }
 
@@ -36,12 +40,15 @@ impl Default for Emu {
         let mut mbc = mbc::Controller::unplugged();
         let mut dma = Dma::default();
         let mut ppu = ppu::Controller::new(false, &lcd);
+        let mut timer = bus::Timer::default();
+        let mut cpu = core::Cpu::new(false);
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
             .with_ppu(&mut ppu)
-            .configure(&mut dma);
-        let mut cpu = core::Cpu::new(false);
+            .configure(&mut dma)
+            .configure(&mut timer)
+            .configure(&mut cpu);
         Self {
             rom: None,
             lcd,
@@ -50,6 +57,7 @@ impl Default for Emu {
             cpu,
             dma,
             bus,
+            timer,
             running: false
         }
     }
@@ -111,6 +119,10 @@ impl dbg::ReadAccess for Emulator {
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
         self.emu.as_ref().borrow().bus.get_range(st, len)
     }
+
+    fn bus(&self) -> Ref<dyn BusWrapper> {
+        self.emu.as_ref().borrow()
+    }
 }
 
 impl dbg::Schedule for Emulator {
@@ -141,12 +153,17 @@ impl Emu {
         let mut mbc = mem::mbc::Controller::new(&rom);
         let mut dma = Dma::default();
         let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), &lcd);
+        let mut timer = bus::Timer::default();
+        let mut cpu = core::Cpu::new(rom.header.kind.requires_gbc());
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(rom.header.kind.requires_gbc()))
             .with_ppu(&mut ppu)
-            .configure(&mut dma);
-        let mut cpu = core::Cpu::new(rom.header.kind.requires_gbc());
+            .configure(&mut dma)
+            .configure(&mut timer)
+            .configure(&mut cpu);
+        timer.offset();
+        IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
         Self {
             lcd,
             bus,
@@ -154,6 +171,7 @@ impl Emu {
             ppu,
             mbc,
             dma,
+            timer,
             rom: Some(rom),
             running
         }
@@ -166,8 +184,9 @@ impl Emu {
                 self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
             }
-            self.ppu.tick();
+            self.timer.tick();
             self.dma.tick(&mut self.bus);
+            self.ppu.tick();
             self.running &= bp.tick(&self.cpu);
             self.cpu.reset_finished();
         })) {
@@ -180,4 +199,9 @@ impl Emu {
         }
         true
     }
+}
+
+impl BusWrapper for Emu {
+    fn bus(&self) -> Box<&dyn dbg::Bus> { Box::new(&self.bus) }
+    fn mbc(&self) -> &Controller { &self.mbc }
 }

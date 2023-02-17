@@ -83,8 +83,8 @@ impl Registers {
     pub const GB: Registers = Registers {
         a: 0x01,
         f: 0xB0,
-        b: 0x13,
-        c: 0x00,
+        b: 0x00,
+        c: 0x13,
         d: 0x00,
         e: 0xD8,
         h: 0x01,
@@ -96,8 +96,8 @@ impl Registers {
     pub const GBC: Registers = Registers {
         a: 0x11,
         f: 0xB0,
-        b: 0x13,
-        c: 0x00,
+        b: 0x00,
+        c: 0x13,
         d: 0x00,
         e: 0xD8,
         h: 0x01,

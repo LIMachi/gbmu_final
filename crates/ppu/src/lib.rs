@@ -1,9 +1,10 @@
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use log::info;
 use lcd::Framebuffer;
 use mem::{Oam, Vram, oam::Sprite};
-use shared::io::{IO, IOReg};
+use shared::io::{IO, IOReg, LCDC};
 use shared::mem::{Device, IOBus, Mem, PPU, *};
 use shared::utils::Cell;
 use crate::fetcher::Fetcher;
@@ -35,7 +36,8 @@ pub struct Registers {
     bcpd: IOReg,
     ocps: IOReg,
     ocpd: IOReg,
-    opri: IOReg
+    opri: IOReg,
+    interrupt: IOReg
 }
 
 impl Device for Registers {
@@ -55,6 +57,7 @@ impl Device for Registers {
         self.ocps = bus.io(IO::OCPS);
         self.ocpd = bus.io(IO::OCPD);
         self.opri = bus.io(IO::OPRI);
+        self.interrupt = bus.io(IO::IF);
     }
 }
 
@@ -88,7 +91,8 @@ struct Ppu {
     regs: Registers,
     sprites: Vec<Sprite>,
     buffer: Rc<RefCell<dyn Framebuffer>>,
-    flags: Flags
+    flags: Flags,
+    lcdc: LCDC
 }
 
 struct OamState {
@@ -201,13 +205,18 @@ impl State for TransferState {
 }
 
 impl VState {
-    pub fn new() -> Self { Self { dots: 4560 } }
+    const DOTS: usize = 4560;
+
+    pub fn new() -> Self { Self { dots: Self::DOTS } }
 }
 
 impl State for VState {
     fn mode(&self) -> Mode { Mode::VBlank }
 
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
+        if self.dots == Self::DOTS {
+            ppu.regs.interrupt.set(0);
+        }
         self.dots -= 1;
         if self.dots % 456 == 0 {
             let ly = (ppu.regs.ly.read() + 1) % 154;
@@ -250,11 +259,19 @@ impl Ppu {
             state: Box::new(OamState::new()),
             sprites,
             buffer,
-            flags: Default::default()
+            flags: Default::default(),
+            lcdc: LCDC(0),
         }
     }
 
     fn tick(&mut self) {
+        let lcdc = LCDC(self.regs.lcdc.read());
+        if self.lcdc.enabled() && !lcdc.enabled() {
+            self.regs.ly.direct_write(0);
+            self.state = Box::new(HState::new(1));
+        }
+        self.lcdc = lcdc;
+        if !self.lcdc.enabled() { return; };
         let mut state = std::mem::replace(&mut self.state, Box::new(OamState::new()));
         self.state = if let Some(state) = state.tick(self) {
             state
@@ -281,7 +298,7 @@ impl Mem for Ppu {
         // TODO prevent write access if oam / vram locked
         match absolute {
             OAM..=OAM_END => self.oam.write(addr, value, absolute),
-            VRAM..=VRAM_END => self.vram.write(addr, value, absolute),
+            VRAM..=VRAM_END => { self.vram.write(addr, value, absolute) },
             _ => unreachable!()
         }
     }

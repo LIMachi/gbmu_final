@@ -22,7 +22,7 @@ impl Break {
             Break::Cycles(n) => { *n = *n - 1; false },
             Break::Instructions(n) if runner.done() && *n == 0 => true,
             Break::Instructions(n) if runner.done() => { *n = *n - 1; *n == 0 },
-            Break::Register(r, v) if runner.register(*r) == *v => true,
+            Break::Register(r, v) if runner.done() && runner.register(*r) == *v => true,
             _ => false
         }
     }

@@ -18,7 +18,7 @@ pub fn dec(state: &mut State) -> Flow {
     state.flags()
         .set_zero(v == 0)
         .set_sub(true)
-        .set_half((v & 0x10) != 0);
+        .set_half(v == 0xF);
     CONTINUE
 }
 

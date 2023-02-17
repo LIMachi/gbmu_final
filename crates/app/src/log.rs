@@ -1,13 +1,18 @@
 pub use log::*;
 
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter, ErrorKind};
 use env_logger::{Builder, Env, Target};
 
 pub fn file_writer() -> std::io::Result<BufWriter<File>> {
-    const FILE: &str = "gbmu.log";
-    let file = File::create(FILE)?;
-    Ok(BufWriter::with_capacity(65_536, file))
+
+    #[cfg(feature = "file_log")]
+    {
+        const FILE: &str = "gbmu.log";
+        let file = File::create(FILE)?;
+        return Ok(BufWriter::with_capacity(65_536, file))
+    }
+    Err(std::io::Error::new(ErrorKind::Other, "not allowed"))
 }
 
 pub fn init() {

@@ -52,6 +52,8 @@ pub trait MemoryBus {
 pub trait IOBus {
     fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
     fn io(&self, io: IO) -> IOReg;
+    fn read(&self, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, value: u8);
 }
 
 pub trait Device {

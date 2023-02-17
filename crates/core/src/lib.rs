@@ -68,7 +68,8 @@ pub struct State<'a> {
     regs: &'a mut Registers,
     cache: &'a mut Vec<Value>,
     flags: Option<Flags>,
-    prefix: &'a mut bool
+    prefix: &'a mut bool,
+    ime: &'a mut bool,
 }
 
 impl<'a> Drop for State<'a> {
@@ -113,14 +114,15 @@ impl Flags {
 }
 
 impl<'a> State<'a> {
-    pub fn new(bus: &'a mut dyn Bus, (regs, cache, prefix): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool)) -> Self {
+    pub fn new(bus: &'a mut dyn Bus, (regs, cache, prefix, ime): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool, &'a mut bool)) -> Self {
         Self {
             mem: bus.status(),
             bus,
             flags: None,
             regs,
             cache,
-            prefix
+            prefix,
+            ime
         }
     }
 

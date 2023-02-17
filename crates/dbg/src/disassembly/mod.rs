@@ -46,7 +46,7 @@ struct OpRange {
 
 impl OpRange {
     pub fn empty() -> Self {
-        Self { st: 0, len: 0, ops: VecDeque::with_capacity(8) }
+        Self { st: 0xFFFF, len: 0, ops: VecDeque::with_capacity(8) }
     }
 
     pub fn pop(&mut self) -> Option<(u16, Op)> {
@@ -87,26 +87,16 @@ impl OpRange {
 }
 
 pub struct Disassembly {
-    history: VecDeque<(u16, Op)>,
     range: OpRange
 }
 
 impl Disassembly {
-    pub fn new() -> Self { Self { history: VecDeque::from(vec![(0, Op::default()); 3]), range: OpRange::empty() } }
+    pub fn new() -> Self { Self { range: OpRange::empty() } }
 
     pub fn render<E: Emulator>(&mut self, emu: &E, ui: &mut Ui) {
         let pc = emu.cpu_register(Reg::PC).u16();
-        if pc != self.range.st {
-            if let Some(v) = self.range.pop() {
-                self.history.pop_front();
-                self.history.push_back(v);
-            }
-            if self.range.contains(pc) {
-                let pc = self.range.next_pc();
-                self.range.push(Op::parse(&emu.get_range(pc, 4)));
-            } else {
-                self.range.replace(pc, emu.get_range(pc, 32));
-            }
+       if !self.range.contains(pc) {
+            self.range.replace(pc, emu.get_range(pc, 32));
         }
         let mut table = TableBuilder::new(ui)
             .columns(Column::remainder(), 3)
@@ -125,24 +115,9 @@ impl Disassembly {
                 });
             })
             .body(|mut body| {
-                for (pc, op) in &self.history {
-                    body.row(30.0, |mut row| {
-                        row.col(|ui| {
-                            ui.label(egui::RichText::new(format!("{:#06X}", pc)).color(Color32::DARK_GRAY));
-                        });
-                        row.col(|ui| {
-                            ui.label(egui::RichText::new(&op.instruction).color(Color32::DARK_GRAY));
-                        });
-                        row.col(|ui| {
-                            let mut code = String::new();
-                            for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
-                            ui.label(egui::RichText::new(code).color(Color32::DARK_GRAY));
-                        });
-                    });
-                }
-                let mut addr = pc;
+                let mut addr = self.range.st;
                 for op in &self.range.ops {
-                    let color = if addr == pc { Color32::WHITE } else { Color32::DARK_GRAY };
+                    let color = if pc >= addr && pc < addr + op.size as u16 { Color32::WHITE } else { Color32::DARK_GRAY };
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
                             ui.label(egui::RichText::new(format!("{:#06X}", addr)).color(color));

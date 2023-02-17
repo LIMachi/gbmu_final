@@ -49,14 +49,13 @@ pub struct Vram {
 
 impl Mem for Vram {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
-        let addr = addr + if self.mem.cgb() { (self.bank.read() & 0x1) as u16 } else { 0 } * BANK_SIZE;
+        let addr = addr + if self.mem.cgb() { (self.bank.read() & 0x1) as u16 * BANK_SIZE } else { 0 };
         self.mem.read(addr, absolute)
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        let addr = addr + if self.mem.cgb() { (self.bank.read() & 0x1) as u16 } else { 0 } * BANK_SIZE;
+        let addr = addr + if self.mem.cgb() { (self.bank.read() & 0x1) as u16 * BANK_SIZE } else { 0 };
         self.mem.write(addr, value, absolute);
-
     }
 }
 
@@ -64,7 +63,7 @@ impl Vram {
     pub fn new(cgb: bool) -> Self {
         Self {
             mem: if cgb { Storage::CGB([0; BANK_SIZE as usize * 2]) } else { Storage::DMG([0; BANK_SIZE as usize]) },
-            bank: IOReg::default()
+            bank: IOReg::unset()
         }
     }
 
@@ -75,6 +74,8 @@ impl Vram {
 
 impl Device for Vram {
     fn configure(&mut self, bus: &dyn IOBus) {
-        self.bank = bus.io(IO::VBK);
+        if self.mem.cgb() {
+            self.bank = bus.io(IO::VBK);
+        }
     }
 }

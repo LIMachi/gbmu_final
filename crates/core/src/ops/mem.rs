@@ -40,7 +40,8 @@ pub fn req_write(state: &mut State) -> Flow {
 /// LDH: take u8 from stack, add 0xFF00, req read
 pub fn req_read_u8(state: &mut State) -> Flow {
     let addr = state.pop().u8();
-    state.req_read(u16::from_le_bytes([addr, 0xFF]));
+    let addr = u16::from_le_bytes([addr, 0xFF]);
+    state.req_read(addr);
     CONTINUE
 }
 

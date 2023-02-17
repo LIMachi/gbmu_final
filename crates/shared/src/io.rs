@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use crate::mem::{IOBus, Mem};
 use crate::utils::Cell;
 
+#[derive(Debug)]
 pub struct LCDC(pub u8);
 
 /// 7	LCD and PPU enable	0=Off, 1=On
@@ -46,6 +47,7 @@ impl LCDC {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum IO {
     JOYP             = 0xFF00,
@@ -122,6 +124,87 @@ pub enum IO {
     PCM12            = 0xFF76,
     PCM34            = 0xFF77,
     IE               = 0xFFFF
+}
+
+impl IO {
+    pub fn name(&self) -> &str {
+        match self {
+            IO::JOYP => "JOY",
+            IO::SB => "SB",
+            IO::SC => "SC",
+            IO::DIV => "DIV",
+            IO::TIMA => "TIMA",
+            IO::TMA => "TMA",
+            IO::TAC => "TAC",
+            IO::IF => "IF",
+            IO::NR10 => "NR10",
+            IO::NR11 => "NR11",
+            IO::NR12 => "NR12",
+            IO::NR13 => "NR13",
+            IO::NR14 => "NR14",
+            IO::NR21 => "NR21",
+            IO::NR22 => "NR22",
+            IO::NR23 => "NR23",
+            IO::NR24 => "NR24",
+            IO::NR30 => "NR30",
+            IO::NR31 => "NR31",
+            IO::NR32 => "NR32",
+            IO::NR33 => "NR33",
+            IO::NR34 => "NR34",
+            IO::NR41 => "NR41",
+            IO::NR42 => "NR42",
+            IO::NR43 => "NR43",
+            IO::NR44 => "NR44",
+            IO::NR50 => "NR50",
+            IO::NR51 => "NR51",
+            IO::NR52 => "NR52",
+            IO::WaveRam0 => "WaveRam0",
+            IO::WaveRam1 => "WaveRam1",
+            IO::WaveRam2 => "WaveRam2",
+            IO::WaveRam3 => "WaveRam3",
+            IO::WaveRam4 => "WaveRam4",
+            IO::WaveRam5 => "WaveRam5",
+            IO::WaveRam6 => "WaveRam6",
+            IO::WaveRam7 => "WaveRam7",
+            IO::WaveRam8 => "WaveRam8",
+            IO::WaveRam9 => "WaveRam9",
+            IO::WaveRamA => "WaveRamA",
+            IO::WaveRamB => "WaveRamB",
+            IO::WaveRamC => "WaveRamC",
+            IO::WaveRamD => "WaveRamD",
+            IO::WaveRamE => "WaveRamE",
+            IO::WaveRamF => "WaveRamF",
+            IO::LCDC => "LCDC",
+            IO::STAT => "STAT",
+            IO::SCY => "SCY",
+            IO::SCX => "SCX",
+            IO::LY => "LY",
+            IO::LYC => "LYC",
+            IO::DMA => "DMA",
+            IO::BGP => "BGP",
+            IO::OBP0 => "OBP0",
+            IO::OBP1 => "OBP1",
+            IO::WY => "WY",
+            IO::WX => "WX",
+            IO::KEY1 => "KEY1",
+            IO::VBK => "VBK",
+            IO::HDMA1 => "HDMA1",
+            IO::HDMA2 => "HDMA2",
+            IO::HDMA3 => "HDMA3",
+            IO::HDMA4 => "HDMA4",
+            IO::HDMA5 => "HDMA5",
+            IO::RP => "RP",
+            IO::BCPS => "BCPS",
+            IO::BCPD => "BCPD",
+            IO::OCPS => "OCPS",
+            IO::OCPD => "OCPD",
+            IO::OPRI => "OPRI",
+            IO::SVBK => "SVBK",
+            IO::PCM12 => "PCM12",
+            IO::PCM34 => "PCM34",
+            IO::IE => "IE",
+        }
+    }
 }
 
 impl TryFrom<u16> for IO {
@@ -219,7 +302,7 @@ impl IO {
             IO::TIMA     => Generic(RW),
             IO::TMA      => Generic(RW),
             IO::TAC      => Generic(RW),
-            IO::IF       => Generic(RW),
+            IO::IF       => Custom([RW, RW, RW, RW, RW, U, U, U]),
             IO::NR10     => Generic(RW),
             IO::NR11     => Custom([W, W, W, W, W, W, RW, RW]),
             IO::NR12     => Generic(RW),
@@ -285,7 +368,7 @@ impl IO {
             IO::SVBK     => Generic(RW),
             IO::PCM12    => Generic(R),
             IO::PCM34    => Generic(R),
-            IO::IE       => Generic(RW)
+            IO::IE       => Custom([RW, RW, RW, RW, RW, U, U, U])
         }
     }
 }
@@ -377,12 +460,11 @@ impl HReg {
 
 impl Mem for HReg {
     fn read(&self, _: u16, absolute: u16) -> u8 {
-        let v = self.v & self.rmask;
-        v
+        self.v | !self.rmask
     }
 
     fn write(&mut self, _: u16, value: u8, _: u16) {
-        self.v = self.v | (value & self.wmask);
+        self.v = value & self.wmask;
         self.dirty = true;
     }
 }
@@ -414,11 +496,22 @@ impl IOReg {
     pub fn rw() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::rw())))) }
     pub fn custom(bits: [Access; 8]) -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::Custom(bits))))) }
     pub fn with_access(mode: AccessMode) -> Self { IOReg(HReg::new(mode).cell()) }
+    pub fn unset() -> Self { IOReg(HReg::new(AccessMode::Generic(Access::U)).cell()) }
 
     pub fn value(&self) -> u8 { self.0.borrow().v }
 
     pub fn direct_write(&mut self, value: u8) {
         self.0.as_ref().borrow_mut().direct_write(value);
+    }
+
+    pub fn set(&mut self, bit: u8) {
+        let v = self.read();
+        self.write(0, v | (1 << bit), 0);
+    }
+
+    pub fn reset(&mut self, bit: u8) {
+        let v = self.read();
+        self.write(0, v & !(1 << bit), 0);
     }
 
     pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }
