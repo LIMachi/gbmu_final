@@ -41,7 +41,8 @@ enum Texture {
     Play,
     Pause,
     Step,
-    Reset
+    Reset,
+    Into
 }
 
 /// Ninja: Debugger internal code name.
@@ -71,7 +72,16 @@ impl<E: Emulator> Ninja<E> {
     }
 
     pub fn pause(&self) { self.breakpoints.pause(); }
-    pub fn step(&self) { self.breakpoints.step(); self.emu.play(); }
+
+    pub fn step(&self) {
+        if let Some((pc, op)) = self.disassembly.next(&self.emu) {
+            if op.is_call() { self.breakpoints.schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()); }
+            else { self.breakpoints.step(); }
+        } else { self.breakpoints.step(); }
+        self.emu.play();
+    }
+
+    pub fn step_into(&self) { self.breakpoints.step(); self.emu.play(); }
     pub fn schedule(&self, bp: Breakpoint) { self.breakpoints.schedule(bp); }
     pub fn breakpoints(&self) -> RefMut<Vec<Breakpoint>> {
         self.breakpoints.bp_mut()

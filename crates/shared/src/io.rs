@@ -301,7 +301,7 @@ impl IO {
             IO::DIV      => Generic(RW),
             IO::TIMA     => Generic(RW),
             IO::TMA      => Generic(RW),
-            IO::TAC      => Generic(RW),
+            IO::TAC      => Custom([RW, RW, RW, U, U, U, U, U]),
             IO::IF       => Custom([RW, RW, RW, RW, RW, U, U, U]),
             IO::NR10     => Generic(RW),
             IO::NR11     => Custom([W, W, W, W, W, W, RW, RW]),
@@ -505,13 +505,15 @@ impl IOReg {
     }
 
     pub fn set(&mut self, bit: u8) {
-        let v = self.read();
-        self.write(0, v | (1 << bit), 0);
+        self.direct_write(self.value() | (1 << bit));
+    }
+
+    pub fn bit(&self, bit: u8) -> u8 {
+        (self.read() >> bit) & 0x1
     }
 
     pub fn reset(&mut self, bit: u8) {
-        let v = self.read();
-        self.write(0, v & !(1 << bit), 0);
+        self.direct_write(self.value() & !(1 << bit));
     }
 
     pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }

@@ -28,9 +28,6 @@ impl Mem for IORegs {
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        if absolute == IO::LCDC as u16 {
-            info!("write on LCDC with {value:#04X}");
-        }
         self.range.get_mut(addr as usize).map(|mut x| x.write(0, value, absolute)).expect(format!("write outside of IOReg range {addr:#06X}").as_str());
     }
 

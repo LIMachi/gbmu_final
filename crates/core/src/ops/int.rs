@@ -11,11 +11,9 @@ pub fn off(state: &mut State) -> Flow {
 }
 
 pub fn stop(state: &mut State) -> Flow {    //TODO pas fini
-    info!("Dont stop me now");
     CONTINUE
 }
 
 pub fn halt(state: &mut State) -> Flow {
-    info!("HALT. F4");
     CONTINUE
 }

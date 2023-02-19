@@ -3,6 +3,8 @@ use std::path::Path;
 use egui::{Context, TextureHandle, TextureOptions};
 use egui_extras::image::{FitTo, load_svg_bytes_with_size};
 
+pub type Image<const W: usize, const H: usize> = [[[u32; 3]; W]; H];
+
 pub trait ImageLoader {
     fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&self, name: S, path: P) -> TextureHandle;
     fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle;

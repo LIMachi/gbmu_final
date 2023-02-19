@@ -21,7 +21,7 @@ pub fn sp(state: &mut State) -> Flow {
 }
 
 pub fn inc(state: &mut State) -> Flow {
-    let v = state.pop().u8() + 1;
+    let v = state.pop().u8().wrapping_add(1);
 
     state.flags().set_zero(v == 0)
         .set_sub(false)
@@ -31,7 +31,7 @@ pub fn inc(state: &mut State) -> Flow {
 }
 
 pub fn inc16(state: &mut State) -> Flow {
-    let v = state.pop().u16() + 1;
+    let v = state.pop().u16().wrapping_add(1);
     state.push(v);
     CONTINUE
 }

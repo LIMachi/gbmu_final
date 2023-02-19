@@ -9,8 +9,8 @@ use crate::Emulator;
 mod dbg_opcodes;
 
 #[derive(Clone)]
-struct Op {
-    size: usize,
+pub(crate) struct Op {
+    pub size: usize,
     instruction: String,
     data: Vec<u8>
 }
@@ -29,6 +29,10 @@ impl Op {
         };
         let (sz, info) = dbg_opcodes::dbg_opcodes(op);
         Self::new(sz, info.to_string(), range[0..sz].to_vec())
+    }
+
+    pub fn is_call(&self) -> bool {
+        self.instruction.contains("CALL") || self.instruction.contains("RST")
     }
 }
 
@@ -92,6 +96,19 @@ pub struct Disassembly {
 
 impl Disassembly {
     pub fn new() -> Self { Self { range: OpRange::empty() } }
+
+    pub(crate) fn next(&self, emu: &impl Emulator) -> Option<(u16, Op)> {
+        let pc = emu.cpu_register(Reg::PC).u16();
+        if !self.range.contains(pc) {
+            return None;
+        }
+        let mut st = self.range.st;
+        for op in &self.range.ops {
+            if st == pc { return Some((st, op.clone())); }
+            st += op.size as u16;
+        }
+        None
+    }
 
     pub fn render<E: Emulator>(&mut self, emu: &E, ui: &mut Ui) {
         let pc = emu.cpu_register(Reg::PC).u16();

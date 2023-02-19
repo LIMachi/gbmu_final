@@ -136,6 +136,7 @@ impl<E: Emulator> Ui for Ninja<E> {
         self.textures.insert(Texture::Pause, ctx.load_svg::<40, 40>("pause", "assets/icons/pause.svg"));
         self.textures.insert(Texture::Step, ctx.load_svg::<32, 32>("step", "assets/icons/step.svg"));
         self.textures.insert(Texture::Reset, ctx.load_svg::<40, 40>("reset", "assets/icons/reset.svg"));
+        self.textures.insert(Texture::Into, ctx.load_svg::<40, 40>("into", "assets/icons/into.svg"));
     }
 
     fn draw(&mut self, ctx: &egui::Context) {
@@ -168,13 +169,14 @@ impl<E: Emulator> Ui for Ninja<E> {
                                 let sz: egui::Vec2 = (32., 32.).into();
                                 let pause = egui::ImageButton::new(self.tex(Texture::Pause), (40., 40.)).frame(false);
                                 let reset = egui::ImageButton::new(self.tex(Texture::Reset), (40., 40.)).frame(false);
-
                                 let play = egui::ImageButton::new(self.tex(Texture::Play), (40., 40.)).frame(false);
                                 let step = egui::ImageButton::new(self.tex(Texture::Step), sz).frame(false);
+                                let into = egui::ImageButton::new(self.tex(Texture::Into), sz).frame(false);
                                 if ui.add(reset).clicked() { self.emu.reset(); };
                                 if ui.add(step).clicked() { self.step() };
                                 if ui.add(play).clicked() { self.emu.play(); };
                                 if ui.add(pause.clone()).clicked() { self.pause(); };
+                                if ui.add(into.clone()).clicked() { self.step_into(); };
                             });
                         });
                 });

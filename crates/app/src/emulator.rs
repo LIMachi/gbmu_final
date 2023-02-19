@@ -36,10 +36,10 @@ pub struct Emu {
 
 impl Default for Emu {
     fn default() -> Self {
-        let lcd = Lcd::default();
+        let lcd = Lcd::new();
         let mut mbc = mbc::Controller::unplugged();
         let mut dma = Dma::default();
-        let mut ppu = ppu::Controller::new(false, &lcd);
+        let mut ppu = ppu::Controller::new(false, lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = core::Cpu::new(false);
         let mut bus = bus::Bus::new()
@@ -149,10 +149,10 @@ impl Emu {
 
     pub fn new(rom: Rom, running: bool) -> Self {
         log::info!("starting emu (cgb required: {})", rom.header.kind.requires_gbc());
-        let lcd = Lcd::default();
+        let lcd = Lcd::new();
         let mut mbc = mem::mbc::Controller::new(&rom);
         let mut dma = Dma::default();
-        let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), &lcd);
+        let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = core::Cpu::new(rom.header.kind.requires_gbc());
         let mut bus = bus::Bus::new()
@@ -163,6 +163,9 @@ impl Emu {
             .configure(&mut timer)
             .configure(&mut cpu);
         timer.offset();
+        IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
+        IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
+        IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
         IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
         Self {
             lcd,

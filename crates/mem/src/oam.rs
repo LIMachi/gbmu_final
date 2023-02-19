@@ -1,6 +1,6 @@
 use shared::mem::Mem;
 
-#[derive(Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct Sprite {
     pub y: u8,
     pub x: u8,

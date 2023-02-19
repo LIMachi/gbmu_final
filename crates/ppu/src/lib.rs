@@ -1,23 +1,35 @@
 use std::cell::RefCell;
-use std::collections::VecDeque;
+
+use std::collections::vec_deque::VecDeque;
+
+use std::fmt::{Debug, Formatter, Write};
 use std::rc::Rc;
-use log::info;
-use lcd::Framebuffer;
+use lcd::{LCD, Lcd};
 use mem::{Oam, Vram, oam::Sprite};
 use shared::io::{IO, IOReg, LCDC};
 use shared::mem::{Device, IOBus, Mem, PPU, *};
 use shared::utils::Cell;
+use shared::utils::image::Image;
 use crate::fetcher::Fetcher;
 
 mod fetcher;
-//
-// pub struct tiles {
-//     IdColor:
-//     squares:
-//     Background:
-//     Window:
-//     Obj:
-// }
+
+struct REdge {
+    inner: bool,
+    input: bool
+}
+
+impl REdge {
+    fn new() -> Self {
+        Self { inner: false, input: false }
+    }
+
+    fn tick(&mut self, input: bool) -> bool {
+        let res = input && !self.inner;
+        self.inner = input;
+        res
+    }
+}
 
 #[derive(Default)]
 pub struct Registers {
@@ -61,6 +73,7 @@ impl Device for Registers {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Mode {
     Search = 2,
@@ -69,32 +82,42 @@ pub enum Mode {
     VBlank = 1,
 }
 
-trait State {
+trait State: Debug {
     fn mode(&self) -> Mode;
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>>;
     fn boxed(self) -> Box<dyn State> where  Self: 'static + Sized { Box::new(self) }
+    fn name(&self) -> String {
+        format!("{:?}", self.mode())
+    }
 }
 
 #[derive(Default)]
-struct Flags {
-    window: u8
+struct Window {
+    scan_enabled: bool,
+    enabled: bool,
+    x: u8,
+    y: u8
 }
 
-impl Flags {
-    fn window_active(&self) -> bool { self.window == 0x7 }
-}
+const TILEDATA_WIDTH: usize = 16 * 16;
+const TILEDATA_HEIGHT: usize = 24 * 16;
 
 struct Ppu {
+    dots: usize,
     oam: Oam,
     vram: Vram,
     state: Box<dyn State>,
     regs: Registers,
     sprites: Vec<Sprite>,
-    buffer: Rc<RefCell<dyn Framebuffer>>,
-    flags: Flags,
-    lcdc: LCDC
+    lcd: Lcd,
+    lcdc: LCDC,
+    win: Window,
+    cgb: bool,
+    stat: REdge,
+    tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>
 }
 
+#[derive(Debug)]
 struct OamState {
     clock: u8,
     sprite: usize
@@ -104,55 +127,159 @@ impl OamState {
     fn new() -> Self { Self { sprite: 0, clock: 0 } }
 }
 
+#[derive(Copy, Clone)]
 pub struct Pixel {
     pub color: u8,
     pub palette: u8,
-    pub index: Option<usize>,
+    pub index: Option<u8>,
     pub priority: Option<bool>
 }
 
 impl Pixel {
+
     pub fn color(&self) -> [u8; 3] {
+        const COLORS: [[u8; 3]; 4] = [[0xBF; 3], [0x7F; 3], [0x3F; 3], [0; 3]];
         let color = (self.palette >> (2 * self.color)) & 0x3;
-        [color * 64; 3]
+        COLORS[color as usize]
+    }
+
+    pub fn white(palette: u8) -> Self {
+        Self {
+            color: 0,
+            palette,
+            index: None,
+            priority: None
+        }
+    }
+
+    /// sprite priority mix
+    pub fn mix(&mut self, rhs: Pixel) {
+        *self = match (self.color, rhs.color, self.index, rhs.index) {
+            (_, 0, ..) => *self,
+            (0, ..) => rhs,
+            (_, _, None, Some(_)) => rhs,
+            (_, _, Some(_), None ) => *self,
+            (_, _, Some(x1), Some(x2) ) if x1 < x2 => *self,
+            (_, _, Some(x1), Some(x2) ) if x1 > x2 => rhs,
+            _ => *self,
+        }
     }
 }
 
-pub struct Fifo {
+pub struct ObjFifo {
     inner: VecDeque<Pixel>,
 }
 
-impl Fifo {
+trait Fifo {
+    fn push(&mut self, data: Vec<Pixel>) -> bool;
+}
+
+impl ObjFifo {
     pub fn new() -> Self {
-        Fifo { inner: VecDeque::with_capacity(16) }
+        ObjFifo { inner: VecDeque::with_capacity(8) }
     }
 
-    pub fn push(&mut self, data: Vec<Pixel>) -> bool {
-        if self.inner.len() > 8 { return false };
-        for pix in data {
-            self.inner.push_back(pix);
-        }
-        true
+    pub fn clear(&mut self) {
+        self.inner.clear();
     }
 
     pub fn pop(&mut self) -> Option<Pixel> {
         self.inner.pop_front()
     }
+
+    fn merge(&mut self, data: Vec<Pixel>) -> bool {
+        for _ in self.inner.len()..8 {
+            self.inner.push_back(Pixel {
+                color: 0x00,
+                palette: 0x00,
+                index: None,
+                priority: None
+            });
+        }
+        self.inner
+            .iter_mut()
+            .zip(data.into_iter())
+            .for_each(|(obj, p)| { obj.mix(p); });
+        true
+    }
+}
+
+pub struct BgFifo {
+    inner: VecDeque<Pixel>,
+    enabled: bool
+}
+
+impl BgFifo {
+    pub fn new() -> Self {
+        BgFifo {
+            enabled: false,
+            inner: VecDeque::with_capacity(16)
+        }
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn clear(&mut self) {
+        self.inner.clear();
+        self.disable();
+    }
+
+    pub(crate) fn mix(&mut self, oam: &mut ObjFifo, ppu: &mut Ppu) -> Option<Pixel> {
+        if self.enabled {
+            match (oam.pop(), self.inner.pop_front()) {
+                (None, bg) => bg,
+                (Some(oam), Some(bg)) => {
+                    Some({
+                        let bg = if !ppu.cgb && !ppu.lcdc.priority() { Pixel::white(ppu.regs.bgp.read()) } else { bg };
+                        if oam.color == 0x0 { bg }
+                        else if ppu.lcdc.priority() && bg.color != 0 && (oam.priority.unwrap_or(true) || bg.priority.unwrap_or(false)) { bg }
+                        else { oam }
+                    })
+                },
+                (_, None) => None
+            }
+        } else { None }
+    }
+
+    fn push(&mut self, data: Vec<Pixel>) -> bool {
+        if self.inner.len() > 8 { return false };
+        for pix in data {
+            self.inner.push_back(pix);
+        }
+        if self.inner.len() > 8 { self.enable(); }
+        true
+    }
 }
 
 struct TransferState {
     dots: usize,
-    x: usize,
-    y: usize,
+    lx: u8,
+    ly: u8,
+    scx: u8,
     fetcher: Fetcher,
-    bg: Fifo,
-    oam: Fifo,
+    bg: BgFifo,
+    oam: ObjFifo,
+    sprite: Option<usize>,
 }
 
+impl Debug for TransferState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("[{} - {}]({}) left {}", self.lx, self.ly, self.scx, self.dots).as_str())
+    }
+}
+
+#[derive(Debug)]
 struct HState {
     dots: usize
 }
 
+#[derive(Debug)]
 struct VState {
     dots: usize
 }
@@ -165,8 +292,12 @@ impl State for OamState {
         if self.clock < 2 { return None }
         self.clock = 0;
         let ly = ppu.regs.ly.read();
+        if self.sprite == 0 {
+            ppu.sprites.clear();
+            ppu.win.scan_enabled = ppu.regs.wy.read() == ly;
+        }
         let oam = ppu.oam.sprites[self.sprite];
-        if ly + 16 >= oam.y && ly + 8 < oam.y && ppu.sprites.len() < 10 {
+        if ly >= oam.y && ly < oam.y + 8 && ppu.sprites.len() < 10 {
             ppu.sprites.push(oam);
         }
         self.sprite += 1;
@@ -177,11 +308,8 @@ impl State for OamState {
 impl TransferState {
     fn new(ppu: &Ppu) -> Self where Self: Sized {
         let ly = ppu.regs.ly.read();
-        Self { dots: 0, x: 0, y: ly as usize, fetcher: Fetcher::new(ly / 8, ly % 8), bg: Fifo::new(), oam: Fifo::new() }
-    }
-
-    fn fetch(&mut self, ppu: &mut Ppu) -> Option<Pixel> {
-        self.bg.pop()
+        let scx = ppu.regs.scx.read() & 0x7;
+        Self { sprite: None, dots: 0, lx: 0, ly, scx, fetcher: Fetcher::new(ly / 8, ly % 8), bg: BgFifo::new(), oam: ObjFifo::new() }
     }
 }
 
@@ -189,14 +317,33 @@ impl State for TransferState {
     fn mode(&self) -> Mode { Mode::Transfer }
 
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
-        self.dots += 1;
-        self.fetcher.tick(ppu, &mut self.bg);
-        // TODO check every sprite for this x.
-        if let Some(pixel) = self.fetch(ppu) {
-            ppu.buffer.as_ref().borrow_mut().set(self.x, self.y, pixel.color());
-            self.x += 1;
-            // TODO render pixel to LCD
-            if self.x == 160 {
+        if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
+            if ppu.lcdc.win_enable() && !ppu.win.enabled {
+                self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
+                self.bg.clear();
+            }
+            ppu.win.enabled = ppu.lcdc.win_enable();
+        }
+        self.fetcher.tick(ppu, &mut self.bg, &mut self.oam);
+        if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled && !self.fetcher.fetching_sprite() {
+            let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
+            for i in idx..ppu.sprites.len() {
+                if ppu.sprites[i].x == self.lx {
+                    self.sprite = Some(i);
+                    self.fetcher.set_mode(fetcher::Mode::Sprite(ppu.sprites[i], self.lx), self.lx);
+                    self.bg.disable();
+                    break ;
+                }
+            }
+        }
+        if let Some(pixel) = self.bg.mix(&mut self.oam, ppu) {
+            if self.scx > 0 {
+                self.scx -= 1;
+                if !ppu.win.enabled || self.scx > 1 { return None; }
+            }
+            ppu.lcd.set(self.lx as usize, self.ly as usize, pixel.color());
+            self.lx += 1;
+            if self.lx == 160 {
                 return Some(HState::new(376 - self.dots).boxed())
             }
         }
@@ -223,6 +370,7 @@ impl State for VState {
             ppu.regs.ly.direct_write(ly);
         }
         if self.dots == 0 {
+            ppu.update_tiledata();
             Some(OamState::new().boxed())
         } else { None }
     }
@@ -250,32 +398,72 @@ impl State for HState {
 }
 
 impl Ppu {
-    pub fn new(cgb: bool, buffer: Rc<RefCell<dyn Framebuffer>>) -> Self {
+    pub fn new(cgb: bool, lcd: Lcd) -> Self {
         let mut sprites = Vec::with_capacity(10);
         Self {
+            dots: 0,
             oam: Oam::new(),
             vram: Vram::new(cgb),
             regs: Registers::default(),
-            state: Box::new(OamState::new()),
+            state: Box::new(VState::new()),
             sprites,
-            buffer,
-            flags: Default::default(),
+            lcd,
+            cgb,
             lcdc: LCDC(0),
+            win: Default::default(),
+            tiledata: vec![],
+            stat: REdge::new()
         }
     }
 
     fn tick(&mut self) {
         let lcdc = LCDC(self.regs.lcdc.read());
         if self.lcdc.enabled() && !lcdc.enabled() {
+            self.dots = 0;
             self.regs.ly.direct_write(0);
-            self.state = Box::new(HState::new(1));
+            self.state = Box::new(OamState::new());
+            self.lcd.disable();
         }
         self.lcdc = lcdc;
-        if !self.lcdc.enabled() { return; };
+        if !self.lcdc.enabled() { return; }
+        if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
         let mut state = std::mem::replace(&mut self.state, Box::new(OamState::new()));
-        self.state = if let Some(state) = state.tick(self) {
-            state
+        self.state = if let Some(next) = state.tick(self) {
+            let mode = next.mode();
+            if mode == Mode::VBlank {
+                self.dots = 0;
+                self.lcd.enable();
+            }
+            next
         } else { state };
+        let mode = self.state.mode();
+        // TODO move this back to next state.
+        self.regs.stat.reset(0);
+        self.regs.stat.reset(1);
+        if (mode as u8 & 0x1) != 0 { self.regs.stat.set(0); }
+        if (mode as u8 & 0x2) != 0 { self.regs.stat.set(1); }
+        let input = self.regs.stat.bit(3) != 0 && mode == Mode::HBlank;
+        let input = input || (self.regs.stat.bit(4) != 0 && mode == Mode::VBlank);
+        let input = input || (self.regs.stat.bit(5) != 0 && mode == Mode::Search);
+        let input = input || (self.regs.stat.bit(6) != 0 && self.regs.stat.bit(2) != 0);
+        if self.stat.tick(input) {
+            self.regs.interrupt.set(1);
+        }
+    }
+
+    pub fn update_tiledata(&mut self) {
+        for (mut bank, img) in self.tiledata.iter_mut().enumerate() {
+            let bank = bank as u8;
+            for y in 0..24 {
+                for x in 0..16 {
+                    for s in 0..8 {
+                        let addr = y * 16 * 16 + 16 * x + s * 2;
+                        let h = self.vram.read_bank(addr + 1, bank) as u16;
+                        let t = self.vram.read_bank(addr, bank) as u16 | (h << 8);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -309,9 +497,9 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new(cgb: bool, lcd: &lcd::Lcd) -> Self {
+    pub fn new(cgb: bool, lcd: Lcd) -> Self {
         Self {
-            ppu: Ppu::new(cgb, lcd.framebuffer()).cell()
+            ppu: Ppu::new(cgb, lcd).cell()
         }
     }
 

@@ -158,6 +158,10 @@ impl<'a> State<'a> {
         self.cache.pop().expect("stack empty")
     }
 
+    pub fn try_pop(&mut self) -> Option<Value> {
+        self.cache.pop()
+    }
+
     pub fn register<R: Into<Reg>>(&mut self, register: R) -> Value {
         match register.into() {
             Reg::ST => self.pop(),

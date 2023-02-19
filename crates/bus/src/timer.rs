@@ -42,7 +42,7 @@ impl Timer {
         self.timer = v;
         let mut d = self.div.value();
         if c {
-            d += 1;
+            d = d.wrapping_add( 1);
             self.div.direct_write(d);
         }
         let tac = self.tac.value();

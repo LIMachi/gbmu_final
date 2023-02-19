@@ -88,7 +88,7 @@ pub fn pc(state: &mut State) -> Flow {
 }
 
 pub fn mem(state: &mut State) -> Flow {
-    let v = state.pop();
+    let v = state.try_pop().expect(format!("failed to pop mem (pc {:#06X})", state.regs.pc()).as_str());
     state.write(v);
     CONTINUE
 }
