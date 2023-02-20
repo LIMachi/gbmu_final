@@ -295,35 +295,35 @@ impl IO {
         use Access::*;
         use AccessMode::*;
         match self {
-            IO::JOYP => Custom([R, R, R, R, W, W, U, U]),
-            IO::SB => Generic(RW),
-            IO::SC => Generic(RW),
-            IO::DIV => Generic(RW),
-            IO::TIMA => Generic(RW),
-            IO::TMA => Generic(RW),
-            IO::TAC => Custom([RW, RW, RW, U, U, U, U, U]),
-            IO::IF => Custom([RW, RW, RW, RW, RW, U, U, U]),
-            IO::NR10 => Generic(RW),
-            IO::NR11 => Custom([W, W, W, W, W, W, RW, RW]),
-            IO::NR12 => Generic(RW),
-            IO::NR13 => Generic(W),
-            IO::NR14 => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR21 => Custom([W, W, W, W, W, W, RW, RW]),
-            IO::NR22 => Generic(RW),
-            IO::NR23 => Generic(W),
-            IO::NR24 => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR30 => Generic(RW),
-            IO::NR31 => Generic(W),
-            IO::NR32 => Generic(RW),
-            IO::NR33 => Generic(W),
-            IO::NR34 => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR41 => Generic(W),
-            IO::NR42 => Generic(RW),
-            IO::NR43 => Generic(RW),
-            IO::NR44 => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR50 => Generic(RW),
-            IO::NR51 => Generic(RW),
-            IO::NR52 => Custom([U, U, U, U, RW, RW, U, U]),
+            IO::JOYP     => Custom([R, R, R, R, RW, RW, U, U]),
+            IO::SB       => Generic(RW),
+            IO::SC       => Generic(RW),
+            IO::DIV      => Generic(RW),
+            IO::TIMA     => Generic(RW),
+            IO::TMA      => Generic(RW),
+            IO::TAC      => Custom([RW, RW, RW, U, U, U, U, U]),
+            IO::IF       => Custom([RW, RW, RW, RW, RW, U, U, U]),
+            IO::NR10     => Generic(RW),
+            IO::NR11     => Custom([W, W, W, W, W, W, RW, RW]),
+            IO::NR12     => Generic(RW),
+            IO::NR13     => Generic(W),
+            IO::NR14     => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR21     => Custom([W, W, W, W, W, W, RW, RW]),
+            IO::NR22     => Generic(RW),
+            IO::NR23     => Generic(W),
+            IO::NR24     => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR30     => Generic(RW),
+            IO::NR31     => Generic(W),
+            IO::NR32     => Generic(RW),
+            IO::NR33     => Generic(W),
+            IO::NR34     => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR41     => Generic(W),
+            IO::NR42     => Generic(RW),
+            IO::NR43     => Generic(RW),
+            IO::NR44     => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR50     => Generic(RW),
+            IO::NR51     => Generic(RW),
+            IO::NR52     => Custom([U, U, U, U, RW, RW, U, U]),
             IO::WaveRam0 => Generic(RW),
             IO::WaveRam1 => Generic(RW),
             IO::WaveRam2 => Generic(RW),
@@ -469,8 +469,18 @@ impl Mem for HReg {
         self.v | !self.rmask
     }
 
-    fn write(&mut self, _: u16, value: u8, _: u16) {
-        self.v = (self.v | !self.wmask) | (value & self.wmask);
+    fn write(&mut self, _: u16, value: u8, io: u16) {
+        if io == (IO::JOYP as u16) {
+            println!("---JOYP---");
+            println!("{:#010b}", self.wmask);
+            println!("{:#010b}", self.v);
+            println!("{:#010b}", value);
+        }
+        self.v = (self.v & !self.wmask) | (value & self.wmask);
+        if io == (IO::JOYP as u16) {
+            println!("{:#010b}", self.v);
+            println!("{:#010b}", self.read(0, io));
+        }
         //self.v = value & self.wmask;
         self.dirty = true;
     }

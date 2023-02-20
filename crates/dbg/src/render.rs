@@ -316,7 +316,7 @@ impl<E: Emulator> Ui for Ninja<E> {
 
     fn handle(&mut self, event: &Events) {
         match event {
-            Events::Loaded => self.disassembly.reload(&self.emu),
+            Events::Loaded => self.disassembly.reload(),
             _ => {}
         }
     }

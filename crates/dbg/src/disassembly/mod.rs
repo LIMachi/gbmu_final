@@ -1,13 +1,14 @@
 use std::collections::{HashMap, VecDeque};
-use std::ops::RangeBounds;
+use std::ops::{Range, RangeBounds};
 use egui_extras::{Column, TableBuilder};
 use shared::cpu::{CBOpcode, Opcode, Reg};
 use shared::egui;
 use shared::egui::{Color32, Ui, Widget};
-use shared::mem::{ROM, SROM};
+use shared::mem::*;
 use shared::utils::Cell;
 use crate::Emulator;
 
+mod viewer;
 mod dbg_opcodes;
 
 #[derive(Clone)]
@@ -44,97 +45,125 @@ impl Default for Op {
     }
 }
 
+#[derive(Default)]
 struct OpRange {
     pub ops: Vec<Op>
 }
 
 
 impl OpRange {
-    pub fn new() -> Self { Self { ops: vec![] } }
-
     // ignore range: start + skip || need to match start exactly to skip
-    pub fn parse(&mut self, input: Vec<u8>, ignore: Vec<(usize, usize)>) {
+    pub fn parse(mut self, input: Vec<u8>, ignore: Vec<(usize, usize)>) -> Self {
+        self.ops.clear();
         let mut st = 0;
         while st < input.len() {
             if let Some((_, len)) = ignore.iter().find(|(x, _)| x == st) {
                 st += len;
+                self.ops.push(Op {
+                    size: len as usize,
+                    instruction: "..".to_string(),
+                    data: input[x..(x + (len as usize).min(8))].to_vec()
+                });
                 continue;
             }
             let op = Op::parse(&input[st..]);
             st += op.size;
             self.ops.push(op);
         }
+        self
     }
 }
 
-struct RomRange {
-    ops: OpRange
+#[derive(Default)]
+struct RomRange(OpRange);
+
+struct DynRange(u16, u16, OpRange);
+
+impl DynRange {
+    pub fn new(st: u16, end: u16) -> Self { Self(st, end - st + 1, OpRange::default()) }
 }
 
-impl RomRange {
-    fn new() -> Self {
-        Self { ops: OpRange::new() }
+impl MemRange for DynRange {
+    fn reload(&mut self) { }
+    fn range(&self) -> Range<u16> {
+        self.0..self.1
     }
-    fn update(&mut self) {
-        if !self.ops.ops.is_empty() { return }
 
+    fn update<E: Emulator>(&mut self, emu: &E) -> &OpRange {
+        self.2 = OpRange::default().parse(emu.get_range(self.0, self.1), vec![]);
+        &self.2
     }
 }
 
+#[derive(Default)]
 struct SromRange {
     banks: HashMap<u16, OpRange>
 }
 
 impl MemRange for RomRange {
-    fn reload(&mut self) { self.ops.ops.clear(); }
+    fn reload(&mut self) { self.0.ops.clear(); }
     fn range(&self) -> std::ops::Range<u16> { (0..0x4000) }
-    fn update<E: Emulator>(&mut self, emu: &E) {
-
+    fn update<E: Emulator>(&mut self, emu: &E) -> &OpRange {
+        if self.0.ops.is_empty() {
+            self.0 = self.0.parse(emu.get_range(0, 0x4000), vec![(0x104, 0x46)]);
+        }
+        &self.0
     }
 }
 
 impl MemRange for SromRange {
     fn reload(&mut self) { self.banks.clear() }
     fn range(&self) -> std::ops::Range<u16> { (0x4000..0x8000) }
-    fn update<E: Emulator>(&mut self, emu: &E) {
-        let bank = emu.mbc()
+    fn update<E: Emulator>(&mut self, emu: &E) -> &OpRange {
+        let bank = {
+            let emu = emu.bus();
+            let mbc = emu.mbc();
+            (mbc.rom_bank_high() as u16) << 8 | mbc.rom_bank_low()
+        };
+        self.banks.entry(bank).or_insert_with(|| OpRange::default().parse(emu.get_range(0x4000, 0x4000), vec![]))
     }
 }
 
 trait MemRange {
     fn reload(&mut self);
     fn range(&self) -> std::ops::Range<u16>;
-    fn update<E: Emulator>(&mut self, emu: &E);
+    fn update<E: Emulator>(&mut self, emu: &E) -> &OpRange;
 }
 
 pub struct Disassembly {
+    last: Range<u16>,
     ranges: Vec<Box<dyn MemRange>>
 }
 
 impl Disassembly {
     pub fn new() -> Self {
         Self {
+            last: 0xFFFF..0xFFFF,
             ranges: vec![
-
+                RomRange::default().into(),
+                SromRange::default().into(),
+                DynRange::new(RAM, RAM_END).into(),
+                DynRange::new(SRAM, SRAM_END).into(),
+                DynRange::new(HRAM, HRAM_END).into()
             ]
         }
     }
 
-    pub(crate) fn next(&self, emu: &impl Emulator) -> Option<(u16, Op)> {
+    pub(crate) fn next(&mut self, emu: &impl Emulator) -> Option<(u16, Op)> {
         let pc = emu.cpu_register(Reg::PC).u16();
-        if !self.range.contains(pc) {
-            return None;
-        }
-        let mut st = self.range.st;
-        for op in &self.range.ops {
-            if st == pc { return Some((st, op.clone())); }
-            st += op.size as u16;
+        if let Some((range, ops)) = self.ranges.iter_mut().find(|x| x.range().contains(&pc))
+            .map(|mut x| (x.range(), x.update(emu))) {
+            let mut st = range.start;
+            for op in &ops.ops {
+                if st == pc { return Some((st, op.clone())); }
+                st += op.size as u16;
+            }
         }
         None
     }
 
-    pub fn reload(&mut self, emu: &impl Emulator) {
-
+    pub fn reload(&mut self) {
+        self.ranges.iter_mut().for_each(|x| x.reload());
     }
 
     pub fn render<E: Emulator>(&mut self, emu: &E, ui: &mut Ui) {
