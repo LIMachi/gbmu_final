@@ -371,6 +371,12 @@ impl IO {
             IO::IE => Custom([RW, RW, RW, RW, RW, U, U, U])
         }
     }
+    pub fn default(&self) -> u8 {
+        match self {
+            IO::JOYP => 0xFF,
+            _ => 0
+        }
+    }
 }
 
 pub enum Access { W, R, RW, U }
@@ -464,7 +470,8 @@ impl Mem for HReg {
     }
 
     fn write(&mut self, _: u16, value: u8, _: u16) {
-        self.v = value & self.wmask;
+        self.v = (self.v | !self.wmask) | (value & self.wmask);
+        //self.v = value & self.wmask;
         self.dirty = true;
     }
 }
@@ -496,6 +503,7 @@ impl IOReg {
     pub fn rw() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::rw())))) }
     pub fn custom(bits: [Access; 8]) -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::Custom(bits))))) }
     pub fn with_access(mode: AccessMode) -> Self { IOReg(HReg::new(mode).cell()) }
+    pub fn with_value(mut self, value: u8) -> Self { self.direct_write(value); self }
     pub fn unset() -> Self { IOReg(HReg::new(AccessMode::Generic(Access::U)).cell()) }
 
     pub fn value(&self) -> u8 { self.0.borrow().v }

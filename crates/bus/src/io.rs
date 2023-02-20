@@ -10,9 +10,10 @@ impl IORegs {
     pub fn init() -> Self {
         Self {
             range: (0..128).into_iter().map(|i| {
-                let access = IO::try_from(0xFF00 + i)
-                    .map(|x| x.access()).unwrap_or(Default::default());
+                let (access, value) = IO::try_from(0xFF00 + i)
+                    .map(|x| (x.access(), x.default())).unwrap_or(Default::default());
                 IOReg::with_access(access)
+                    .with_value(value)
             }).collect()
         }
     }
