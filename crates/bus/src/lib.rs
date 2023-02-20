@@ -61,11 +61,7 @@ impl Bus {
             UN_1..=UN_1_END => self.un_1.borrow().read(addr - UN_1, addr),
             IO..=IO_END => self.io.read(addr - IO, addr),
             HRAM..=HRAM_END => self.hram.borrow().read(addr - HRAM, addr),
-            END => {
-                let v = self.ie.read();
-                log::debug!("read on {} ({})", addr, v);
-                v
-            },
+            END => self.ie.read(),
             _=> unreachable!()
         }
     }

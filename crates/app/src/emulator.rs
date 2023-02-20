@@ -144,6 +144,7 @@ impl dbg::Schedule for Emulator {
 }
 
 impl Emu {
+    // pub const CLOCK_PER_SECOND: u32 = 4_194_304 / 8;
     pub const CLOCK_PER_SECOND: u32 = 4_194_304;
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 

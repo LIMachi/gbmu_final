@@ -6,6 +6,7 @@ use super::{ops::*, State, Registers, decode::decode};
 
 pub struct Cpu {
     prev: Opcode,
+    at: u16,
     instructions: Vec<Vec<Op>>,
     regs: Registers,
     cache: Vec<Value>,
@@ -34,6 +35,7 @@ impl Cpu {
             ime: false,
             int_flags: IOReg::unset(),
             ie: IOReg::unset(),
+            at: 0,
         }
     }
 
@@ -58,22 +60,35 @@ impl Cpu {
         if self.instructions.is_empty() {
             let opcode = state.read();
             if let Ok(opcode) = Opcode::try_from((opcode, prefixed)) {
-                #[cfg(feature = "log_opcode")]
-                log::debug!("[0x{:x}] instruction {opcode:?}", state.register(Reg::PC));
                 self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
                 self.prev = opcode;
+                self.at = state.register(Reg::PC).u16();
             } else {
                 self.instructions = vec![vec![inc::pc]];
                 self.prev = Opcode::Nop;
                 log::warn!("invalid opcode {opcode:x}");
             }
         }
+        let mut ok = true;
         for op in self.instructions.pop().expect("this can never be empty") {
             if op(&mut state) == BREAK {
+                #[cfg(feature = "log_opcode")]
+                log::debug!("[0x{:x}] instruction {:?} [BREAK]", self.at, self.prev);
                 state.clear();
                 self.instructions.clear();
+                ok = false;
                 break;
             }
+        }
+        if ok && self.instructions.is_empty() && [
+            Opcode::Ret, Opcode::Reti, Opcode::RetNZ, Opcode::RetNC, Opcode::RetC, Opcode::RetZ,
+            Opcode::Calla16, Opcode::CallNZa16, Opcode::CallZa16, Opcode::CallNCa16,Opcode::CallCa16,
+            Opcode::Rst00H, Opcode::Rst08H, Opcode::Rst10H, Opcode::Rst18H, Opcode::Rst28H, Opcode::Rst20H, Opcode::Rst30H, Opcode::Rst38H,
+            Opcode::Jpa16, Opcode::Jrr8, Opcode::JpHL, Opcode::JrCr8, Opcode::JrZr8, Opcode::JrNCr8, Opcode::JrNZr8,
+            Opcode::JpCa16, Opcode::JpZa16, Opcode::JpNZa16, Opcode::JpNCa16, Opcode::Ei, Opcode::Di, Opcode::LdhInda8A, Opcode::LdhAInda8
+        ].contains(&self.prev) {
+            #[cfg(feature = "log_opcode")]
+            log::debug!("[0x{:x}] instruction {:?}", self.at, self.prev);
         }
         self.finished = self.instructions.is_empty() && !*state.prefix;
     }
