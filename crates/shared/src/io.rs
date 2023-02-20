@@ -295,7 +295,7 @@ impl IO {
         use Access::*;
         use AccessMode::*;
         match self {
-            IO::JOYP     => Custom([R, R, R, R, W, W, U, U]),
+            IO::JOYP     => Custom([R, R, R, R, RW, RW, U, U]),
             IO::SB       => Generic(RW),
             IO::SC       => Generic(RW),
             IO::DIV      => Generic(RW),
@@ -469,8 +469,18 @@ impl Mem for HReg {
         self.v | !self.rmask
     }
 
-    fn write(&mut self, _: u16, value: u8, _: u16) {
-        self.v = (self.v | !self.wmask) | (value & self.wmask);
+    fn write(&mut self, _: u16, value: u8, io: u16) {
+        if io == (IO::JOYP as u16) {
+            println!("---JOYP---");
+            println!("{:#010b}", self.wmask);
+            println!("{:#010b}", self.v);
+            println!("{:#010b}", value);
+        }
+        self.v = (self.v & !self.wmask) | (value & self.wmask);
+        if io == (IO::JOYP as u16) {
+            println!("{:#010b}", self.v);
+            println!("{:#010b}", self.read(0, io));
+        }
         //self.v = value & self.wmask;
         self.dirty = true;
     }
