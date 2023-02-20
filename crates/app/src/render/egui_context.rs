@@ -144,6 +144,7 @@ impl<U: 'static + Ui> Context for EguiContext<U> {
             Event::WindowEvent { window_id, .. } if window_id == &self.window.id() => {
                 self.platform.handle_event(event);
             },
+            Event::UserEvent(evt) => self.data.handle(evt),
             Event::WindowEvent { event: wevent, .. } => {
                 match wevent {
                     WindowEvent::CursorEntered { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::CursorMoved { ..} => {

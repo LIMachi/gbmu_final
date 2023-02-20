@@ -12,10 +12,11 @@ use app::Menu;
 use dbg::Debugger;
 use render::{windows::Windows, WindowType};
 use shared::breakpoints::Breakpoints;
+use shared::{Events, Handle};
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::emulator::Emu;
-use crate::render::{Event, EventLoop, Events, Handle, Proxy};
+use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
     emu: emulator::Emulator,

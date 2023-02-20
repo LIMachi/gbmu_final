@@ -13,6 +13,23 @@ mod value;
 pub mod rom;
 pub mod breakpoints;
 
+#[derive(Copy, Debug, Eq, PartialEq, Hash, Clone)]
+pub enum Handle {
+    Main,
+    Debug,
+    Game,
+    Settings
+}
+
+#[derive(Debug)]
+pub enum Events {
+    Play(rom::Rom),
+    Load(String),
+    Loaded,
+    Open(Handle),
+    Close(Handle)
+}
+
 pub enum Target {
     GB,
     GBC
@@ -51,6 +68,7 @@ pub mod cpu {
 pub trait Ui {
     fn init(&mut self, ctx: &mut egui::Context) { }
     fn draw(&mut self, ctx: &egui::Context) { }
+    fn handle(&mut self, event: &Events) { }
 }
 
 impl Ui for () { }

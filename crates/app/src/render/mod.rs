@@ -19,14 +19,6 @@ pub enum WindowType {
     Keybindings
 }
 
-#[derive(Copy, Debug, Eq, PartialEq, Hash, Clone)]
-pub enum Handle {
-    Main,
-    Debug,
-    Game,
-    Settings
-}
-
 impl WindowType {
     pub fn handle(&self) -> Handle {
         match self {
@@ -45,7 +37,7 @@ impl WindowType {
             WindowType::Game(_) => WindowBuilder::new()
                 .with_title(" ")
                 .with_min_inner_size(PhysicalSize::new(160, 144))
-                .with_inner_size(PhysicalSize::<u32>::from((1280, 1152))),
+                .with_inner_size(PhysicalSize::<u32>::from((640, 576))),
             WindowType::Debug(_) => WindowBuilder::new()
                 .with_title("GBMU - debugger")
                 .with_min_inner_size(PhysicalSize::<u32>::from((1000, 750)))
@@ -62,14 +54,6 @@ impl WindowType {
             _ => unimplemented!()
         }
     }
-}
-
-#[derive(Debug)]
-pub enum Events {
-    Play(Rom),
-    Load(String),
-    Open(Handle),
-    Close(Handle)
 }
 
 pub type Event<'a> = winit::event::Event<'a, Events>;
@@ -102,6 +86,7 @@ pub trait Render {
 pub use egui_context::EguiContext;
 pub use raw_context::RawContext;
 use shared::cpu::Reg;
+use shared::{Events, Handle};
 use shared::rom::Rom;
 use crate::emulator::Emulator;
 use crate::Menu;

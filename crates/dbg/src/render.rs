@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use egui_extras::Column;
 use super::{Emulator, Ninja, Disassembly};
-use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}};
+use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}, Events};
 use shared::breakpoints::{Breakpoint};
 use shared::cpu::{Reg, Value, Flags};
 use shared::egui::{ScrollArea, SidePanel, Stroke};
@@ -312,6 +312,13 @@ impl<E: Emulator> Ui for Ninja<E> {
                         });
                 });
             });
+    }
+
+    fn handle(&mut self, event: &Events) {
+        match event {
+            Events::Loaded => self.disassembly.reload(&self.emu),
+            _ => {}
+        }
     }
 }
 

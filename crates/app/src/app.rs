@@ -5,10 +5,10 @@ use std::sync::mpsc::{Receiver, Sender};
 use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Widget};
 use shared::rom::Rom;
 use shared::utils::image::ImageLoader;
-use crate::{Events, Handle};
 use crate::render::Proxy;
 
 use serde::{Serialize, Deserialize};
+use shared::{Events, Handle};
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 

@@ -1,8 +1,10 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::ops::RangeBounds;
 use egui_extras::{Column, TableBuilder};
 use shared::cpu::{CBOpcode, Opcode, Reg};
 use shared::egui;
 use shared::egui::{Color32, Ui, Widget};
+use shared::mem::{ROM, SROM};
 use shared::utils::Cell;
 use crate::Emulator;
 
@@ -43,59 +45,80 @@ impl Default for Op {
 }
 
 struct OpRange {
-    st: u16,
-    len: usize,
-    ops: VecDeque<Op>
+    pub ops: Vec<Op>
 }
 
+
 impl OpRange {
-    pub fn empty() -> Self {
-        Self { st: 0xFFFF, len: 0, ops: VecDeque::with_capacity(8) }
-    }
+    pub fn new() -> Self { Self { ops: vec![] } }
 
-    pub fn pop(&mut self) -> Option<(u16, Op)> {
-        self.ops.pop_front().map(|x| {
-            let pc = self.st;
-            self.st += x.size as u16;
-            self.len -= x.size;
-            (pc, x)
-        })
-    }
-
-    pub fn push(&mut self, op: Op) {
-        self.ops.push_back(op);
-    }
-
-    pub fn replace(&mut self, pc: u16, range: Vec<u8>) {
-        self.ops.clear();
-        let mut off = 0;
-        while self.ops.len() < 8 && off < range.len() {
-            let op = Op::parse(&range[off..]);
-            off += op.size;
-            self.ops.push_back(op);
+    // ignore range: start + skip || need to match start exactly to skip
+    pub fn parse(&mut self, input: Vec<u8>, ignore: Vec<(usize, usize)>) {
+        let mut st = 0;
+        while st < input.len() {
+            if let Some((_, len)) = ignore.iter().find(|(x, _)| x == st) {
+                st += len;
+                continue;
+            }
+            let op = Op::parse(&input[st..]);
+            st += op.size;
+            self.ops.push(op);
         }
-        for i in self.ops.len()..8 {
-            self.ops.push_back(Op::default());
-        }
-        self.st = pc;
-        self.len = off;
     }
+}
 
-    pub fn next_pc(&self) -> u16 {
-        self.st + self.len as u16
-    }
+struct RomRange {
+    ops: OpRange
+}
 
-    pub fn contains(&self, pc: u16) -> bool {
-        pc >= self.st && pc < (self.st + self.len as u16)
+impl RomRange {
+    fn new() -> Self {
+        Self { ops: OpRange::new() }
     }
+    fn update(&mut self) {
+        if !self.ops.ops.is_empty() { return }
+
+    }
+}
+
+struct SromRange {
+    banks: HashMap<u16, OpRange>
+}
+
+impl MemRange for RomRange {
+    fn reload(&mut self) { self.ops.ops.clear(); }
+    fn range(&self) -> std::ops::Range<u16> { (0..0x4000) }
+    fn update<E: Emulator>(&mut self, emu: &E) {
+
+    }
+}
+
+impl MemRange for SromRange {
+    fn reload(&mut self) { self.banks.clear() }
+    fn range(&self) -> std::ops::Range<u16> { (0x4000..0x8000) }
+    fn update<E: Emulator>(&mut self, emu: &E) {
+        let bank = emu.mbc()
+    }
+}
+
+trait MemRange {
+    fn reload(&mut self);
+    fn range(&self) -> std::ops::Range<u16>;
+    fn update<E: Emulator>(&mut self, emu: &E);
 }
 
 pub struct Disassembly {
-    range: OpRange
+    ranges: Vec<Box<dyn MemRange>>
 }
 
 impl Disassembly {
-    pub fn new() -> Self { Self { range: OpRange::empty() } }
+    pub fn new() -> Self {
+        Self {
+            ranges: vec![
+
+            ]
+        }
+    }
 
     pub(crate) fn next(&self, emu: &impl Emulator) -> Option<(u16, Op)> {
         let pc = emu.cpu_register(Reg::PC).u16();
@@ -108,6 +131,10 @@ impl Disassembly {
             st += op.size as u16;
         }
         None
+    }
+
+    pub fn reload(&mut self, emu: &impl Emulator) {
+
     }
 
     pub fn render<E: Emulator>(&mut self, emu: &E, ui: &mut Ui) {

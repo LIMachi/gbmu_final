@@ -3,7 +3,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
-use shared::{egui::Context, Ui, cpu::*, breakpoints::{Breakpoint, Breakpoints}};
+use shared::{egui::Context, Ui, cpu::*, breakpoints::{Breakpoint, Breakpoints}, Events};
 
 mod disassembly;
 mod memory;
@@ -101,6 +101,8 @@ impl<E:Emulator> Ui for Debugger<E> {
     fn draw(&mut self, ctx: &Context) {
         self.inner.borrow_mut().draw(ctx)
     }
+
+    fn handle(&mut self, event: &Events) {self.inner.borrow_mut().handle(event); }
 }
 
 impl<E: Emulator> Debugger<E> {

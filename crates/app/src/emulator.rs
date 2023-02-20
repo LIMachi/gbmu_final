@@ -15,11 +15,11 @@ use shared::breakpoints::Breakpoints;
 use shared::rom::Rom;
 use shared::cpu::*;
 use shared::io::IO;
-use shared::Ui;
+use shared::{Events, Ui};
 use shared::winit::{window::Window};
 use shared::mem::{IOBus, MemoryBus};
 use shared::utils::Cell;
-use crate::{Events, Proxy};
+use crate::Proxy;
 use crate::render::{Render, Event};
 
 pub struct Emu {
