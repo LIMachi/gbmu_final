@@ -8,7 +8,7 @@ use winit::event::WindowEvent;
 use bus::Dma;
 use dbg::BusWrapper;
 use lcd::Lcd;
-use mem::{mbc, Vram, Wram};
+use mem::{mbc, Wram};
 use mem::mbc::Controller;
 use shared::breakpoints::Breakpoints;
 
@@ -16,13 +16,15 @@ use shared::rom::Rom;
 use shared::cpu::*;
 use shared::io::IO;
 use shared::{Events, Ui};
-use shared::winit::{window::Window};
+use shared::egui::Context;
+use shared::winit::window::Window;
 use shared::mem::{IOBus, MemoryBus};
 use shared::utils::Cell;
 use crate::Proxy;
-use crate::render::{Render, Event};
+use crate::render::{Event, Render};
 
 pub struct Emu {
+    speed: i32,
     rom: Option<Rom>,
     pub lcd: lcd::Lcd,
     pub bus: bus::Bus,
@@ -50,6 +52,7 @@ impl Default for Emu {
             .configure(&mut timer)
             .configure(&mut cpu);
         Self {
+            speed: Default::default(),
             rom: None,
             lcd,
             ppu,
@@ -81,6 +84,15 @@ impl Emulator {
     pub fn stop(&mut self) {
         self.emu.replace(Emu::default());
     }
+
+    pub fn cycle_time(&self) -> f64 {
+        match self.emu.as_ref().borrow().speed {
+            0 => Emu::CYCLE_TIME,
+            1 => Emu::CYCLE_TIME / 2.,
+            n if n < 0 => Emu::CYCLE_TIME * ((1 << -n) as f64),
+            _ => unimplemented!()
+        }
+    }
 }
 
 impl Render for Emulator {
@@ -101,13 +113,27 @@ impl Render for Emulator {
             Event::UserEvent(Events::Play(rom)) => {
                 let mut emu = Emu::new(rom.clone(), true);
                 self.emu.replace(emu);
-                self.init(window);
+                Render::init(self, window);
             },
             Event::WindowEvent { window_id, event } if window_id == &window.id() && event == &WindowEvent::CloseRequested => {
                 self.stop();
             },
             _ => {}
         }
+    }
+}
+
+impl Ui for Emulator {
+    fn init(&mut self, ctx: &mut Context) {
+        self.emu.as_ref().borrow_mut().ppu.init(ctx);
+    }
+
+    fn draw(&mut self, ctx: &mut Context) {
+        self.emu.as_ref().borrow_mut().ppu.draw(ctx);
+    }
+
+    fn handle(&mut self, event: &Events) {
+        self.emu.as_ref().borrow_mut().ppu.handle(event);
     }
 }
 
@@ -141,6 +167,9 @@ impl dbg::Schedule for Emulator {
             .unwrap_or_else(|| Emu::default());
         self.emu.replace(emu);
     }
+
+    fn speed(&self) -> i32 { self.emu.as_ref().borrow().speed }
+    fn set_speed(&self, speed: i32) { self.emu.as_ref().borrow_mut().speed = speed; }
 }
 
 impl Emu {
@@ -169,6 +198,7 @@ impl Emu {
         IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
         IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
         Self {
+            speed: Default::default(),
             lcd,
             bus,
             cpu,
@@ -188,8 +218,8 @@ impl Emu {
                 self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
             }
-            self.timer.tick();
             self.dma.tick(&mut self.bus);
+            self.timer.tick();
             self.ppu.tick();
             self.running &= bp.tick(&self.cpu);
             self.cpu.reset_finished();

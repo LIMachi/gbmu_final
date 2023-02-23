@@ -5,65 +5,104 @@ use shared::mem::*;
 const BANK_SIZE: usize = 0x1000;
 const WRAM_SIZE: usize = 2 * BANK_SIZE;
 
-pub struct Wram {
-    banks: Vec<Vec<u8>>,
-    svbk: IOReg,
-    cgb: bool
+enum Storage {
+    Dmg([u8; WRAM_SIZE]),
+    Cgb(IOReg, [[u8; BANK_SIZE]; 8])
 }
 
-impl Mem for Wram {
+impl Storage {
+    fn bank(&self) -> usize {
+        match self {
+            Storage::Dmg(_) => 0,
+            Storage::Cgb(r, _) => { r.read().clamp(1, 7) as usize }
+        }
+    }
+}
+
+impl Mem for Storage {
     fn read(&self, addr: u16, _: u16) -> u8 {
-        let (bank, addr) = match addr as usize {
-            0..BANK_SIZE => (0, addr as usize),
-            BANK_SIZE..WRAM_SIZE => (self.bank(), addr as usize - BANK_SIZE),
-            _ => unreachable!()
-        };
-        self.banks[bank][addr]
+        let addr = addr as usize;
+        let b = self.bank();
+        match self {
+            Storage::Dmg(v) => v[addr],
+            Storage::Cgb(bank, banks) => {
+                match addr as usize {
+                    0..BANK_SIZE => banks[0][addr],
+                    BANK_SIZE..WRAM_SIZE => banks[b][addr],
+                    _ => unreachable!()
+                }
+            }
+        }
     }
 
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        let (bank, addr) = match addr as usize {
-            0..BANK_SIZE => (0, addr as usize),
-            BANK_SIZE..WRAM_SIZE => (self.bank(), addr as usize - BANK_SIZE),
-            _ => unreachable!()
-        };
-        self.banks[bank][addr] = value;
+    fn write(&mut self, addr: u16, value: u8, _: u16) {
+        let addr = addr as usize;
+        let b = self.bank();
+        match self {
+            Storage::Dmg(v) => v[addr] = value,
+            Storage::Cgb(bank, banks) => {
+                match addr as usize {
+                    0..BANK_SIZE => banks[0][addr] = value,
+                    BANK_SIZE..WRAM_SIZE => banks[b][addr] = value,
+                    _ => unreachable!()
+                }
+            }
+        }
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        let (bank, st, end) = match st {
-            RAM..=WRAM_HALF_END => { let st = (st - RAM) as usize; let end = (st + len as usize).min(BANK_SIZE); (0, st, end) },
-            WRAM_HALF..=RAM_END => { let st = (st - WRAM_HALF) as usize; let end = (st + len as usize).min(BANK_SIZE); (self.bank(), st, end) },
-            _ => unreachable!()
-        };
-        self.banks[bank][st..end].to_vec()
+        let st = (st - RAM) as usize;
+        let len = len as usize;
+        match self {
+            Storage::Dmg(v) => v[st..(st + len).min(WRAM_SIZE)].to_vec(),
+            Storage::Cgb(bank, banks) => {
+                let bank = self.bank();
+                match (st, len) {
+                    (st @ BANK_SIZE..WRAM_SIZE, len) => banks[bank][(st - BANK_SIZE)..(st + len - BANK_SIZE).min(BANK_SIZE)].to_vec(),
+                    (st @ 0..BANK_SIZE, len) if st + len < BANK_SIZE => banks[0][st..(st + len)].to_vec(),
+                    (st @ 0..BANK_SIZE, len) => {
+                        let mut ret = banks[0][st..].to_vec();
+                        ret.extend_from_slice(&banks[bank][..(len - BANK_SIZE - st).min(BANK_SIZE)]);
+                        ret
+                    },
+                    _ => unreachable!()
+                }
+            }
+        }
+    }
+}
+
+pub struct Wram {
+    storage: Storage
+}
+
+impl Mem for Wram {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
+        self.storage.read(addr, absolute)
+    }
+
+    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        self.storage.write(addr, value, absolute);
+    }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        self.storage.get_range(st, len)
     }
 }
 
 impl Wram {
     pub fn new(cgb: bool) -> Self {
-        let banks = if cgb { (0..8) } else { (0..2) }
-            .into_iter().map(|_| vec![0; BANK_SIZE]).collect();
         Self {
-            banks,
-            cgb,
-            svbk: IOReg::unset()
-        }
-    }
-
-    pub fn bank(&self) -> usize {
-        match (self.cgb, self.svbk.read()) {
-            (false, _) => 1,
-            (true, v) => { if v != 0 { v as usize } else { 1 }}
+            storage: if cgb { Storage::Cgb(Default::default(), [[0; BANK_SIZE]; 8]) } else { Storage::Dmg([0; WRAM_SIZE]) }
         }
     }
 }
 
 impl Device for Wram {
     fn configure(&mut self, bus: &dyn IOBus) {
-        if self.cgb {
-            self.svbk = bus.io(IO::SVBK);
+        match &mut self.storage {
+            Storage::Dmg(_) => {},
+            Storage::Cgb(ref mut svbk, _) => { *svbk = bus.io(IO::SVBK); svbk.direct_write(1); }
         }
-        self.svbk.direct_write(1);
     }
 }

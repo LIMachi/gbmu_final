@@ -16,6 +16,7 @@ pub enum WindowType {
     Main(Menu), // debugger / library
     Debug(Debugger<Emulator>),
     Game(Emulator),
+    Sprites(Emulator),
     Keybindings
 }
 
@@ -25,6 +26,7 @@ impl WindowType {
             WindowType::Main(_) => Handle::Main,
             WindowType::Game(_) => Handle::Game,
             WindowType::Debug(_) => Handle::Debug,
+            WindowType::Sprites(_) => Handle::Sprites,
             WindowType::Keybindings => Handle::Settings
         }
     }
@@ -34,6 +36,10 @@ impl WindowType {
             WindowType::Main(_) => WindowBuilder::new()
                 .with_title("GBMU")
                 .with_min_inner_size(PhysicalSize::new(800, 600)),
+            WindowType::Sprites(_) => WindowBuilder::new()
+                .with_title("Spritesheet")
+                .with_min_inner_size(PhysicalSize::new(1200, 840))
+                .with_resizable(false),
             WindowType::Game(_) => WindowBuilder::new()
                 .with_title(" ")
                 .with_min_inner_size(PhysicalSize::new(160, 144))
@@ -51,6 +57,7 @@ impl WindowType {
             WindowType::Main(menu) => EguiContext::builder(menu),
             WindowType::Game(emu) => RawContext::builder(emu),
             WindowType::Debug(ninja) => EguiContext::builder(ninja),
+            WindowType::Sprites(emu) => EguiContext::builder(emu),
             _ => unimplemented!()
         }
     }

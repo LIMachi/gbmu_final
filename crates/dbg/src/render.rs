@@ -1,3 +1,4 @@
+use std::ops::{AddAssign, Mul};
 use std::str::FromStr;
 use egui_extras::Column;
 use super::{Emulator, Ninja, Disassembly};
@@ -39,6 +40,8 @@ trait Converter {
 
 impl Converter for u8 {
     fn convert(raw: &str) -> Self {
+        let a = 2;
+
         let str = raw.trim_start_matches("0x").trim_start_matches("0X");
         if str != raw {
             u8::from_str_radix(str, 16).unwrap_or(0)
@@ -139,7 +142,7 @@ impl<E: Emulator> Ui for Ninja<E> {
         self.textures.insert(Texture::Into, ctx.load_svg::<40, 40>("into", "assets/icons/into.svg"));
     }
 
-    fn draw(&mut self, ctx: &egui::Context) {
+    fn draw(&mut self, ctx: &mut egui::Context) {
         use egui::{FontId, TextStyle::*, FontFamily::Proportional};
         let mut style = (*ctx.style()).clone();
         style.visuals.override_text_color = Some(Color32::WHITE);
@@ -177,6 +180,17 @@ impl<E: Emulator> Ui for Ninja<E> {
                                 if ui.add(play).clicked() { self.emu.play(); };
                                 if ui.add(pause.clone()).clicked() { self.pause(); };
                                 if ui.add(into.clone()).clicked() { self.step_into(); };
+                            });
+                            ui.horizontal(|ui| {
+                                let sp = self.emu.speed();
+                                if ui.add(egui::Button::new("+")).clicked() { self.emu.set_speed((sp + 1).min(1)); }
+                                let text = match sp {
+                                    0 => egui::Label::new("Normal"),
+                                    1 => egui::Label::new("x2"),
+                                    n => egui::Label::new(format!("x1/{}", 1 << -n))
+                                };
+                                ui.add(text);
+                                if ui.add(egui::Button::new("-")).clicked() { self.emu.set_speed((sp - 1).max(-15)); }
                             });
                         });
                 });

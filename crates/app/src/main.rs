@@ -15,7 +15,6 @@ use shared::breakpoints::Breakpoints;
 use shared::{Events, Handle};
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
-use crate::emulator::Emu;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
@@ -64,6 +63,7 @@ impl App {
                   Handle::Main => unimplemented!(),
                   Handle::Debug => WindowType::Debug(self.dbg.clone()),
                   Handle::Game => WindowType::Game(self.emu.clone()),
+                  Handle::Sprites => WindowType::Sprites(self.emu.clone()),
                   Handle::Settings => unimplemented!()
               }, target);
             },
@@ -110,14 +110,15 @@ fn main() {
                 }
                 acc += current.elapsed().as_secs_f64();
                 current = std::time::Instant::now();
-                while acc >= Emu::CYCLE_TIME {
+                let cy = app.emu.cycle_time();
+                while acc >= cy {
                     cycles += 1;
                     clock.tick();
                     if !app.emu.cycle(clock.value()) {
                         st.pause();
                         break ;
                     }
-                    acc -= Emu::CYCLE_TIME;
+                    acc -= cy;
                 }
             } else {
                 st.pause();

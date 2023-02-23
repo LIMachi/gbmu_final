@@ -15,6 +15,7 @@ const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 enum Texture {
     Settings,
+    Spritesheet,
     Debug,
     Add,
     Cover(String)
@@ -185,13 +186,14 @@ impl shared::Ui for Menu {
         self.textures.insert(Texture::Add, ctx.load_svg::<40, 40>("add", "assets/icons/add.svg"));
         self.textures.insert(Texture::Debug, ctx.load_svg::<40, 40>("debug", "assets/icons/debug.svg"));
         self.textures.insert(Texture::Settings, ctx.load_svg::<40, 40>("settings", "assets/icons/settings.svg"));
+        self.textures.insert(Texture::Spritesheet, ctx.load_svg::<40, 40>("spritesheet", "assets/icons/palette.svg"));
         for path in &self.conf.paths {
             self.search(path);
             println!("looking at path {path}");
         }
     }
 
-    fn draw(&mut self, ctx: &Context) {
+    fn draw(&mut self, ctx: &mut Context) {
         for (path, mut rom) in self.receiver.try_recv() {
             println!("found rom {:?} at {}", rom.header, path);
             if !self.roms.contains_key(&path) {
@@ -210,6 +212,7 @@ impl shared::Ui for Menu {
                 ui.columns(2, |uis| {
                     let [l, r] = match uis { [l, r] => [l, r], _ => unreachable!() };
                     let debug = egui::ImageButton::new(self.tex(Texture::Debug), (28., 28.)).frame(false);
+                    let spritesheet = egui::ImageButton::new(self.tex(Texture::Spritesheet), (28., 28.)).frame(false);
                     let setting = egui::ImageButton::new(self.tex(Texture::Settings), (24., 24.)).frame(false);
                     let add = egui::ImageButton::new(self.tex(Texture::Add), (32., 32.)).frame(false);
                     l.with_layout(Layout::default(), |ui| {
@@ -221,6 +224,7 @@ impl shared::Ui for Menu {
                     });
                     r.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui.add(debug).clicked() { self.proxy.send_event(Events::Open(Handle::Debug)).ok(); };
+                        if ui.add(spritesheet).clicked() { self.proxy.send_event(Events::Open(Handle::Sprites)).ok(); };
                         ui.add(setting);
                     });
                 })

@@ -11,6 +11,7 @@ use log::{info, warn};
 use registers::*;
 use shared::cpu::{Value, Opcode, CBOpcode, Reg, MemStatus, Bus, regs};
 pub use cpu::Cpu;
+use crate::cpu::Mode;
 use crate::ops::alu::add;
 
 trait RWStatus {
@@ -70,6 +71,7 @@ pub struct State<'a> {
     flags: Option<Flags>,
     prefix: &'a mut bool,
     ime: &'a mut bool,
+    halt: &'a mut cpu::Mode,
 }
 
 impl<'a> Drop for State<'a> {
@@ -114,7 +116,7 @@ impl Flags {
 }
 
 impl<'a> State<'a> {
-    pub fn new(bus: &'a mut dyn Bus, (regs, cache, prefix, ime): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool, &'a mut bool)) -> Self {
+    pub(crate) fn new(bus: &'a mut dyn Bus, (regs, cache, prefix, ime, mode): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool, &'a mut bool, &'a mut cpu::Mode)) -> Self {
         Self {
             mem: bus.status(),
             bus,
@@ -122,12 +124,17 @@ impl<'a> State<'a> {
             regs,
             cache,
             prefix,
-            ime
+            ime,
+            halt: mode
         }
     }
 
     pub fn read(&mut self) -> u8 {
         self.mem.read()
+    }
+
+    pub(crate) fn halt(&mut self) {
+        *self.halt = Mode::Halt;
     }
 
     pub fn write(&mut self, value: Value) {

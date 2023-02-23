@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use crate::mem::{IOBus, Mem};
 use crate::utils::Cell;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct LCDC(pub u8);
 
 /// 7	LCD and PPU enable	0=Off, 1=On
@@ -36,6 +36,10 @@ impl LCDC {
 
     pub fn obj_size(&self) -> u8 {
         if (self.0 & 0x4) == 0 { 0x8 } else { 0x10 }
+    }
+
+    pub fn obj_tall(&self) -> bool {
+        (self.0 & 0x4) != 0
     }
 
     pub fn obj_enable(&self) -> bool {
@@ -470,18 +474,7 @@ impl Mem for HReg {
     }
 
     fn write(&mut self, _: u16, value: u8, io: u16) {
-        if io == (IO::JOYP as u16) {
-            println!("---JOYP---");
-            println!("{:#010b}", self.wmask);
-            println!("{:#010b}", self.v);
-            println!("{:#010b}", value);
-        }
         self.v = (self.v & !self.wmask) | (value & self.wmask);
-        if io == (IO::JOYP as u16) {
-            println!("{:#010b}", self.v);
-            println!("{:#010b}", self.read(0, io));
-        }
-        //self.v = value & self.wmask;
         self.dirty = true;
     }
 }

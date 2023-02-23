@@ -15,5 +15,6 @@ pub fn stop(state: &mut State) -> Flow {    //TODO pas fini
 }
 
 pub fn halt(state: &mut State) -> Flow {
+    state.halt();
     CONTINUE
 }

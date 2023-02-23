@@ -28,6 +28,9 @@ pub trait Schedule {
     fn breakpoints(&self) -> Breakpoints;
     fn play(&self);
     fn reset(&self);
+
+    fn speed(&self) -> i32;
+    fn set_speed(&self, speed: i32);
 }
 
 pub trait ReadAccess {
@@ -49,7 +52,7 @@ enum Texture {
 struct Ninja<E: Emulator> {
     emu: E,
     render_data: render::Data,
-    disassembly: Disassembly,
+    disassembly: Disassembly<E>,
     viewer: memory::Viewer,
     textures: HashMap<Texture, TextureHandle>,
     breakpoints: Breakpoints
@@ -73,7 +76,7 @@ impl<E: Emulator> Ninja<E> {
 
     pub fn pause(&self) { self.breakpoints.pause(); }
 
-    pub fn step(&self) {
+    pub fn step(&mut self) {
         if let Some((pc, op)) = self.disassembly.next(&self.emu) {
             if op.is_call() { self.breakpoints.schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()); }
             else { self.breakpoints.step(); }
@@ -98,7 +101,7 @@ impl<E:Emulator> Ui for Debugger<E> {
         self.inner.borrow_mut().init(ctx);
     }
 
-    fn draw(&mut self, ctx: &Context) {
+    fn draw(&mut self, ctx: &mut Context) {
         self.inner.borrow_mut().draw(ctx)
     }
 

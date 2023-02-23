@@ -8,6 +8,7 @@ pub struct Breakpoints {
     breakpoints: Rc<RefCell<Vec<Breakpoint>>>
 }
 
+//TODO add Read(u16) / Write(u16)
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Break {
     Cycles(usize),

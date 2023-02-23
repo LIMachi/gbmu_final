@@ -99,30 +99,30 @@ impl Fetcher {
         let bank = if ppu.cgb {
             if let Mode::Sprite(Sprite { flags, .. }, _) = self.mode { (flags >> 2) & 0x1 } else { 0 }
         } else { 0 };
-        self.tile = ppu.vram.read_bank(addr, bank) as u16;
+        self.tile = ppu.vram.read_bank(addr, bank as usize) as u16;
         State::DataLow
     }
 
     fn get_tile_data(&self, ppu: &Ppu, high: bool) -> u8 {
-        let lcdc = ppu.lcdc.0;
+        let lcdc = ppu.lcdc;
         let scy = ppu.regs.scy.read();
         let ly = ppu.regs.ly.read();
-        let (wrap, tile) = if (lcdc & 0x4) != 0 { (0xF, self.tile & 0xFE)  } else { (0x7, self.tile) };
+        let (wrap, tile) = if lcdc.obj_tall() { (0xF, self.tile & 0xFE)  } else { (0x7, self.tile) };
         let y = (match self.mode {
             Mode::Bg => ly.wrapping_add(scy),
             Mode::Window => ppu.win.y,
-            Mode::Sprite(s, ..) => ly - s.y,
+            Mode::Sprite(s, ..) => ly.wrapping_sub(s.y),
         } & wrap) as u16;
         let y = if self.flip_y { wrap as u16 - y } else { y };
         let addr = (match self.mode {
-            Mode::Bg | Mode::Window => !((lcdc & 0x10) != 0 || (tile & 0x80) != 0) as u16,
+            Mode::Bg | Mode::Window => !(!lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
             Mode::Sprite( .. ) => 0
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
         let bank = match self.mode {
             Mode::Sprite(sprite, _) if ppu.cgb => (sprite.flags >> 2) & 0x1,
             _ => 0
         };
-        ppu.vram.read_bank(addr, bank)
+        ppu.vram.read_bank(addr, bank as usize)
     }
 
     fn data_low(&mut self, ppu: &Ppu) -> State {
@@ -155,19 +155,20 @@ impl Fetcher {
             let index = if let Mode::Sprite(_, x) = self.mode { Some(x) } else { None };
             let priority = if let Mode::Sprite(sp, _) = self.mode { Some((sp.flags >> 7) != 0) } else { None };
             // TODO shift some pixels if it's too far left (<8)
-            let mut iter = (0..8).into_iter().rev()
-                .map(|x| Pixel {
-                    color: ((low >> x) & 0x1) | (((high >> x) & 0x1) << 1),
-                    palette: dmg,
-                    index,
-                    priority
-                });
-            let pixels: Vec<Pixel> = if self.flip_x { iter.rev().collect() } else { iter.collect() };
-            if let Mode::Sprite(_, n) = self.mode {
-                oam.merge(pixels);
+            let mut colors = [0; 8];
+            colors.iter_mut().enumerate().for_each(|(i, c)| {
+                let x = 7 - i;
+                *c = ((low >> x) & 0x1) | (((high >> x) & 0x1) << 1);
+            });
+            if self.flip_x { colors.reverse(); }
+            if let Mode::Sprite(sp, n) = self.mode {
+                let s = 8u8.saturating_sub(sp.x) as usize;
+                colors.rotate_left(s);
+                colors[8-s..].iter_mut().for_each(|x| *x = 0);
+                oam.merge(colors.into_iter().map(|x| Pixel { color: x, palette: dmg, index, priority }).collect());
                 self.set_mode(self.prev, self.x);
                 bg.enable();
-            } else if bg.push(pixels) {
+            } else if bg.push(colors.into_iter().map(|x| Pixel { color: x, palette: dmg, index, priority }).collect()) {
                 self.x += 1;
                 self.low = Some(low);
                 self.high = Some(high);

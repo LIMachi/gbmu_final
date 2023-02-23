@@ -4,9 +4,16 @@ use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus};
 use super::{ops::*, State, Registers, decode::decode};
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum Mode {
+    Running,
+    Halt,
+}
+
 pub struct Cpu {
     prev: Opcode,
     at: u16,
+    mode: Mode,
     instructions: Vec<Vec<Op>>,
     regs: Registers,
     cache: Vec<Value>,
@@ -26,6 +33,7 @@ impl Cpu {
 
     pub fn new(cgb: bool) -> Self {
         Self {
+            mode: Mode::Running,
             prev: Opcode::Nop,
             instructions: Vec::new(),
             regs: if cgb { Registers::GBC } else { Registers::GB },
@@ -44,11 +52,14 @@ impl Cpu {
     fn check_interrupts(&mut self) {
         if !self.instructions.is_empty() || self.prev == Opcode::Ei { return };
         let int = (self.int_flags.read() & self.ie.read()) & 0x1F;
-        if self.ime && int != 0 {
-            self.ime = false;
-            let (bit, ins) = super::decode::interrupt(int);
-            self.int_flags.reset(bit);
-            self.instructions = ins.iter().rev().map(|x| x.to_vec()).collect();
+        if int != 0 {
+            if self.mode == Mode::Halt { self.mode = Mode::Running };
+            if self.ime {
+                self.ime = false;
+                let (bit, ins) = super::decode::interrupt(int);
+                self.int_flags.reset(bit);
+                self.instructions = ins.iter().rev().map(|x| x.to_vec()).collect();
+            }
         }
     }
 
@@ -56,7 +67,10 @@ impl Cpu {
         let prefixed = self.prefixed;
         self.prefixed = false;
         self.check_interrupts();
-        let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime));
+        if self.mode == Mode::Halt {
+            return ;
+        }
+        let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime, &mut self.mode));
         if self.instructions.is_empty() {
             let opcode = state.read();
             if let Ok(opcode) = Opcode::try_from((opcode, prefixed)) {

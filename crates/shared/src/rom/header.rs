@@ -206,9 +206,9 @@ impl RomSize {
     pub const BANK_SIZE: u16 = 16384;
 
     pub fn new(v: u8) -> Self { Self(v) }
-    pub fn banks(&self) -> u8 {
+    pub fn banks(&self) -> usize {
         match self.0 {
-            n @0..=6 => 2u8.pow((n + 1) as u32),
+            n @0..=8 => 2usize.pow((n + 1) as u32),
             0x52 => 72,
             0x53 => 80,
             0x54 => 96,
@@ -226,7 +226,7 @@ impl RamSize {
 
     pub fn new(v: u8) -> Self { Self(v) }
 
-    pub fn banks(&self) -> u8 {
+    pub fn banks(&self) -> usize {
         match self.0 {
             2 => 1,
             3 => 4,

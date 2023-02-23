@@ -100,11 +100,11 @@ impl<U: 'static + Ui> Context for EguiContext<U> {
         };
         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
         self.platform.begin_frame();
-        self.data.draw(&self.inner);
+        self.data.draw(&mut self.inner);
         let out = self.platform.end_frame(Some(&self.window));
         let jobs = self.inner.tessellate(out.shapes);
         let delta = out.textures_delta;
-        self.rpass.add_textures(&self.device, &self.queue, &delta);
+        self.rpass.add_textures(&self.device, &self.queue, &delta).ok();
         self.rpass.update_buffers(
             &self.device,
             &self.queue,

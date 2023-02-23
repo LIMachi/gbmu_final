@@ -1,18 +1,23 @@
+#![feature(slice_flatten)]
+#![feature(generic_const_exprs)]
+
 use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 
 use std::collections::vec_deque::VecDeque;
 
 use std::fmt::{Debug, Formatter, Write};
 use std::rc::Rc;
 use lcd::{LCD, Lcd};
-use mem::{Oam, Vram, oam::Sprite};
+use mem::{Oam, oam::Sprite, Vram};
 use shared::io::{IO, IOReg, LCDC};
-use shared::mem::{Device, IOBus, Mem, PPU, *};
+use shared::mem::{*, Device, IOBus, Mem, PPU};
 use shared::utils::Cell;
 use shared::utils::image::Image;
 use crate::fetcher::Fetcher;
 
 mod fetcher;
+mod render;
 
 struct REdge {
     inner: bool,
@@ -102,7 +107,8 @@ struct Window {
 const TILEDATA_WIDTH: usize = 16 * 16;
 const TILEDATA_HEIGHT: usize = 24 * 16;
 
-struct Ppu {
+pub(crate) struct Ppu {
+    tile_cache: HashSet<usize>,
     dots: usize,
     oam: Oam,
     vram: Vram,
@@ -155,10 +161,10 @@ impl Pixel {
     /// sprite priority mix
     pub fn mix(&mut self, rhs: Pixel) {
         *self = match (self.color, rhs.color, self.index, rhs.index) {
-            (_, 0, ..) => *self,
-            (0, ..) => rhs,
             (_, _, None, Some(_)) => rhs,
             (_, _, Some(_), None ) => *self,
+            (_, 0, ..) => *self,
+            (0, ..) => rhs,
             (_, _, Some(x1), Some(x2) ) if x1 < x2 => *self,
             (_, _, Some(x1), Some(x2) ) if x1 > x2 => rhs,
             _ => *self,
@@ -238,7 +244,7 @@ impl BgFifo {
                     Some({
                         let bg = if !ppu.cgb && !ppu.lcdc.priority() { Pixel::white(ppu.regs.bgp.read()) } else { bg };
                         if oam.color == 0x0 { bg }
-                        else if ppu.lcdc.priority() && bg.color != 0 && (oam.priority.unwrap_or(true) || bg.priority.unwrap_or(false)) { bg }
+                        else if ppu.lcdc.priority() && bg.color != 0 && (oam.priority.unwrap_or(false) || bg.priority.unwrap_or(false)) { bg }
                         else { oam }
                     })
                 },
@@ -297,7 +303,7 @@ impl State for OamState {
             ppu.win.scan_enabled = ppu.regs.wy.read() == ly;
         }
         let oam = ppu.oam.sprites[self.sprite];
-        if ly >= oam.y && ly < oam.y + 8 && ppu.sprites.len() < 10 {
+        if ly + if ppu.lcdc.obj_tall() { 0 } else { 8 } < oam.y && ly + 16 >= oam.y && ppu.sprites.len() < 10 {
             ppu.sprites.push(oam);
         }
         self.sprite += 1;
@@ -319,6 +325,7 @@ impl State for TransferState {
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
+                self.scx = self.scx.saturating_sub(1);
                 self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
                 self.bg.clear();
             }
@@ -328,7 +335,7 @@ impl State for TransferState {
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
             for i in idx..ppu.sprites.len() {
-                if ppu.sprites[i].x == self.lx {
+                if ppu.sprites[i].screen_x() == self.lx || (ppu.sprites[i].x < 8 && self.lx == 0) {
                     self.sprite = Some(i);
                     self.fetcher.set_mode(fetcher::Mode::Sprite(ppu.sprites[i], self.lx), self.lx);
                     self.bg.disable();
@@ -339,7 +346,7 @@ impl State for TransferState {
         if let Some(pixel) = self.bg.mix(&mut self.oam, ppu) {
             if self.scx > 0 {
                 self.scx -= 1;
-                if !ppu.win.enabled || self.scx > 1 { return None; }
+                return None;
             }
             ppu.lcd.set(self.lx as usize, self.ly as usize, pixel.color());
             self.lx += 1;
@@ -370,7 +377,6 @@ impl State for VState {
             ppu.regs.ly.direct_write(ly);
         }
         if self.dots == 0 {
-            ppu.update_tiledata();
             Some(OamState::new().boxed())
         } else { None }
     }
@@ -401,6 +407,7 @@ impl Ppu {
     pub fn new(cgb: bool, lcd: Lcd) -> Self {
         let mut sprites = Vec::with_capacity(10);
         Self {
+            tile_cache: HashSet::with_capacity(384),
             dots: 0,
             oam: Oam::new(),
             vram: Vram::new(cgb),
@@ -450,21 +457,6 @@ impl Ppu {
             self.regs.interrupt.set(1);
         }
     }
-
-    pub fn update_tiledata(&mut self) {
-        for (mut bank, img) in self.tiledata.iter_mut().enumerate() {
-            let bank = bank as u8;
-            for y in 0..24 {
-                for x in 0..16 {
-                    for s in 0..8 {
-                        let addr = y * 16 * 16 + 16 * x + s * 2;
-                        let h = self.vram.read_bank(addr + 1, bank) as u16;
-                        let t = self.vram.read_bank(addr, bank) as u16 | (h << 8);
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Device for Ppu {
@@ -472,6 +464,9 @@ impl Device for Ppu {
         self.regs.configure(bus);
     }
 }
+
+const TILE_DATA_END: u16 = 0x97FF;
+const TILEMAP: u16 = 0x9800;
 
 impl Mem for Ppu {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
@@ -486,19 +481,39 @@ impl Mem for Ppu {
         // TODO prevent write access if oam / vram locked
         match absolute {
             OAM..=OAM_END => self.oam.write(addr, value, absolute),
-            VRAM..=VRAM_END => { self.vram.write(addr, value, absolute) },
+            VRAM..=TILE_DATA_END => {
+                self.tile_cache.insert(addr as usize / 16);
+                self.vram.write(addr, value, absolute)
+            }
+            VRAM..=VRAM_END => {
+                self.vram.write(addr, value, absolute)
+            },
             _ => unreachable!()
+        }
+    }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        match st {
+            OAM => self.oam.get_range(st, len),
+            VRAM => self.vram.get_range(st, len),
+            _ => unimplemented!()
         }
     }
 }
 
 pub struct Controller {
+    init: bool,
+    clock: usize,
+    storage: HashMap<render::Textures, shared::egui::TextureHandle>,
     ppu: Rc<RefCell<Ppu>>
 }
 
 impl Controller {
     pub fn new(cgb: bool, lcd: Lcd) -> Self {
         Self {
+            clock: 0,
+            init: false,
+            storage: HashMap::with_capacity(256),
             ppu: Ppu::new(cgb, lcd).cell()
         }
     }

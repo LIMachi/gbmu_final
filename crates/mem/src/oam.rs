@@ -8,6 +8,11 @@ pub struct Sprite {
     pub flags: u8
 }
 
+impl Sprite {
+    pub fn screen_x(&self) -> u8 { self.x.wrapping_sub(8) }
+    pub fn screen_y(&self) -> u8 { self.y.wrapping_sub(16) }
+}
+
 impl Mem for Sprite {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         match addr {
@@ -47,6 +52,12 @@ impl Mem for Oam {
             0..160 => self.sprites[(addr / 4) as usize].write(addr % 4, value, absolute),
             _ => unreachable!()
         }
+    }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        self.sprites.as_ref().iter().map(|x| [x.x, x.y, x.tile, x.flags])
+            .flatten()
+            .collect()
     }
 }
 
