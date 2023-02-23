@@ -107,6 +107,12 @@ struct Window {
 const TILEDATA_WIDTH: usize = 16 * 16;
 const TILEDATA_HEIGHT: usize = 24 * 16;
 
+#[derive(Default)]
+struct Scroll {
+    x: u8,
+    y: u8
+}
+
 pub(crate) struct Ppu {
     tile_cache: HashSet<usize>,
     dots: usize,
@@ -119,6 +125,7 @@ pub(crate) struct Ppu {
     lcdc: LCDC,
     win: Window,
     cgb: bool,
+    sc: Scroll,
     stat: REdge,
     tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>
 }
@@ -238,8 +245,8 @@ impl BgFifo {
 
     pub(crate) fn mix(&mut self, oam: &mut ObjFifo, ppu: &mut Ppu) -> Option<Pixel> {
         if self.enabled {
-            match (oam.pop(), self.inner.pop_front()) {
-                (None, bg) => bg,
+            let res = match (oam.pop(), self.inner.pop_front()) {
+                (None, Some(bg)) => Some(bg),
                 (Some(oam), Some(bg)) => {
                     Some({
                         let bg = if !ppu.cgb && !ppu.lcdc.priority() { Pixel::white(ppu.regs.bgp.read()) } else { bg };
@@ -248,8 +255,12 @@ impl BgFifo {
                         else { oam }
                     })
                 },
-                (_, None) => None
+                (_, None) => unreachable!()
+            };
+            if self.inner.len() <= 8 {
+                self.disable();
             }
+            res
         } else { None }
     }
 
@@ -299,6 +310,7 @@ impl State for OamState {
         self.clock = 0;
         let ly = ppu.regs.ly.read();
         if self.sprite == 0 {
+            ppu.sc = Scroll::default();
             ppu.sprites.clear();
             ppu.win.scan_enabled = ppu.regs.wy.read() == ly;
         }
@@ -307,7 +319,10 @@ impl State for OamState {
             ppu.sprites.push(oam);
         }
         self.sprite += 1;
-        if self.sprite == 40 { Some(TransferState::new(ppu).boxed()) } else { None }
+        if self.sprite == 40 {
+            ppu.sc.x = ppu.sc.x.max(ppu.regs.scx.read());
+            ppu.sc.y = ppu.sc.y.max(ppu.regs.scy.read());
+            Some(TransferState::new(ppu).boxed()) } else { None }
     }
 }
 
@@ -325,6 +340,7 @@ impl State for TransferState {
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
+                println!("window");
                 self.scx = self.scx.saturating_sub(1);
                 self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
                 self.bg.clear();
@@ -349,6 +365,7 @@ impl State for TransferState {
                 return None;
             }
             ppu.lcd.set(self.lx as usize, self.ly as usize, pixel.color());
+            self.sprite = None;
             self.lx += 1;
             if self.lx == 160 {
                 return Some(HState::new(376 - self.dots).boxed())
@@ -407,6 +424,7 @@ impl Ppu {
     pub fn new(cgb: bool, lcd: Lcd) -> Self {
         let mut sprites = Vec::with_capacity(10);
         Self {
+            sc: Scroll::default(),
             tile_cache: HashSet::with_capacity(384),
             dots: 0,
             oam: Oam::new(),
@@ -502,6 +520,7 @@ impl Mem for Ppu {
 }
 
 pub struct Controller {
+    tab: render::Tabs,
     init: bool,
     clock: usize,
     storage: HashMap<render::Textures, shared::egui::TextureHandle>,
@@ -511,6 +530,7 @@ pub struct Controller {
 impl Controller {
     pub fn new(cgb: bool, lcd: Lcd) -> Self {
         Self {
+            tab: render::Tabs::Oam,
             clock: 0,
             init: false,
             storage: HashMap::with_capacity(256),
