@@ -154,7 +154,6 @@ impl Fetcher {
             let dmg = ppu.regs.bgp.read();
             let index = if let Mode::Sprite(_, x) = self.mode { Some(x) } else { None };
             let priority = if let Mode::Sprite(sp, _) = self.mode { Some((sp.flags >> 7) != 0) } else { None };
-            // TODO shift some pixels if it's too far left (<8)
             let mut colors = [0; 8];
             colors.iter_mut().enumerate().for_each(|(i, c)| {
                 let x = 7 - i;

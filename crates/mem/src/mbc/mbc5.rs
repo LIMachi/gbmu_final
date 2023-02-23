@@ -66,8 +66,8 @@ impl Mem for Mbc5 {
             SROM..=SROM_END => {
                 let bank = self.rom_bank as usize % self.rom_banks;
                 let s = s - SROM as usize;
-                let end = (s + len as usize).min(BANK_SIZE) + self.rom_bank * BANK_SIZE;
-                let st = s + self.rom_bank * BANK_SIZE;
+                let end = (s + len as usize).min(BANK_SIZE) + bank * BANK_SIZE;
+                let st = s + bank * BANK_SIZE;
                 self.rom[st..end].to_vec()
             },
             SRAM..=SRAM_END => {

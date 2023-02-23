@@ -3,13 +3,17 @@ use shared::egui::epaint::ImageDelta;
 use shared::Events;
 use super::*;
 
+mod tabs;
 mod tilemap;
 mod oam;
-mod tiledata;
+mod bgmap;
+
+const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Textures {
     None,
+    Blank,
     Placeholder,
     Tile(usize),
     Miniature
@@ -57,13 +61,28 @@ impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized 
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+pub enum Tabs {
+    Oam,
+    Tiledata,
+    Tilemap
+}
+
+impl tabs::Tab for Tabs {
+    fn name(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
 impl shared::Ui for Controller {
     fn init(&mut self, ctx: &mut Context) {
+        let ppu = self.ppu.as_ref().borrow();
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        for n in 0..768 {
+        for n in 0..if ppu.cgb { 728 } else { 384 } {
             let s = Textures::Tile(n);
             self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
         }
+        self.storage.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
         self.storage.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.storage.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
         self.storage.insert(Textures::Miniature,ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
@@ -85,7 +104,11 @@ impl shared::Ui for Controller {
         }
         CentralPanel::default()
             .show(ctx, |ui| {
-               ui.add(oam::Oam(&self.storage, &ppu));
+                ui.add(tabs::Tabs::new(&mut self.tab)
+                    .with_tab(Tabs::Oam, || oam::Oam(&self.storage, &ppu))
+                    .with_tab(Tabs::Tiledata, || bgmap::BgMap(&self.storage, &ppu, ctx))
+                    .with_tab(Tabs::Tilemap, || tilemap::Tilemap(&self.storage))
+                );
             });
     }
 

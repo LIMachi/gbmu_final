@@ -38,7 +38,7 @@ impl WindowType {
                 .with_min_inner_size(PhysicalSize::new(800, 600)),
             WindowType::Sprites(_) => WindowBuilder::new()
                 .with_title("Spritesheet")
-                .with_min_inner_size(PhysicalSize::new(1200, 840))
+                .with_min_inner_size(PhysicalSize::new(1200, 860))
                 .with_resizable(false),
             WindowType::Game(_) => WindowBuilder::new()
                 .with_title(" ")
