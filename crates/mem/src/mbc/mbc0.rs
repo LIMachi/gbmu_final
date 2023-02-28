@@ -21,7 +21,7 @@ impl Mem for Mbc0 {
         let end = s + len as usize;
         match st {
             ROM..=SROM_END => self.rom[s..end].to_vec(),
-            SRAM..=SRAM_END => self.ram[s..end].to_vec(),
+            SRAM..=SRAM_END => self.ram[s.min(self.ram.len())..end.min(self.ram.len())].to_vec(),
             _ => vec![]
         }
     }

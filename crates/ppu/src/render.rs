@@ -112,6 +112,6 @@ impl shared::Ui for Controller {
             });
     }
 
-    fn handle(&mut self, event: &Events) {
+    fn handle(&mut self, event: &shared::Event) {
     }
 }

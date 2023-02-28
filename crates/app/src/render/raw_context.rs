@@ -38,6 +38,6 @@ impl<Data: 'static + Render> Context for RawContext<Data> {
     }
 
     fn handle(&mut self, event: &Event) {
-        self.inner.handle(event, &self.proxy, &self.window);
+        self.inner.handle(event, &self.window);
     }
 }

@@ -3,6 +3,7 @@
 use std::borrow::BorrowMut;
 pub use egui;
 pub use winit;
+use crate::cpu::Opcode;
 
 pub mod utils;
 pub mod mem;
@@ -22,9 +23,12 @@ pub enum Handle {
     Settings
 }
 
+pub type Event<'a> = winit::event::Event<'a, Events>;
+
 #[derive(Debug)]
 pub enum Events {
     Play(rom::Rom),
+    Reload,
     Load(String),
     Loaded,
     Open(Handle),
@@ -38,6 +42,8 @@ pub enum Target {
 
 pub trait Cpu {
     fn done(&self) -> bool;
+
+    fn previous(&self) -> Opcode;
     fn register(&self, reg: registers::Reg) -> value::Value;
 }
 
@@ -45,7 +51,6 @@ pub mod cpu {
     pub use super::opcodes::*;
     pub use super::registers::{Reg, regs, Flags};
     pub use super::value::Value;
-
 
     pub trait Bus {
         fn status(&self) -> MemStatus;
@@ -69,7 +74,7 @@ pub mod cpu {
 pub trait Ui {
     fn init(&mut self, ctx: &mut egui::Context) { }
     fn draw(&mut self, ctx: &mut egui::Context) { }
-    fn handle(&mut self, event: &Events) { }
+    fn handle(&mut self, event: &winit::event::Event<Events>) { }
 }
 
 impl Ui for () { }

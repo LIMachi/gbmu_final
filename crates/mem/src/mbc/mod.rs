@@ -13,9 +13,8 @@ pub trait MemoryController {
     fn new(rom: &Rom, ram: Vec<u8>) -> Self where Self: Sized;
     fn ram_dump(&self) -> Vec<u8>;
 
-    fn rom_bank_low(&self) -> u8 { 0 }
-    fn rom_bank_high(&self) -> u8 { 0 }
-    fn ram_bank(&self) -> u8 { 0 }
+    fn rom_bank(&self) -> usize { 0 }
+    fn ram_bank(&self) -> usize { 0 }
 }
 
 trait Mbc: MemoryController + Mem {
@@ -54,7 +53,7 @@ impl Controller {
         } else { (None, vec![0xAF; rom.header.ram_size.size()]) };
         let inner: Rc<RefCell<dyn Mbc>> = match rom.header.cartridge.mbc() {
             Mbcs::MBC0 => mbc0::Mbc0::new(rom, ram).cell(),
-            Mbcs::MBC1 => unimplemented!(),
+            Mbcs::MBC1 => mbc1::Mbc1::new(rom, ram).cell(),
             Mbcs::MBC2 => unimplemented!(),
             Mbcs::MBC3 => unimplemented!(),
             Mbcs::MBC5 => mbc5::Mbc5::new(rom, ram).cell(),
@@ -71,9 +70,8 @@ impl Controller {
         Self { sav: None, inner: Unplugged { }.cell() }
     }
 
-    pub fn rom_bank_low(&self) -> u8 { self.inner.borrow().rom_bank_low() }
-    pub fn rom_bank_high(&self) -> u8 { self.inner.borrow().rom_bank_high() }
-    pub fn ram_bank(&self) -> u8 { self.inner.borrow().ram_bank() }
+    pub fn rom_bank(&self) -> usize { self.inner.borrow().rom_bank() }
+    pub fn ram_bank(&self) -> usize { self.inner.borrow().ram_bank() }
 }
 
 impl Drop for Controller {

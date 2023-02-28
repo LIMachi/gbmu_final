@@ -26,6 +26,7 @@ pub struct Cpu {
 
 impl shared::Cpu for Cpu {
     fn done(&self) -> bool { self.finished }
+    fn previous(&self) -> Opcode { self.prev }
     fn register(&self, reg: Reg) -> Value { self.regs.read(reg) }
 }
 
@@ -104,7 +105,7 @@ impl Cpu {
             #[cfg(feature = "log_opcode")]
             log::debug!("[0x{:x}] instruction {:?}", self.at, self.prev);
         }
-        self.finished = self.instructions.is_empty() && !*state.prefix;
+        self.finished = self.instructions.is_empty();
     }
 
     pub fn reset_finished(&mut self) { self.finished = false; }

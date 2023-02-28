@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use shared::cpu::*;
+use crate::cpu::*;
 
 pub struct DebugInfo {
     sz: usize,

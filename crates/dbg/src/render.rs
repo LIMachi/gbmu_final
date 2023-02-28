@@ -1,14 +1,15 @@
-use std::ops::{AddAssign, Mul};
 use std::str::FromStr;
 use egui_extras::Column;
-use super::{Emulator, Ninja, Disassembly};
-use shared::{Ui, egui::{self, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}, Events};
+use super::{Emulator, Ninja};
+use shared::{egui::{self, Ui, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}, Events, Event};
 use shared::breakpoints::{Breakpoint};
-use shared::cpu::{Reg, Value, Flags};
+use shared::cpu::{Reg, Value, Flags, Opcode};
 use shared::egui::{ScrollArea, SidePanel, Stroke};
 use shared::io::IO;
 use shared::utils::image::ImageLoader;
+use shared::winit::event::WindowEvent;
 use crate::{Bus, Context, Texture};
+use crate::disassembly::Op;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Kind {
@@ -28,6 +29,9 @@ impl Kind {
 }
 
 pub struct Data {
+    op: &'static str,
+    ins: Opcode,
+    raw_op: String,
     raw: String,
     value: Value,
     reg: Kind,
@@ -46,7 +50,7 @@ impl Converter for u8 {
         if str != raw {
             u8::from_str_radix(str, 16).unwrap_or(0)
         } else {
-            u8::from_str(str).unwrap_or(0)
+            u8::from_str(str).or_else(|_| u8::from_str_radix(str, 16)).unwrap_or(0)
         }
     }
 }
@@ -57,7 +61,7 @@ impl Converter for u16 {
         if str != raw {
             u16::from_str_radix(str, 16).unwrap_or(0)
         } else {
-            u16::from_str(str).unwrap_or(0)
+            u16::from_str(str).or_else(|_| u16::from_str_radix(str, 16)).unwrap_or(0)
         }
     }
 }
@@ -68,8 +72,15 @@ impl Data {
             Kind::Cycles => Breakpoint::cycles(self.count),
             Kind::Instructions => Breakpoint::instructions(self.count),
         }
+    }
 
-
+    fn parse_op(&mut self) {
+        let opcode = u16::convert(&self.raw_op);
+        let prefix = opcode & 0xFF00 == 0xCB00;
+        if let Ok(opcode) = Opcode::try_from((opcode as u8, prefix)) {
+            self.ins = opcode;
+            self.op = shared::cpu::dbg::dbg_opcodes(opcode).1;
+        }
     }
 
     fn parse(&mut self) {
@@ -91,7 +102,7 @@ impl Data {
 
 impl Default for Data {
     fn default() -> Self {
-        Self { reg: Kind::Reg(Reg::PC), count: 0, raw: "".to_string(), value: Value::U16(0) }
+        Self { op: "NOP", ins: Opcode::Nop, raw_op: Default::default(), reg: Kind::Reg(Reg::PC), count: 0, raw: "".to_string(), value: Value::U16(0) }
     }
 }
 
@@ -111,7 +122,7 @@ impl Widget for Register {
     }
 }
 
-fn io_table(ui: &mut egui::Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str) {
+fn io_table(ui: &mut egui::Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str, extra: impl FnOnce(&mut Ui)) {
     ScrollArea::vertical()
         .id_source("ScrollArea_".to_owned() + source)
         .auto_shrink([false, false])
@@ -120,20 +131,21 @@ fn io_table(ui: &mut egui::Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str)
                 egui_extras::TableBuilder::new(ui)
                     .striped(true)
                     .columns(Column::exact(100.), 2)
-                    .auto_shrink([false, false])
+                    .auto_shrink([false, true])
                     .body(|mut body| {
                         for io in ios {
                             body.row(16., |mut row| {
-                                row.col(|ui| { ui.label(io.name()); });
+                                row.col(|ui| { ui.label(format!("{:04X}:{}", *io as u16, io.name())); });
                                 row.col(|ui| { ui.label(format!("{:#04X}", bus.read(*io as u16))); });
                             })
                         }
                     });
             });
+            extra(ui);
         });
 }
 
-impl<E: Emulator> Ui for Ninja<E> {
+impl<E: Emulator> shared::Ui for Ninja<E> {
     fn init(&mut self, ctx: &mut Context) {
         self.textures.insert(Texture::Play, ctx.load_svg::<40, 40>("play", "assets/icons/play.svg"));
         self.textures.insert(Texture::Pause, ctx.load_svg::<40, 40>("pause", "assets/icons/pause.svg"));
@@ -154,7 +166,6 @@ impl<E: Emulator> Ui for Ninja<E> {
             (Small, FontId::new(10.0, Proportional)),
         ].into();
         ctx.set_style(style.clone());
-        let rect = ctx.available_rect();
         SidePanel::left("left")
             .show(ctx, |ui| {
                 let emu = self.emu.bus();
@@ -177,7 +188,7 @@ impl<E: Emulator> Ui for Ninja<E> {
                                 let into = egui::ImageButton::new(self.tex(Texture::Into), sz).frame(false);
                                 if ui.add(reset).clicked() { self.emu.reset(); };
                                 if ui.add(step).clicked() { self.step() };
-                                if ui.add(play).clicked() { self.emu.play(); };
+                                if ui.add(play).clicked() { self.play(); };
                                 if ui.add(pause.clone()).clicked() { self.pause(); };
                                 if ui.add(into.clone()).clicked() { self.step_into(); };
                             });
@@ -196,6 +207,14 @@ impl<E: Emulator> Ui for Ninja<E> {
                 });
                 egui::Frame::group(ui.style())
                     .show(ui, |ui: &mut egui::Ui| {
+                        ui.horizontal(|ui| {
+                            if ui.add(egui::TextEdit::singleline(&mut self.render_data.raw_op).desired_width(64.)).changed() {
+                                self.render_data.parse_op();
+                            }
+                            if ui.button("BREAK").clicked() {
+                                self.schedule(Breakpoint::instruction(self.render_data.ins));
+                            }
+                        });
                         ui.horizontal(|ui| {
                             ui.menu_button(self.render_data.reg.name(), |ui| {
                                 use Reg::*;
@@ -223,11 +242,10 @@ impl<E: Emulator> Ui for Ninja<E> {
                         self.breakpoints().drain_filter(|bp| {
                             if bp.temp() { return false };
                             let mut rem = false;
-                            let (r, v) = bp.display();
                             body.row(30.0, |mut row| {
                                 row.col(|ui| { if ui.button("-").clicked() { rem = true; } });
                                 row.col(|ui| { ui.checkbox(&mut bp.enabled, ""); });
-                                row.col(|ui| { ui.label(format!("{r:?} == {v:#06x}")); });
+                                row.col(|ui| { ui.label(bp.display()); });
                             });
                             rem
                         });
@@ -297,20 +315,16 @@ impl<E: Emulator> Ui for Ninja<E> {
                                         const MEM: &[IO] = &[IO::KEY1, IO::DMA, IO::VBK, IO::SVBK, IO::HDMA1, IO::HDMA2, IO::HDMA3, IO::HDMA4, IO::HDMA5];
                                         const AUDIO: &[IO] = &[IO::WaveRam0];
                                         const VIDEO: &[IO] = &[IO::LCDC, IO::STAT, IO::SCX, IO::SCY, IO::LY, IO::LYC, IO::DMA, IO::WX, IO::WY, IO::BGP, IO::OBP0, IO::OBP1, IO::BCPS, IO::BCPD, IO::OPRI, IO::OCPS];
-                                        row.col(|ui| { io_table(ui, CPU, bus.as_ref(), "CPU"); });
-                                        row.col(|ui| { io_table(ui, MEM, bus.as_ref(), "MEM");
+                                        row.col(|ui| { io_table(ui, CPU, bus.as_ref(), "CPU", |_| {}); });
+                                        row.col(|ui| { io_table(ui, MEM, bus.as_ref(), "MEM", |ui: &mut Ui| {
                                             ui.push_id("BANK_TABLE", |ui| {
                                                 egui_extras::TableBuilder::new(ui)
                                                     .columns(Column::exact(100.), 2)
                                                     .auto_shrink([false, false])
                                                     .body(|mut body| {
                                                         body.row(16., |mut row| {
-                                                            row.col(|ui| { ui.label("ROM_H"); });
-                                                            row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().rom_bank_high())); });
-                                                        });
-                                                        body.row(16., |mut row| {
-                                                            row.col(|ui| { ui.label("ROM_L"); });
-                                                            row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().rom_bank_low())); });
+                                                            row.col(|ui| { ui.label("ROM"); });
+                                                            row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().rom_bank())); });
                                                         });
                                                         body.row(16., |mut row| {
                                                             row.col(|ui| { ui.label("RAM"); });
@@ -318,9 +332,9 @@ impl<E: Emulator> Ui for Ninja<E> {
                                                         });
                                                     });
                                             });
-                                        });
-                                        row.col(|ui| { io_table(ui, AUDIO, bus.as_ref(), "AUDIO"); });
-                                        row.col(|ui| { io_table(ui, VIDEO, bus.as_ref(), "VIDEO"); });
+                                        })});
+                                        row.col(|ui| { io_table(ui, AUDIO, bus.as_ref(), "AUDIO", |_| {}); });
+                                        row.col(|ui| { io_table(ui, VIDEO, bus.as_ref(), "VIDEO", |_| {}); });
                                     });
                                 });
                         });
@@ -328,9 +342,10 @@ impl<E: Emulator> Ui for Ninja<E> {
             });
     }
 
-    fn handle(&mut self, event: &Events) {
+    fn handle(&mut self, event: &Event) {
         match event {
-            Events::Loaded => self.disassembly.reload(),
+            Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
+            Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&self.emu),
             _ => {}
         }
     }

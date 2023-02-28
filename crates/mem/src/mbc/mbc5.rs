@@ -19,7 +19,7 @@ pub struct Mbc5 {
     ram: Vec<u8>,
     enabled_ram: bool,
     rom_bank: usize,
-    ram_bank: u8,
+    ram_bank: usize,
     rom_banks: usize,
     ram_banks: usize,
 }
@@ -29,14 +29,12 @@ impl Mem for Mbc5 {
         match absolute {
             ROM..=ROM_END => self.rom[addr as usize],
             SROM..=SROM_END => {
-                let bank = self.rom_bank % self.rom_banks;
-                let addr = addr as usize + bank * BANK_SIZE;
+                let addr = addr as usize + self.rom_bank * BANK_SIZE;
                 if addr > self.rom.len() { panic!("out of bounds cartridge rom read at {absolute}"); }
                 self.rom[addr]
             },
             SRAM..=SRAM_END => {
-                let bank = self.ram_bank as usize % self.ram_banks;
-                let addr = addr as usize + bank * RAM_SIZE;
+                let addr = addr as usize + self.ram_bank * RAM_SIZE;
                 if addr > self.ram.len() { panic!("out of bounds cartridge ram read at {absolute}"); }
                 self.ram[addr]
             },
@@ -47,12 +45,11 @@ impl Mem for Mbc5 {
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         match absolute {
             RAM_ENABLE..=RAM_ENABLE_END => self.enabled_ram = (value & 0xF) == 0xA,
-            ROM_BANK..=ROM_BANK_END => self.rom_bank = (self.rom_bank & 0x100) | value as usize,
+            ROM_BANK..=ROM_BANK_END => self.rom_bank = ((self.rom_bank & 0x100) | (value as usize)) % self.rom_banks,
             ROM_BANK_H..=ROM_BANK_H_END => self.rom_bank = ((value as usize & 0x1) << 8) | (self.rom_bank & 0xFF),
-            RAM_BANK..=RAM_BANK_END => self.ram_bank = value & 0xF,
+            RAM_BANK..=RAM_BANK_END => self.ram_bank = (value as usize & 0xF) % self.ram_banks,
             SRAM..=SRAM_END => {
-                let bank = self.ram_bank as usize % self.ram_banks;
-                let addr = addr as usize + bank as usize * BANK_SIZE;
+                let addr = addr as usize + self.ram_bank as usize * RAM_SIZE;
                 self.ram[addr] = value;
             },
             _ => unreachable!("mbc not supposed to write at {addr:#06X} [{absolute:#06X}]")
@@ -64,16 +61,14 @@ impl Mem for Mbc5 {
         match st {
             ROM..=ROM_END => self.rom[s..((st + len) as usize).min(BANK_SIZE)].to_vec(),
             SROM..=SROM_END => {
-                let bank = self.rom_bank as usize % self.rom_banks;
                 let s = s - SROM as usize;
-                let end = (s + len as usize).min(BANK_SIZE) + bank * BANK_SIZE;
-                let st = s + bank * BANK_SIZE;
+                let end = (s + len as usize).min(BANK_SIZE) + self.rom_bank * BANK_SIZE;
+                let st = s + self.rom_bank * BANK_SIZE;
                 self.rom[st..end].to_vec()
             },
             SRAM..=SRAM_END => {
-                let bank = self.ram_bank as usize % self.ram_banks;
                 let s = s - SRAM as usize;
-                let st = s + RAM_SIZE * bank as usize;
+                let st = s + RAM_SIZE * self.ram_bank as usize;
                 let end = (st + len as usize).min((self.ram_bank + 1) as usize * RAM_SIZE);
                 if end > self.ram.len() {
                     eprintln!("hope you're not reading from that rambank ({}) because it's not mapped !", self.ram_bank);
@@ -103,15 +98,8 @@ impl MemoryController for Mbc5 {
         self.ram.clone()
     }
 
-    fn rom_bank_low(&self) -> u8 {
-        (self.rom_bank & 0xFF) as u8
-    }
-
-    fn rom_bank_high(&self) -> u8 {
-        (self.rom_bank >> 8) as u8
-    }
-
-    fn ram_bank(&self) -> u8 {
+    fn rom_bank(&self) -> usize { self.rom_bank }
+    fn ram_bank(&self) -> usize {
         self.ram_bank
     }
 }

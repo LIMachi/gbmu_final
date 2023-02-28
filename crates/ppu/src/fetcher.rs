@@ -79,7 +79,6 @@ impl Fetcher {
         self.mode == Mode::Window
     }
 
-    // TODO fix window y. rest looks cool.
     fn get_tile(&mut self, ppu: &Ppu) -> State {
         if self.clock == 0 {
             self.clock = 1;
@@ -167,7 +166,13 @@ impl Fetcher {
                 oam.merge(colors.into_iter().map(|x| Pixel { color: x, palette: dmg, index, priority }).collect());
                 self.set_mode(self.prev, self.x);
                 bg.enable();
-            } else if bg.push(colors.into_iter().map(|x| Pixel { color: x, palette: dmg, index, priority }).collect()) {
+            } else if bg.push(colors.into_iter().map(|x|
+                if !ppu.cgb && !ppu.lcdc.priority() {
+                    Pixel::white(ppu.regs.bgp.read())
+                } else {
+                    Pixel { color: x, palette: dmg, index, priority }
+                }
+            ).collect()) {
                 self.x += 1;
                 self.low = Some(low);
                 self.high = Some(high);

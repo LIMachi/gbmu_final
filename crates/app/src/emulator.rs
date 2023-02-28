@@ -5,30 +5,30 @@ use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use log::{error, log, warn};
 use winit::event::WindowEvent;
-use bus::Dma;
 use dbg::BusWrapper;
-use lcd::Lcd;
 use mem::{mbc, Wram};
-use mem::mbc::Controller;
 use shared::breakpoints::Breakpoints;
-
 use shared::rom::Rom;
-use shared::cpu::*;
-use shared::io::IO;
-use shared::{Events, Ui};
-use shared::egui::Context;
+use shared::{io::IO, Events, Ui, egui::Context};
+use shared::cpu::Bus;
 use shared::winit::window::Window;
 use shared::mem::{IOBus, MemoryBus};
 use shared::utils::Cell;
+
 use crate::Proxy;
 use crate::render::{Event, Render};
+
+mod joy;
+
+pub use joy::Keybindings;
 
 pub struct Emu {
     speed: i32,
     rom: Option<Rom>,
+    joy: joy::Joypad,
     pub lcd: lcd::Lcd,
     pub bus: bus::Bus,
-    pub cpu: core::Cpu,
+    pub cpu: cpu::Cpu,
     pub ppu: ppu::Controller,
     pub mbc: mbc::Controller,
     pub dma: bus::Dma,
@@ -38,23 +38,26 @@ pub struct Emu {
 
 impl Default for Emu {
     fn default() -> Self {
-        let lcd = Lcd::new();
+        let lcd = lcd::Lcd::new();
+        let mut joy = joy::Joypad::new(Default::default());
         let mut mbc = mbc::Controller::unplugged();
-        let mut dma = Dma::default();
+        let mut dma = bus::Dma::default();
         let mut ppu = ppu::Controller::new(false, lcd.clone());
         let mut timer = bus::Timer::default();
-        let mut cpu = core::Cpu::new(false);
+        let mut cpu = cpu::Cpu::new(false);
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
             .configure(&mut timer)
-            .configure(&mut cpu);
+            .configure(&mut cpu)
+            .configure(&mut joy);
         Self {
             speed: Default::default(),
             rom: None,
             lcd,
+            joy,
             ppu,
             mbc,
             cpu,
@@ -68,14 +71,16 @@ impl Default for Emu {
 
 #[derive(Clone)]
 pub struct Emulator {
+    proxy: Proxy,
+    bindings: Rc<RefCell<Keybindings>>,
     breakpoints: Breakpoints,
     emu: Rc<RefCell<Emu>>
 }
 
 impl Emulator {
 
-    pub fn new(breakpoints: Breakpoints) -> Self {
-        Self { emu: Emu::default().cell(), breakpoints }
+    pub fn new(proxy: Proxy, bindings: Rc<RefCell<Keybindings>>, breakpoints: Breakpoints) -> Self {
+        Self { proxy, bindings, emu: Emu::default().cell(), breakpoints }
     }
     pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints) }
 
@@ -108,15 +113,21 @@ impl Render for Emulator {
         self.emu.as_ref().borrow_mut().lcd.resize(w, h);
     }
 
-    fn handle(&mut self, event: &Event, _: &Proxy, window: &Window) {
+    fn handle(&mut self, event: &Event, window: &Window) {
         match event {
             Event::UserEvent(Events::Play(rom)) => {
-                let mut emu = Emu::new(rom.clone(), true);
+                let mut emu = Emu::new(self.bindings.clone(), rom.clone(), true);
                 self.emu.replace(emu);
                 Render::init(self, window);
             },
-            Event::WindowEvent { window_id, event } if window_id == &window.id() && event == &WindowEvent::CloseRequested => {
-                self.stop();
+            Event::UserEvent(Events::Reload) => {
+                Render::init(self, window);
+            },
+            Event::WindowEvent { window_id, event } if window_id == &window.id() => {
+                if event == &WindowEvent::CloseRequested { self.stop(); }
+                if let WindowEvent::KeyboardInput { input, .. } = event {
+                    self.emu.as_ref().borrow_mut().joy.handle(*input);
+                }
             },
             _ => {}
         }
@@ -132,13 +143,13 @@ impl Ui for Emulator {
         self.emu.as_ref().borrow_mut().ppu.draw(ctx);
     }
 
-    fn handle(&mut self, event: &Events) {
+    fn handle(&mut self, event: &shared::Event) {
         self.emu.as_ref().borrow_mut().ppu.handle(event);
     }
 }
 
 impl dbg::ReadAccess for Emulator {
-    fn cpu_register(&self, reg: Reg) -> Value {
+    fn cpu_register(&self, reg: shared::cpu::Reg) -> shared::cpu::Value {
         self.emu.as_ref().borrow().cpu.registers().read(reg)
     }
 
@@ -161,11 +172,11 @@ impl dbg::Schedule for Emulator {
     }
 
     fn reset(&self) {
-        warn!("RESET");
         let emu = self.emu.as_ref().borrow().rom.clone()
-            .map(|rom| Emu::new(rom, false))
+            .map(|rom| Emu::new(self.bindings.clone(), rom, false))
             .unwrap_or_else(|| Emu::default());
         self.emu.replace(emu);
+        self.proxy.send_event(Events::Reload).ok();
     }
 
     fn speed(&self) -> i32 { self.emu.as_ref().borrow().speed }
@@ -177,21 +188,23 @@ impl Emu {
     pub const CLOCK_PER_SECOND: u32 = 4_194_304;
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(rom: Rom, running: bool) -> Self {
+    pub fn new(bindings: Rc<RefCell<Keybindings>>, rom: Rom, running: bool) -> Self {
         log::info!("starting emu (cgb required: {})", rom.header.kind.requires_gbc());
-        let lcd = Lcd::new();
+        let lcd = lcd::Lcd::new();
+        let mut joy = joy::Joypad::new(bindings);
         let mut mbc = mem::mbc::Controller::new(&rom);
-        let mut dma = Dma::default();
+        let mut dma = bus::Dma::default();
         let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), lcd.clone());
         let mut timer = bus::Timer::default();
-        let mut cpu = core::Cpu::new(rom.header.kind.requires_gbc());
+        let mut cpu = cpu::Cpu::new(rom.header.kind.requires_gbc());
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(rom.header.kind.requires_gbc()))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
             .configure(&mut timer)
-            .configure(&mut cpu);
+            .configure(&mut cpu)
+            .configure(&mut joy);
         timer.offset();
         IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
         IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
@@ -199,6 +212,7 @@ impl Emu {
         IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
         Self {
             speed: Default::default(),
+            joy,
             lcd,
             bus,
             cpu,
@@ -207,13 +221,14 @@ impl Emu {
             dma,
             timer,
             rom: Some(rom),
-            running
+            running,
         }
     }
 
     pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) -> bool {
         if !self.running { return false; }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
+            self.joy.tick();
             if clock == 0 { // OR clock == 2 && cpu.double_speed()
                 self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
@@ -237,5 +252,5 @@ impl Emu {
 
 impl BusWrapper for Emu {
     fn bus(&self) -> Box<&dyn dbg::Bus> { Box::new(&self.bus) }
-    fn mbc(&self) -> &Controller { &self.mbc }
+    fn mbc(&self) -> &mem::mbc::Controller { &self.mbc }
 }

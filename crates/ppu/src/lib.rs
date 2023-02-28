@@ -247,14 +247,11 @@ impl BgFifo {
         if self.enabled {
             let res = match (oam.pop(), self.inner.pop_front()) {
                 (None, Some(bg)) => Some(bg),
-                (Some(oam), Some(bg)) => {
-                    Some({
-                        let bg = if !ppu.cgb && !ppu.lcdc.priority() { Pixel::white(ppu.regs.bgp.read()) } else { bg };
+                (Some(oam), Some(bg)) => Some({
                         if oam.color == 0x0 { bg }
                         else if ppu.lcdc.priority() && bg.color != 0 && (oam.priority.unwrap_or(false) || bg.priority.unwrap_or(false)) { bg }
                         else { oam }
-                    })
-                },
+                    }),
                 (_, None) => unreachable!()
             };
             if self.inner.len() <= 8 {
@@ -338,6 +335,7 @@ impl State for TransferState {
     fn mode(&self) -> Mode { Mode::Transfer }
 
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
+        self.dots += 1;
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
                 println!("window");
@@ -345,8 +343,8 @@ impl State for TransferState {
                 self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
                 self.bg.clear();
             }
-            ppu.win.enabled = ppu.lcdc.win_enable();
         }
+        ppu.win.enabled = ppu.lcdc.win_enable();
         self.fetcher.tick(ppu, &mut self.bg, &mut self.oam);
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
@@ -451,11 +449,13 @@ impl Ppu {
         }
         self.lcdc = lcdc;
         if !self.lcdc.enabled() { return; }
+        self.dots += 1;
         if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
         let mut state = std::mem::replace(&mut self.state, Box::new(OamState::new()));
         self.state = if let Some(next) = state.tick(self) {
             let mode = next.mode();
             if mode == Mode::VBlank {
+                log::info!("frame ran for {}", self.dots);
                 self.dots = 0;
                 self.lcd.enable();
             }

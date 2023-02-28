@@ -28,7 +28,7 @@ impl Mem for Storage {
             Storage::Cgb(bank, banks) => {
                 match addr as usize {
                     0..BANK_SIZE => banks[0][addr],
-                    BANK_SIZE..WRAM_SIZE => banks[b][addr],
+                    BANK_SIZE..WRAM_SIZE => banks[b][addr - BANK_SIZE],
                     _ => unreachable!()
                 }
             }
@@ -43,7 +43,7 @@ impl Mem for Storage {
             Storage::Cgb(bank, banks) => {
                 match addr as usize {
                     0..BANK_SIZE => banks[0][addr] = value,
-                    BANK_SIZE..WRAM_SIZE => banks[b][addr] = value,
+                    BANK_SIZE..WRAM_SIZE => banks[b][addr - BANK_SIZE] = value,
                     _ => unreachable!()
                 }
             }

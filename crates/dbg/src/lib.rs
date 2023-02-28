@@ -3,7 +3,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
-use shared::{egui::Context, Ui, cpu::*, breakpoints::{Breakpoint, Breakpoints}, Events};
+use shared::{egui::Context, Ui, cpu::*, breakpoints::{Breakpoint, Breakpoints}, Events, Event};
 
 mod disassembly;
 mod memory;
@@ -76,15 +76,20 @@ impl<E: Emulator> Ninja<E> {
 
     pub fn pause(&self) { self.breakpoints.pause(); }
 
+    pub fn play(&mut self) {
+        self.emu.play();
+        self.disassembly.follow();
+    }
+
     pub fn step(&mut self) {
         if let Some((pc, op)) = self.disassembly.next(&self.emu) {
             if op.is_call() { self.breakpoints.schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()); }
             else { self.breakpoints.step(); }
         } else { self.breakpoints.step(); }
-        self.emu.play();
+        self.play();
     }
 
-    pub fn step_into(&self) { self.breakpoints.step(); self.emu.play(); }
+    pub fn step_into(&mut self) { self.breakpoints.step(); self.play(); }
     pub fn schedule(&self, bp: Breakpoint) { self.breakpoints.schedule(bp); }
     pub fn breakpoints(&self) -> RefMut<Vec<Breakpoint>> {
         self.breakpoints.bp_mut()
@@ -105,7 +110,7 @@ impl<E:Emulator> Ui for Debugger<E> {
         self.inner.borrow_mut().draw(ctx)
     }
 
-    fn handle(&mut self, event: &Events) {self.inner.borrow_mut().handle(event); }
+    fn handle(&mut self, event: &Event) {self.inner.borrow_mut().handle(event); }
 }
 
 impl<E: Emulator> Debugger<E> {

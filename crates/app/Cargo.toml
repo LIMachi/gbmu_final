@@ -25,13 +25,13 @@ version = "1.0.152"
 features = ["derive"]
 
 [features]
-debug = ["core/log_opcode"]
+debug = ["cpu/log_opcode"]
 file_log = []
 
 [dependencies.shared]
 path = "../shared"
-[dependencies.core]
-path = "../core"
+[dependencies.cpu]
+path = "../cpu"
 [dependencies.lcd]
 path = "../lcd"
 [dependencies.bus]

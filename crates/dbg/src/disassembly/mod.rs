@@ -1,20 +1,17 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::ops::{Range, RangeBounds};
 use egui_extras::{Column, TableBuilder};
-use shared::cpu::{CBOpcode, Opcode, Reg};
+use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
-use shared::egui::{Color32, ScrollArea, TextStyle, Ui, Widget};
+use shared::egui::{Align, Color32, Rounding, Ui};
 use shared::mem::*;
-use shared::utils::Cell;
 use crate::Emulator;
-
-mod dbg_opcodes;
 
 #[derive(Clone)]
 pub struct Op {
     pub offset: u16,
     pub size: usize,
-    instruction: String,
+    pub instruction: String,
     data: Vec<u8>
 }
 
@@ -30,8 +27,12 @@ impl Op {
             Ok(opcode) => opcode,
             Err(e) => Opcode::Nop
         };
-        let (sz, info) = dbg_opcodes::dbg_opcodes(op);
-        Self::new(pc, sz, info.to_string(), range[0..sz].to_vec())
+        let (sz, info) = dbg::dbg_opcodes(op);
+        Self::new(pc, sz, info.to_string(), if range.len() < sz {
+            vec![0xFF, range.len() as u8]
+        } else {
+            range[0..sz].to_vec()
+        })
     }
 
     pub fn is_call(&self) -> bool {
@@ -41,8 +42,14 @@ impl Op {
 
 impl Default for Op {
     fn default() -> Self {
-        Op::new(0, 1, dbg_opcodes::dbg_opcodes(Opcode::Nop).1.to_string(), vec![])
+        Op::new(0, 1, dbg::dbg_opcodes(Opcode::Nop).1.to_string(), vec![])
     }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Cursor {
+    Fixed(usize),
+    Follow
 }
 
 pub struct OpRange {
@@ -103,8 +110,8 @@ impl<E: Emulator> MemRange<E> for DynRange {
 }
 
 struct SromRange {
-    current: u16,
-    banks: HashMap<u16, OpRange>
+    current: usize,
+    banks: HashMap<usize, OpRange>
 }
 
 impl Default for SromRange {
@@ -129,11 +136,7 @@ impl<E: Emulator> MemRange<E> for SromRange {
     fn reload(&mut self) { self.banks.clear() }
     fn range(&self) -> std::ops::Range<u16> { 0x4000..0x8000 }
     fn update(&mut self, emu: &E) {
-        let bank = {
-            let emu = emu.bus();
-            let mbc = emu.mbc();
-            (mbc.rom_bank_high() as u16) << 8 | mbc.rom_bank_low() as u16
-        };
+        let bank = emu.bus().mbc().rom_bank();
         self.current = bank;
         self.banks.entry(bank).or_insert_with(|| OpRange::default().parse(emu.get_range(0x4000, 0x4000), vec![]));
     }
@@ -153,12 +156,14 @@ pub trait MemRange<E: Emulator> {
 }
 
 pub struct Disassembly<E: Emulator> {
-    ranges: Vec<Box<dyn MemRange<E>>>
+    ranges: Vec<Box<dyn MemRange<E>>>,
+    cursor: Cursor,
 }
 
 impl<E: Emulator> Disassembly<E> {
     pub fn new() -> Self {
         Self {
+            cursor: Cursor::Follow,
             ranges: vec![
                 RomRange::default().boxed(),
                 SromRange::default().boxed(),
@@ -169,12 +174,31 @@ impl<E: Emulator> Disassembly<E> {
         }
     }
 
+    pub fn follow(&mut self) {
+        self.cursor = Cursor::Follow;
+    }
+
     pub fn range(&mut self, pc: u16) -> Option<&mut Box<dyn MemRange<E>>> {
         self.ranges.iter_mut().find(|x| x.range().contains(&pc))
     }
 
     pub fn lines(&self) -> usize {
         self.ranges.iter().fold(0, |acc, range| acc + range.count())
+    }
+
+    pub fn row(&self, addr: u16) -> usize {
+        self.ranges.iter().fold(0, |row, range| {
+            let r = range.range();
+            if r.contains(&addr) {
+                range.ops().ops.iter().enumerate().find(|(i, x)| x.offset + r.start >= addr)
+                    .map(|x| row + x.0)
+                    .unwrap_or(row)
+            } else if r.start < addr {
+                row + range.count()
+            } else {
+                row
+            }
+        })
     }
 
     pub(crate) fn next(&mut self, emu: &E) -> Option<(u16, Op)> {
@@ -190,19 +214,34 @@ impl<E: Emulator> Disassembly<E> {
         None
     }
 
+    pub fn fixed(&mut self, emu: &E) {
+        if Cursor::Follow == self.cursor {
+            self.cursor = Cursor::Fixed(self.row(emu.cpu_register(Reg::PC).u16()));
+        }
+    }
+
     pub fn reload(&mut self) {
         self.ranges.iter_mut().for_each(|x| x.reload());
     }
 
     pub fn render(&mut self, emu: &E, ui: &mut Ui) {
+        let pc = emu.cpu_register(Reg::PC).u16();
+        let cursor = match self.cursor {
+            Cursor::Follow => self.row(pc),
+            Cursor::Fixed(row) => row,
+        };
         ui.set_height(300.);
+        let row = self.row(pc);
         self.ranges.iter_mut().for_each(|x| { x.update(emu); });
-        TableBuilder::new(ui)
+        let mut table = TableBuilder::new(ui)
             .columns(Column::remainder(), 3)
             .striped(true)
             .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .auto_shrink([false, false])
-            .header(20., |mut header| {
+            .auto_shrink([false, false]);
+        if let Cursor::Follow = self.cursor {
+            table = table.scroll_to_row(row, Some(Align::Center));
+        }
+        table.header(20., |mut header| {
                 header.col(|ui| {
                     ui.strong(egui::RichText::new("Address").color(Color32::GOLD));
                 });
@@ -214,35 +253,49 @@ impl<E: Emulator> Disassembly<E> {
                 });
             })
             .body(|mut body| {
-                let lines = self.lines();
-                body.rows(30., lines, |index, mut row| {
-                    let mut st = index;
-                    if let Some(mut current) = self.ranges.iter_mut()
-                        .fold(None, |res, current| {
-                            match res {
-                                None if st < current.count() => Some(current),
-                                None => {
-                                    st -= current.count();
-                                    None
-                                },
-                                v => v
-                            }
-                        }) {
-                        let addr = current.range().start;
-                        let op = &current.ops().ops[st];
-                        row.col(|ui| {
-                            ui.label(egui::RichText::new(format!("{:#06X}", addr + op.offset)));
-                        });
-                        row.col(|ui| {
-                            ui.label(egui::RichText::new(&op.instruction));
-                        });
-                        row.col(|ui| {
-                            let mut code = String::new();
-                            for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
-                            ui.label(egui::RichText::new(code));
-                        });
-                    }
-                });
+            let lines = self.lines();
+            body.rows(30., lines, |index, mut row| {
+                let mut st = index;
+                if let Some(mut current) = self.ranges.iter_mut()
+                    .fold(None, |res, current| {
+                        match res {
+                            None if st < current.count() => Some(current),
+                            None => {
+                                st -= current.count();
+                                None
+                            },
+                            v => v
+                        }
+                    }) {
+                    let addr = current.range().start;
+                    let op = &current.ops().ops[st];
+                    row.col(|ui| {
+                        if index == cursor {
+                            let mut rect = ui.available_rect_before_wrap();
+                            rect.max.x += 8.;
+                            rect.min.x -= 8.;
+                            ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::DARK_GREEN);
+                        }
+                        ui.label(egui::RichText::new(format!("{:#06X}", addr + op.offset)));
+                    });
+                    row.col(|ui| {
+                        if index == cursor {
+                            let mut rect = ui.available_rect_before_wrap();
+                            rect.max.x += 8.;
+                            ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN);
+                        }
+                        ui.label(egui::RichText::new(&op.instruction));
+                    });
+                    row.col(|ui| {
+                        if index == cursor {
+                            ui.painter().rect_filled(ui.available_rect_before_wrap(), 0., Color32::DARK_GREEN);
+                        }
+                        let mut code = String::new();
+                        for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
+                        ui.label(egui::RichText::new(code));
+                    });
+                }
             });
+        });
     }
 }

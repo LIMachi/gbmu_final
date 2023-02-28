@@ -87,7 +87,7 @@ pub trait Render {
     fn init(&mut self, window: &Window);
     fn render(&mut self);
     fn resize(&mut self, w: u32, h: u32);
-    fn handle(&mut self, event: &Event, proxy: &Proxy, window: &Window);
+    fn handle(&mut self, event: &Event, window: &Window);
 }
 
 pub use egui_context::EguiContext;

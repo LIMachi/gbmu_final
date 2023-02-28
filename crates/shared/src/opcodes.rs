@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+pub mod dbg;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Invalid opcode")]

@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use winit::{
     event_loop::{ControlFlow, EventLoopWindowTarget}
 };
@@ -15,9 +17,11 @@ use shared::breakpoints::Breakpoints;
 use shared::{Events, Handle};
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
+use crate::emulator::Keybindings;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
+    bindings: Rc<RefCell<emulator::Keybindings>>,
     emu: emulator::Emulator,
     dbg: Debugger<emulator::Emulator>,
     event_loop: Option<EventLoop>,
@@ -26,12 +30,17 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let mut emu = emulator::Emulator::new(Breakpoints::default());
-        let dbg = Debugger::new(emu.clone());
         let e = EventLoopBuilder::with_user_event()
             .build();
         let proxy = e.create_proxy();
+        let bindings = Keybindings::default().cell();
+        let mut emu = emulator::Emulator::new(
+            proxy.clone(),
+            bindings.clone(),
+            Breakpoints::default());
+        let dbg = Debugger::new(emu.clone());
         Self {
+            bindings,
             event_loop: Some(e),
             windows: Windows::new(proxy),
             emu,
