@@ -339,7 +339,7 @@ impl State for TransferState {
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
                 println!("window");
-                self.scx = self.scx.saturating_sub(1);
+                self.scx = 7 - ppu.regs.wx.read();
                 self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
                 self.bg.clear();
             }
