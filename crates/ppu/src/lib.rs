@@ -339,8 +339,9 @@ impl State for TransferState {
         self.dots += 1;
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
-                self.scx = 7 - ppu.regs.wx.read();
-                self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
+                // println!("win enabled for {} ({})", ppu.regs.ly.read(), ppu.win.y);
+                self.scx = 7u8.saturating_sub(ppu.regs.wx.read());
+                self.fetcher.set_mode(fetcher::Mode::Window);
                 self.bg.clear();
                 ppu.win.enabled = true;
             }
@@ -349,9 +350,9 @@ impl State for TransferState {
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
             for i in idx..ppu.sprites.len() {
-                if ppu.sprites[i].screen_x() == self.lx || (ppu.sprites[i].x < 8 && self.lx == 0) {
+                if ppu.sprites[i].screen_x() == self.lx || (ppu.sprites[i].x != 0 && ppu.sprites[i].x < 8 && self.lx == 0) {
                     self.sprite = Some(i);
-                    self.fetcher.set_mode(fetcher::Mode::Sprite(ppu.sprites[i], self.lx), self.lx);
+                    self.fetcher.set_mode(fetcher::Mode::Sprite(ppu.sprites[i], self.lx));
                     self.bg.disable();
                     break ;
                 }
@@ -364,11 +365,11 @@ impl State for TransferState {
             }
             ppu.lcd.set(self.lx as usize, self.ly as usize, pixel.color());
             self.sprite = None;
-            if ppu.win.enabled { ppu.win.y += 1; }
-            ppu.win.enabled = false;
             self.lx += 1;
             if self.lx == 160 {
-                return Some(HState::new(376 - self.dots).boxed())
+                if ppu.win.enabled { ppu.win.y += 1; }
+                ppu.win.enabled = false;
+                return Some(HState::new(376usize.saturating_sub(self.dots)).boxed())
             }
         }
         None
@@ -386,6 +387,7 @@ impl State for VState {
 
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
         if self.dots == Self::DOTS {
+            ppu.win.y = 0;
             ppu.regs.interrupt.set(0);
         }
         self.dots -= 1;
@@ -409,7 +411,7 @@ impl State for HState {
     fn mode(&self) -> Mode { Mode::HBlank }
 
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
-        self.dots -= 1;
+        self.dots = self.dots.saturating_sub(1);
         if self.dots == 0 {
             let ly = ppu.regs.ly.read() + 1;
             ppu.regs.ly.direct_write(ly);

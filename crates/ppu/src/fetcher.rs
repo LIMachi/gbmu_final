@@ -58,11 +58,10 @@ impl Fetcher {
         }
     }
 
-    pub fn set_mode(&mut self, mode: Mode, lx: u8) -> bool {
+    pub fn set_mode(&mut self, mode: Mode) -> bool {
         let mut changed = false;
         if mode == Mode::Window && self.mode == Mode::Bg {
             self.state = State::Tile;
-            self.x = lx;
             changed = true;
         }
         if let Mode::Sprite(Sprite { tile, flags, .. }, .. ) = mode {
@@ -91,13 +90,19 @@ impl Fetcher {
         let ly = ppu.regs.ly.read();
         let scx = ppu.regs.scx.read();
         let scy = ppu.regs.scy.read();
-        let addr = 0x1800 | match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
-            (false, n , _) => (n as u16) << 10 | ((ly.wrapping_add(scy) as u16 / 8) << 5) | ((self.x + scx / 8) & 0x1F) as u16, //bg tile (LCDC.3)
-            (true, _, n) => (n as u16) << 10 | ((ppu.win.y / 8) << 5) as u16 | self.x as u16, //window tile (LCDC.6)
+        let (offset, y, x) = match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
+            (false, n , _) => (n, ly.wrapping_add(scy) as u16 / 8, (self.x + scx / 8) & 0x1F), //bg tile (LCDC.3)
+            (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6)
         };
+        let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
         let bank = if ppu.cgb {
             if let Mode::Sprite(Sprite { flags, .. }, _) = self.mode { (flags >> 2) & 0x1 } else { 0 }
         } else { 0 };
+        // println!("{} ({:#06X}): [{x},{y}] (tile index {})",
+        //     if self.window_active() { "WINDOW" } else { "BG" },
+        //     if offset { 0x9C00 } else { 0x9800 },
+        //     (offset as u16) << 10 | y << 5 as u16 | x as u16
+        // );
         self.tile = ppu.vram.read_bank(addr, bank as usize) as u16;
         State::DataLow
     }
@@ -106,7 +111,9 @@ impl Fetcher {
         let lcdc = ppu.lcdc;
         let scy = ppu.regs.scy.read();
         let ly = ppu.regs.ly.read();
-        let (wrap, tile) = if lcdc.obj_tall() { (0xF, self.tile & 0xFE)  } else { (0x7, self.tile) };
+        let (wrap, tile) = if let Mode::Sprite(..) = self.mode {
+            if lcdc.obj_tall() { (0xF, self.tile & 0xFE)  } else { (0x7, self.tile) }
+        } else { (0x7, self.tile) };
         let y = (match self.mode {
             Mode::Bg => ly.wrapping_add(scy),
             Mode::Window => ppu.win.y,
@@ -164,7 +171,7 @@ impl Fetcher {
                 colors.rotate_left(s);
                 colors[8-s..].iter_mut().for_each(|x| *x = 0);
                 oam.merge(colors.into_iter().map(|x| Pixel { color: x, palette: dmg, index, priority }).collect());
-                self.set_mode(self.prev, self.x);
+                self.set_mode(self.prev);
                 bg.enable();
             } else if bg.push(colors.into_iter().map(|x|
                 if !ppu.cgb && !ppu.lcdc.priority() {
@@ -174,9 +181,11 @@ impl Fetcher {
                 }
             ).collect()) {
                 self.x += 1;
+            } else {
                 self.low = Some(low);
                 self.high = Some(high);
-            } else { return State::Push }
+                return State::Push
+            }
         }
         State::Tile
         // TODO use obj palette if mode == sprite

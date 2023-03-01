@@ -17,6 +17,7 @@ use shared::breakpoints::Breakpoints;
 use shared::{Events, Handle};
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
+use crate::app::AppConfig;
 use crate::emulator::Keybindings;
 use crate::render::{Event, EventLoop, Proxy};
 
@@ -25,7 +26,8 @@ pub struct App {
     emu: emulator::Emulator,
     dbg: Debugger<emulator::Emulator>,
     event_loop: Option<EventLoop>,
-    pub windows: Windows
+    pub windows: Windows,
+    conf: AppConfig,
 }
 
 impl App {
@@ -39,12 +41,14 @@ impl App {
             bindings.clone(),
             Breakpoints::default());
         let dbg = Debugger::new(emu.clone());
+        let conf = AppConfig::try_load().map_err(|x| { log::error!("failed to load rom config with {x:?}"); () }).unwrap_or_else(|_| AppConfig::default());
         Self {
             bindings,
             event_loop: Some(e),
             windows: Windows::new(proxy),
             emu,
-            dbg
+            dbg,
+            conf
         }
     }
 
@@ -53,6 +57,10 @@ impl App {
     pub fn open(&mut self, handle: WindowType, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
         self.windows.create(handle, event_loop);
         self
+    }
+
+    pub fn menu(&self) -> Menu {
+        Menu::new(&self.conf, self.proxy())
     }
 
     pub fn create(mut self, handle: WindowType) -> Self {
@@ -103,7 +111,7 @@ impl App {
 fn main() {
     log::init();
     let mut app = App::new();
-    let menu = WindowType::Main(Menu::new(app.proxy()));
+    let menu = WindowType::Main(app.menu());
     let mut st = Chrono::new();
     let mut current = std::time::Instant::now();
     let mut s = 0;

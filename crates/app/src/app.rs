@@ -31,18 +31,32 @@ pub struct RomConfig {
     paths: Vec<String>
 }
 
-impl RomConfig {
+#[derive(Default, Serialize, Deserialize, Clone)]
+#[serde(rename = "debug")]
+pub struct DbgConfig {
+
+}
+
+#[derive(Default, Serialize, Deserialize, Clone)]
+pub struct AppConfig {
+    #[serde(default)]
+    roms: RomConfig,
+    #[serde(default)]
+    debug: DbgConfig,
+}
+
+impl AppConfig {
     pub fn try_load() -> anyhow::Result<Self> {
-        let mut file = std::fs::File::open("roms.conf")?;
+        let mut file = std::fs::File::open("gbmu.conf")?;
         let mut buf = String::with_capacity(512);
         file.read_to_string(&mut buf).ok();
         Ok(toml::from_str(&buf)?)
     }
 }
 
-impl Drop for RomConfig {
+impl Drop for AppConfig {
     fn drop(&mut self) {
-        if let Ok(mut file) = std::fs::File::create("roms.conf") {
+        if let Ok(mut file) = std::fs::File::create("gbmu.conf") {
             toml::to_string(self).map(|x| file.write_all(x.as_bytes())).ok();
         }
     }
@@ -97,14 +111,14 @@ impl Menu {
         });
     }
 
-    pub fn new(proxy: Proxy) -> Self {
+    // TODO take conf as param (let App do the conf loading)
+    pub fn new(conf: &AppConfig, proxy: Proxy) -> Self {
         let (sender, receiver) = std::sync::mpsc::channel();
-        let conf = RomConfig::try_load().map_err(|x| { log::error!("failed to load rom config with {x:?}"); () }).unwrap_or_else(|_| RomConfig::default());
         Self {
             proxy,
             textures: Default::default(),
             roms: Default::default(),
-            conf,
+            conf: conf.roms.clone(),
             sender,
             receiver
         }
