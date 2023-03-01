@@ -52,7 +52,7 @@ impl Mem for Mbc5 {
                 let addr = addr as usize + self.ram_bank as usize * RAM_SIZE;
                 self.ram[addr] = value;
             },
-            _ => unreachable!("mbc not supposed to write at {addr:#06X} [{absolute:#06X}]")
+            _ => {}
         }
     }
 

@@ -455,7 +455,6 @@ impl Ppu {
         self.state = if let Some(next) = state.tick(self) {
             let mode = next.mode();
             if mode == Mode::VBlank {
-                log::info!("frame ran for {}", self.dots);
                 self.dots = 0;
                 self.lcd.enable();
             }
