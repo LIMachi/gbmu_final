@@ -69,6 +69,7 @@ impl Device for Registers {
         self.obp0 = bus.io(IO::OBP0);
         self.obp1 = bus.io(IO::OBP1);
         self.wx = bus.io(IO::WX);
+        self.wy = bus.io(IO::WY);
         self.bcps = bus.io(IO::BCPS);
         self.bcpd = bus.io(IO::BCPD);
         self.ocps = bus.io(IO::OCPS);
@@ -309,7 +310,7 @@ impl State for OamState {
         if self.sprite == 0 {
             ppu.sc = Scroll::default();
             ppu.sprites.clear();
-            ppu.win.scan_enabled = ppu.regs.wy.read() == ly;
+            ppu.win.scan_enabled = ppu.regs.wy.read() <= ly;
         }
         let oam = ppu.oam.sprites[self.sprite];
         if ly + if ppu.lcdc.obj_tall() { 0 } else { 8 } < oam.y && ly + 16 >= oam.y && ppu.sprites.len() < 10 {
@@ -338,13 +339,12 @@ impl State for TransferState {
         self.dots += 1;
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
-                println!("window");
                 self.scx = self.scx.saturating_sub(1);
                 self.fetcher.set_mode(fetcher::Mode::Window, self.lx);
                 self.bg.clear();
+                ppu.win.enabled = true;
             }
         }
-        ppu.win.enabled = ppu.lcdc.win_enable();
         self.fetcher.tick(ppu, &mut self.bg, &mut self.oam);
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
@@ -364,6 +364,8 @@ impl State for TransferState {
             }
             ppu.lcd.set(self.lx as usize, self.ly as usize, pixel.color());
             self.sprite = None;
+            if ppu.win.enabled { ppu.win.y += 1; }
+            ppu.win.enabled = false;
             self.lx += 1;
             if self.lx == 160 {
                 return Some(HState::new(376 - self.dots).boxed())
