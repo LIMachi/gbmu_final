@@ -45,7 +45,6 @@ impl Widget for Oam<'_> {
                         let h = self.0.get(&if sprite.x > 0 && sprite.y > 0 { Textures::Tile(sprite.tile as usize) } else { Textures::Placeholder }).unwrap().id();
                         let h2 = self.0.get(&if self.1.lcdc.obj_tall() { Textures::Tile(sprite.tile as usize + 1) } else { Textures::Placeholder }).unwrap().id();
                         if ui.add(Sprite(sprite, h, h2)).hovered() {
-                           println!("{index}");
                         }
                     }
                 });

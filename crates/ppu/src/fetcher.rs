@@ -93,7 +93,7 @@ impl Fetcher {
         let scy = ppu.regs.scy.read();
         let addr = 0x1800 | match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
             (false, n , _) => (n as u16) << 10 | ((ly.wrapping_add(scy) as u16 / 8) << 5) | ((self.x + scx / 8) & 0x1F) as u16, //bg tile (LCDC.3)
-            (true, _, n) => (n as u16) << 10 | (ppu.win.y << 5) as u16 | self.x as u16, //window tile (LCDC.6)
+            (true, _, n) => (n as u16) << 10 | ((ppu.win.y / 8) << 5) as u16 | self.x as u16, //window tile (LCDC.6)
         };
         let bank = if ppu.cgb {
             if let Mode::Sprite(Sprite { flags, .. }, _) = self.mode { (flags >> 2) & 0x1 } else { 0 }
