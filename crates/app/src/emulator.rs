@@ -7,7 +7,7 @@ use log::{error, log, warn};
 use winit::event::WindowEvent;
 use dbg::BusWrapper;
 use mem::{mbc, Wram};
-use shared::breakpoints::Breakpoints;
+use shared::breakpoints::{Breakpoint, Breakpoints};
 use shared::rom::Rom;
 use shared::{io::IO, Events, Ui, egui::Context};
 use shared::cpu::Bus;
@@ -79,8 +79,8 @@ pub struct Emulator {
 
 impl Emulator {
 
-    pub fn new(proxy: Proxy, bindings: Rc<RefCell<Keybindings>>, breakpoints: Breakpoints) -> Self {
-        Self { proxy, bindings, emu: Emu::default().cell(), breakpoints }
+    pub fn new(proxy: Proxy, bindings: Rc<RefCell<Keybindings>>, breaks: Vec<Breakpoint>) -> Self {
+        Self { proxy, bindings, emu: Emu::default().cell(), breakpoints: Breakpoints::new(breaks) }
     }
     pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints) }
 

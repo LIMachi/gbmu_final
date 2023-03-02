@@ -1,7 +1,8 @@
 use std::fmt;
 use std::fmt::{Formatter, LowerHex};
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     U8(u8),
     U16(u16)

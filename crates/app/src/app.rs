@@ -1,14 +1,18 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
 use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Vec2, Widget};
 use shared::rom::Rom;
 use shared::utils::image::ImageLoader;
 use crate::render::Proxy;
 
-use serde::{Serialize, Deserialize};
+use shared::serde::{Serialize, Deserialize};
 use shared::{Events, Handle};
+use shared::breakpoints::Breakpoint;
+use crate::emulator::Keybindings;
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
@@ -34,7 +38,7 @@ pub struct RomConfig {
 #[derive(Default, Serialize, Deserialize, Clone)]
 #[serde(rename = "debug")]
 pub struct DbgConfig {
-
+    pub breaks: Vec<Breakpoint>
 }
 
 #[derive(Default, Serialize, Deserialize, Clone)]
@@ -42,7 +46,8 @@ pub struct AppConfig {
     #[serde(default)]
     roms: RomConfig,
     #[serde(default)]
-    debug: DbgConfig,
+    pub debug: DbgConfig,
+    pub keys: Keybindings
 }
 
 impl AppConfig {

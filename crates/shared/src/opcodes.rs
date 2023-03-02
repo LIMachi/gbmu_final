@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub mod dbg;
@@ -8,7 +9,7 @@ pub enum Error {
     Invalid
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u16)]
 pub enum Opcode {
     Nop             = 0x0,
@@ -259,7 +260,7 @@ pub enum Opcode {
     CB(CBOpcode)    = 0x100
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CBOpcode {
     RlcB            = 0x0,
     RlcC            = 0x1,

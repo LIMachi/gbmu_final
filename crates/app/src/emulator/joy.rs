@@ -4,8 +4,9 @@ use std::rc::Rc;
 use winit::event::{ElementState, KeyboardInput, ScanCode, VirtualKeyCode};
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus, Mem};
+use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum Keys {
     A = 0,
@@ -18,6 +19,7 @@ pub enum Keys {
     Down = 7,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Keybindings {
     bindings: HashMap<VirtualKeyCode, Keys>
 }
@@ -26,18 +28,17 @@ impl Default for Keybindings {
     fn default() -> Self {
         //TODO read in a config file
         let mut bindings = HashMap::new();
-        bindings.insert(VirtualKeyCode::A, Keys::Left);
-        bindings.insert(VirtualKeyCode::D, Keys::Right);
-        bindings.insert(VirtualKeyCode::S, Keys::Down);
-        bindings.insert(VirtualKeyCode::W, Keys::Up);
+        bindings.insert(VirtualKeyCode::Left, Keys::Left);
+        bindings.insert(VirtualKeyCode::Right, Keys::Right);
+        bindings.insert(VirtualKeyCode::Down, Keys::Down);
+        bindings.insert(VirtualKeyCode::Up, Keys::Up);
 
-        bindings.insert(VirtualKeyCode::I, Keys::A);
-        bindings.insert(VirtualKeyCode::O, Keys::B);
-        bindings.insert(VirtualKeyCode::K, Keys::Start);
-        bindings.insert(VirtualKeyCode::L, Keys::Select);
+        bindings.insert(VirtualKeyCode::Numpad0, Keys::A);
+        bindings.insert(VirtualKeyCode::Numpad1, Keys::B);
+        bindings.insert(VirtualKeyCode::NumpadDecimal, Keys::Start);
+        bindings.insert(VirtualKeyCode::Numpad2, Keys::Select);
         Self { bindings }
     }
-
 }
 
 #[derive(Default)]

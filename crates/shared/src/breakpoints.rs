@@ -3,14 +3,24 @@ use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 use crate::cpu::Opcode;
 use super::{Cpu, registers, value};
+use serde::{Serialize, Deserialize};
+use crate::utils::Cell;
 
 #[derive(Clone, Default)]
 pub struct Breakpoints {
     breakpoints: Rc<RefCell<Vec<Breakpoint>>>
 }
 
+impl Breakpoints {
+    pub fn new(breaks: Vec<Breakpoint>) -> Self {
+        Self {
+            breakpoints: breaks.cell()
+        }
+    }
+}
+
 //TODO add Read(u16) / Write(u16)
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Break {
     Cycles(usize),
     Instructions(usize),
@@ -36,7 +46,7 @@ impl Break {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Breakpoint {
     kind: Break,
     once: bool,
@@ -47,7 +57,9 @@ impl Breakpoint {
     fn new(kind: Break, once: bool) -> Self {
         Self { kind, once, enabled: true }
     }
+}
 
+impl Breakpoint {
     pub fn tick(&mut self, runner: &impl Cpu) -> (bool, bool) {
         (self.once, self.kind.tick(runner) && self.enabled)
     }

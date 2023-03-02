@@ -13,6 +13,7 @@ mod registers;
 mod value;
 pub mod rom;
 pub mod breakpoints;
+pub use serde;
 
 #[derive(Copy, Debug, Eq, PartialEq, Hash, Clone)]
 pub enum Handle {

@@ -10,8 +10,15 @@ egui = "0.21.0"
 thiserror = "1.0.38"
 log = "0.4.17"
 image = "0.24.5"
-winit = "0.27.5"
+
+[dependencies.winit]
+version = "0.27.5"
+features = ["serde"]
 
 [dependencies.egui_extras]
 version = "0.21.0"
 features = ["svg"]
+
+[dependencies.serde]
+version = "1.0.152"
+features = ["derive"]

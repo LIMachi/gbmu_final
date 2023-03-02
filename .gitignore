@@ -6,3 +6,4 @@ Cargo.lock
 *.log
 *.sav
 tests/
+gbmu.conf

@@ -35,13 +35,13 @@ impl App {
         let e = EventLoopBuilder::with_user_event()
             .build();
         let proxy = e.create_proxy();
-        let bindings = Keybindings::default().cell();
+        let conf = AppConfig::try_load().map_err(|x| { log::error!("failed to load rom config with {x:?}"); () }).unwrap_or_else(|_| AppConfig::default());
+        let bindings = conf.keys.clone().cell();
         let mut emu = emulator::Emulator::new(
             proxy.clone(),
             bindings.clone(),
-            Breakpoints::default());
+            conf.debug.breaks);
         let dbg = Debugger::new(emu.clone());
-        let conf = AppConfig::try_load().map_err(|x| { log::error!("failed to load rom config with {x:?}"); () }).unwrap_or_else(|_| AppConfig::default());
         Self {
             bindings,
             event_loop: Some(e),
