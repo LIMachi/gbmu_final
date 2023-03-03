@@ -1,6 +1,6 @@
 use mem::oam::Sprite;
 use shared::io::LCDC;
-use shared::mem::{Mem, VRAM};
+use shared::mem::{Mem};
 use crate::{Pixel, Ppu};
 
 #[derive(Debug)]
@@ -166,7 +166,7 @@ impl Fetcher {
                 *c = ((low >> x) & 0x1) | (((high >> x) & 0x1) << 1);
             });
             if self.flip_x { colors.reverse(); }
-            if let Mode::Sprite(sp, n) = self.mode {
+            if let Mode::Sprite(sp, _n) = self.mode {
                 let s = 8u8.saturating_sub(sp.x) as usize;
                 colors.rotate_left(s);
                 colors[8-s..].iter_mut().for_each(|x| *x = 0);

@@ -28,15 +28,15 @@ impl Default for Keybindings {
     fn default() -> Self {
         //TODO read in a config file
         let mut bindings = HashMap::new();
-        bindings.insert(VirtualKeyCode::Left, Keys::Left);
-        bindings.insert(VirtualKeyCode::Right, Keys::Right);
-        bindings.insert(VirtualKeyCode::Down, Keys::Down);
-        bindings.insert(VirtualKeyCode::Up, Keys::Up);
+        bindings.insert(VirtualKeyCode::A, Keys::Left);
+        bindings.insert(VirtualKeyCode::D, Keys::Right);
+        bindings.insert(VirtualKeyCode::S, Keys::Down);
+        bindings.insert(VirtualKeyCode::W, Keys::Up);
 
-        bindings.insert(VirtualKeyCode::Numpad0, Keys::A);
-        bindings.insert(VirtualKeyCode::Numpad1, Keys::B);
-        bindings.insert(VirtualKeyCode::NumpadDecimal, Keys::Start);
-        bindings.insert(VirtualKeyCode::Numpad2, Keys::Select);
+        bindings.insert(VirtualKeyCode::Space, Keys::A);
+        bindings.insert(VirtualKeyCode::LShift, Keys::B);
+        bindings.insert(VirtualKeyCode::Z, Keys::Start);
+        bindings.insert(VirtualKeyCode::X, Keys::Select);
         Self { bindings }
     }
 }

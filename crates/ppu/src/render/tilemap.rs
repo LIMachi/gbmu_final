@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use shared::egui::{ColorImage, Image, Response, TextureHandle, Ui, Widget};
+use shared::egui::{Image, Response, TextureHandle, Ui, Widget};
 use crate::render::Textures;
 
 pub struct Tilemap<'a>(pub &'a HashMap<Textures, TextureHandle>);

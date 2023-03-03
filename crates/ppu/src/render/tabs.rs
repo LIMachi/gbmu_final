@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
+
 use std::hash::Hash;
 use shared::egui;
-use shared::egui::{Color32, Margin, Response, SelectableLabel, Ui, Widget};
+use shared::egui::{Margin, Response, Ui, Widget};
 
 pub trait Tab {
     fn name(&self) -> String;

@@ -3,7 +3,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
-use shared::{egui::Context, Ui, cpu::*, breakpoints::{Breakpoint, Breakpoints}, Events, Event};
+use shared::{egui::Context, Ui, cpu::{self, Reg, Value}, breakpoints::{Breakpoint, Breakpoints}, Event};
 
 mod disassembly;
 mod memory;
@@ -14,7 +14,7 @@ use shared::egui::{TextureHandle, TextureId};
 use shared::mem::{IOBus};
 
 pub trait Emulator: ReadAccess + Schedule { }
-pub trait Bus: shared::cpu::Bus + IOBus { }
+pub trait Bus: cpu::Bus + IOBus { }
 
 pub trait BusWrapper {
     fn bus(&self) -> Box<&dyn Bus>;
@@ -22,7 +22,7 @@ pub trait BusWrapper {
 }
 
 impl<E: ReadAccess + Schedule> Emulator for E { }
-impl<B: shared::cpu::Bus + IOBus> Bus for B { }
+impl<B: cpu::Bus + IOBus> Bus for B { }
 
 pub trait Schedule {
     fn breakpoints(&self) -> Breakpoints;

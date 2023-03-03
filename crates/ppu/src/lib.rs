@@ -15,7 +15,7 @@ use shared::mem::{*, Device, IOBus, Mem, PPU};
 use shared::utils::Cell;
 use shared::utils::image::Image;
 use crate::fetcher::Fetcher;
-use crate::Mode::HBlank;
+
 
 mod fetcher;
 mod render;
@@ -436,7 +436,7 @@ impl State for HState {
 
 impl Ppu {
     pub fn new(cgb: bool, lcd: Lcd) -> Self {
-        let mut sprites = Vec::with_capacity(10);
+        let sprites = Vec::with_capacity(10);
         Self {
             sc: Scroll::default(),
             tile_cache: HashSet::with_capacity(384),

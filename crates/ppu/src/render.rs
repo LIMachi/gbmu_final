@@ -1,6 +1,6 @@
 use shared::egui::*;
 use shared::egui::epaint::ImageDelta;
-use shared::Events;
+
 use super::*;
 
 mod tabs;
@@ -95,7 +95,7 @@ impl shared::Ui for Controller {
             self.init = true;
         }
         let tiles: Vec<usize> = { self.ppu.as_ref().borrow_mut().tile_cache.drain().collect() };
-        let mut ppu = self.ppu.as_ref().borrow();
+        let ppu = self.ppu.as_ref().borrow();
         for n in tiles {
             let buf = PixelBuffer::<8, 8>::new(ppu.vram.tile_data(n, 0)).image::<64, 64>();
             ctx.tex_manager()
@@ -112,6 +112,6 @@ impl shared::Ui for Controller {
             });
     }
 
-    fn handle(&mut self, event: &shared::Event) {
+    fn handle(&mut self, _event: &shared::Event) {
     }
 }

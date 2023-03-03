@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use shared::egui;
-use shared::egui::{Color32, ColorImage, Image, Response, Stroke, TextureHandle, Ui, Vec2, Widget};
+use shared::egui::{Color32, Image, Response, Stroke, TextureHandle, Ui, Vec2, Widget};
 use crate::render::Textures;
 
 pub struct BgMap<'a>(pub &'a HashMap<Textures, TextureHandle>, pub(crate) &'a super::Ppu, pub(crate) &'a egui::Context);

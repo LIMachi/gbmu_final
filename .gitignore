@@ -7,3 +7,4 @@ Cargo.lock
 *.sav
 tests/
 gbmu.conf
+gbmu.ron

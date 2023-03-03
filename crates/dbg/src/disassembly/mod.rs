@@ -25,7 +25,7 @@ impl Op {
         let op = match (opcode, false).try_into() {
             Ok(Opcode::PrefixCB) => { (range[1], true).try_into().unwrap() },
             Ok(opcode) => opcode,
-            Err(e) => Opcode::Nop
+            Err(_e) => Opcode::Nop
         };
         let (sz, info) = dbg::dbg_opcodes(op);
         Self::new(pc, sz, info.to_string(), if range.len() < sz {
@@ -122,7 +122,7 @@ impl Default for SromRange {
 
 impl<E: Emulator> MemRange<E> for RomRange {
     fn reload(&mut self) { self.0.ops.clear(); }
-    fn range(&self) -> std::ops::Range<u16> { 0..0x4000 }
+    fn range(&self) -> Range<u16> { 0..0x4000 }
     fn update(&mut self, emu: &E) {
         if self.0.ops.is_empty() {
             self.0 = OpRange::default().parse(emu.get_range(0, 0x4000), vec![(0x104, 0x46)]);
@@ -134,7 +134,7 @@ impl<E: Emulator> MemRange<E> for RomRange {
 
 impl<E: Emulator> MemRange<E> for SromRange {
     fn reload(&mut self) { self.banks.clear() }
-    fn range(&self) -> std::ops::Range<u16> { 0x4000..0x8000 }
+    fn range(&self) -> Range<u16> { 0x4000..0x8000 }
     fn update(&mut self, emu: &E) {
         let bank = emu.bus().mbc().rom_bank();
         self.current = bank;
@@ -148,7 +148,7 @@ impl<E: Emulator> MemRange<E> for SromRange {
 
 pub trait MemRange<E: Emulator> {
     fn reload(&mut self);
-    fn range(&self) -> std::ops::Range<u16>;
+    fn range(&self) -> Range<u16>;
     fn update(&mut self, emu: &E);
     fn ops(&self) -> &OpRange;
     fn boxed(self) -> Box<dyn MemRange<E>> where Self: 'static + Sized { Box::new(self) }
@@ -190,7 +190,7 @@ impl<E: Emulator> Disassembly<E> {
         self.ranges.iter().fold(0, |row, range| {
             let r = range.range();
             if r.contains(&addr) {
-                range.ops().ops.iter().enumerate().find(|(i, x)| x.offset + r.start >= addr)
+                range.ops().ops.iter().enumerate().find(|(_i, x)| x.offset + r.start >= addr)
                     .map(|x| row + x.0)
                     .unwrap_or(row)
             } else if r.start < addr {
@@ -204,7 +204,7 @@ impl<E: Emulator> Disassembly<E> {
     pub(crate) fn next(&mut self, emu: &E) -> Option<(u16, Op)> {
         let pc = emu.cpu_register(Reg::PC).u16();
         if let Some((range, ops)) = self.range(pc)
-            .map(|mut x| (x.range(), x.ops())) {
+            .map(|x| (x.range(), x.ops())) {
             let mut st = range.start;
             for op in &ops.ops {
                 if st == pc { return Some((st, op.clone())); }
@@ -236,7 +236,7 @@ impl<E: Emulator> Disassembly<E> {
         let mut table = TableBuilder::new(ui)
             .columns(Column::remainder(), 3)
             .striped(true)
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .cell_layout(egui::Layout::left_to_right(Align::Center))
             .auto_shrink([false, false]);
         if let Cursor::Follow = self.cursor {
             table = table.scroll_to_row(row, Some(Align::Center));
@@ -252,11 +252,11 @@ impl<E: Emulator> Disassembly<E> {
                     ui.strong(egui::RichText::new("Parameters").color(Color32::GOLD));
                 });
             })
-            .body(|mut body| {
+            .body(|body| {
             let lines = self.lines();
             body.rows(30., lines, |index, mut row| {
                 let mut st = index;
-                if let Some(mut current) = self.ranges.iter_mut()
+                if let Some(current) = self.ranges.iter_mut()
                     .fold(None, |res, current| {
                         match res {
                             None if st < current.count() => Some(current),

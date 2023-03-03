@@ -1,6 +1,6 @@
-use std::borrow::Borrow;
+
 use shared::egui;
-use shared::mem::{OAM, PPU};
+use shared::mem::{PPU};
 use super::*;
 
 struct Sprite<'a>(&'a mem::oam::Sprite, TextureId, TextureId);

@@ -78,10 +78,7 @@ impl Bus {
             UN_1..=UN_1_END => self.un_1.as_ref().borrow_mut().write(addr - UN_1, value, addr),
             IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.as_ref().borrow_mut().write(addr - HRAM, value, addr),
-            END => {
-                log::debug!("write on {} ({})", addr, value);
-                self.ie.write(0, value, addr)
-            },
+            END => { self.ie.write(0, value, addr) },
             e => unreachable!("wrote address {e:#06X}")
         }
     }

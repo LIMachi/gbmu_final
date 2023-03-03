@@ -1,6 +1,6 @@
-use std::fmt::format;
+
 use std::ops::Range;
-use std::thread::current;
+
 use shared::egui;
 use shared::egui::{Color32, Label, ScrollArea, Sense, TextStyle, Vec2};
 use shared::egui::RichText;
@@ -91,15 +91,15 @@ impl Viewer {
                 });
                 let ViewerOptions {
                     zero_color,
-                    address_color,
-                    highlight_color,
+                    
+                    
                     text_style,
                     address_text_style,
                     ..
                 } = self.options.clone();
                 let space = &self.ranges[self.current];
                 ui.separator();
-                let mut scroll = ScrollArea::vertical()
+                let scroll = ScrollArea::vertical()
                     .id_source(self.current())
                     .max_height(f32::INFINITY)
                     .auto_shrink([false, true]);
@@ -125,9 +125,9 @@ impl Viewer {
                                             if !space.range.contains(&addr) { break; }
                                             let v = bus.read(addr);
                                             let text = format!("{:02X}", v);
-                                            let mut text = RichText::new(text).text_style(text_style.clone())
+                                            let text = RichText::new(text).text_style(text_style.clone())
                                                 .color(if v == 0 { zero_color } else { ui.style().visuals.text_color() });
-                                            let res = ui.add(Label::new(text).sense(Sense::click()));
+                                            let _res = ui.add(Label::new(text).sense(Sense::click()));
                                         }
                                     });
                                 }

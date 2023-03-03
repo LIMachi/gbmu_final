@@ -13,9 +13,9 @@ impl DSG {
         }
     }
 
-    pub fn tick(&mut self, registers: super) -> [f32; 2] {
+    pub fn tick(&mut self, registers: &Registers) -> [f32; 2] {
         self.tick += 1;
-        let a = (2. * PI * 440. * self.tick as f32 / sample_rate as f32).sin();
+        let a = (2. * PI * 220. * self.tick as f32 / 48000 as f32).sin();
         [a; 2]
     }
 }

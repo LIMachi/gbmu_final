@@ -24,20 +24,30 @@ impl Default for Input {
 
 impl Input {
     pub fn write_sample(&mut self, samples: [f32; 2]) {
-        self.0.as_ref().borrow_mut().push(left).ok();
-        self.0.as_ref().borrow_mut().push(right).ok();
+        self.0.as_ref().borrow_mut().push(samples[0]).ok();
+        self.0.as_ref().borrow_mut().push(samples[1]).ok();
     }
 
-    pub fn replace(&mut self, other: Input) {
-        self.0.replace(other.0.into_inner());
+    pub fn replace(&mut self, with: Producer<f32>) {
+        self.0.replace(with);
     }
 }
 
-pub(crate)struct Output(pub(crate) u32, pub(crate) Consumer<f32>);
+pub(crate)struct Output {
+    sample_rate: u32,
+    consumer: Consumer<f32>
+}
 
 impl Output {
-    pub fn read_sample(&mut self) -> f32 {
-        self.1.pop().unwrap_or(0.)
+    fn new(sample_rate: u32, consumer: Consumer<f32>) -> Self {
+        Self {
+            sample_rate,
+            consumer,
+        }
+    }
+
+    fn read_sample(&mut self) -> f32 {
+        self.consumer.pop().unwrap_or(0.)
     }
 }
 
@@ -46,7 +56,7 @@ impl Source for Output {
 
     fn channels(&self) -> u16 { 2 }
 
-    fn sample_rate(&self) -> u32 { self.0 }
+    fn sample_rate(&self) -> u32 { self.sample_rate }
 
     fn total_duration(&self) -> Option<Duration> { None }
 }
@@ -68,7 +78,7 @@ pub(crate) struct Audio {
     sink: Sink
 }
 
-fn default_device() -> String {
+pub(crate) fn default_device() -> String {
     cpal::default_host().default_output_device().unwrap().name().unwrap_or(Default::default())
 }
 
@@ -107,10 +117,10 @@ impl Audio {
         self.handle.is_some()
     }
 
-    pub(crate) fn bind(&self) -> Input {
+    pub(crate) fn bind(&self, input: &mut Input) {
         let (producer, consumer) = RingBuffer::new(self.sample_rate() as usize);
-        self.sink.append(Output(self.sample_rate(), consumer));
-        Input(producer.cell())
+        self.sink.append(Output::new(self.sample_rate(), consumer));
+        input.replace(producer);
     }
 
     pub(crate) fn new(config: &super::SoundConfig) -> Self {

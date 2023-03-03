@@ -17,14 +17,14 @@ use driver::{Audio, Input};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SoundConfig {
-    #[serde(default = "default_device")]
+    #[serde(default = "driver::default_device")]
     dev_name: String
 }
 
 impl Default for SoundConfig {
     fn default() -> Self {
         Self {
-            dev_name: default_device()
+            dev_name: driver::default_device()
         }
     }
 }
@@ -41,14 +41,15 @@ impl Controller {
     }
 
     pub fn switch<S: Into<String>>(&mut self, name: S) {
-        self.driver.as_ref().borrow_mut().switch(name).map(|x| {
-            self.input.replace(x.bind());
-        }).ok();
+        self.driver.as_ref().borrow_mut()
+            .switch(name)
+            .map(|x| x.bind(&mut self.input)).ok();
     }
 
     pub fn new(config: &SoundConfig) -> Self {
         let audio = Audio::new(config);
-        let input = audio.bind();
+        let mut input = Input::default();
+        audio.bind(&mut input);
         Self { input, driver: audio.cell() }
     }
 
