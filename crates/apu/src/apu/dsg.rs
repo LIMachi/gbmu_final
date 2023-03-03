@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use super::Registers;
 
 #[derive(Default)]
 pub(crate) struct DSG {
@@ -12,7 +13,7 @@ impl DSG {
         }
     }
 
-    pub fn tick(&mut self, sample_rate: u32) -> [f32; 2] {
+    pub fn tick(&mut self, registers: super) -> [f32; 2] {
         self.tick += 1;
         let a = (2. * PI * 440. * self.tick as f32 / sample_rate as f32).sin();
         [a; 2]
