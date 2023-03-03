@@ -33,7 +33,7 @@ pub enum Events {
     Load(String),
     Loaded,
     Open(Handle),
-    Close(Handle)
+    Close
 }
 
 pub enum Target {

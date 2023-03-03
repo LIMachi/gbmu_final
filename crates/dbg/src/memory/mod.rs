@@ -106,8 +106,6 @@ impl Viewer {
                 let height = self.get_line_height(ui);
                 let max_lines = (space.range.len() + 15) / 16;
                 scroll.show_rows(ui, height, max_lines, |ui, range| {
-                    // let st = space.range.start + range.start * column_count;
-                    // let end = space.range.start + range.end * column_count;
                     egui::Grid::new("viewer_grid")
                         .striped(true)
                         .spacing(Vec2::new(15., ui.style().spacing.item_spacing.y))
@@ -116,7 +114,6 @@ impl Viewer {
                             ui.style_mut().spacing.item_spacing.x = 3.0;
                             for row in range {
                                 let addr = space.range.start + COLUMNS * row as u16;
-                                let range = addr..addr + COLUMNS;
                                 let text = RichText::new(format!("0x{:04X}:", addr))
                                     .text_style(address_text_style.clone());
                                 ui.label(text);

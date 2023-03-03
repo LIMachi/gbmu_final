@@ -17,6 +17,10 @@ impl Breakpoints {
             breakpoints: breaks.cell()
         }
     }
+
+    pub fn take(&self) -> Vec<Breakpoint> {
+        self.breakpoints.as_ref().take()
+    }
 }
 
 //TODO add Read(u16) / Write(u16)

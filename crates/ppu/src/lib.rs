@@ -15,6 +15,7 @@ use shared::mem::{*, Device, IOBus, Mem, PPU};
 use shared::utils::Cell;
 use shared::utils::image::Image;
 use crate::fetcher::Fetcher;
+use crate::Mode::HBlank;
 
 mod fetcher;
 mod render;
@@ -380,17 +381,24 @@ impl VState {
     const DOTS: usize = 4560;
 
     pub fn new() -> Self { Self { dots: Self::DOTS } }
+
+    pub fn immediate() -> Self {
+        Self { dots: 0 }
+    }
 }
 
 impl State for VState {
     fn mode(&self) -> Mode { Mode::VBlank }
 
     fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
-        if self.dots == Self::DOTS {
+        if self.dots == Self::DOTS || self.dots == 0 {
             ppu.win.y = 0;
             ppu.regs.interrupt.set(0);
         }
-        self.dots -= 1;
+        if self.dots == 0 {
+            ppu.regs.ly.direct_write(0);
+        }
+        self.dots = self.dots.saturating_sub(1);
         if self.dots % 456 == 0 {
             let ly = (ppu.regs.ly.read() + 1) % 154;
             ppu.regs.ly.direct_write(ly);
@@ -404,6 +412,10 @@ impl State for VState {
 impl HState {
     pub fn new(dots: usize) -> Self {
         Self { dots }
+    }
+
+    pub fn last() -> Self {
+        Self { dots: 0 }
     }
 }
 
@@ -448,22 +460,25 @@ impl Ppu {
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
             self.regs.ly.direct_write(0);
-            self.state = Box::new(OamState::new());
+            self.state = Box::new(HState::last());
             self.lcd.disable();
         }
         self.lcdc = lcdc;
-        if !self.lcdc.enabled() { return; }
         self.dots += 1;
-        if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
-        let mut state = std::mem::replace(&mut self.state, Box::new(OamState::new()));
-        self.state = if let Some(next) = state.tick(self) {
-            let mode = next.mode();
-            if mode == Mode::VBlank {
-                self.dots = 0;
-                self.lcd.enable();
-            }
-            next
-        } else { state };
+        if self.lcdc.enabled() {
+            if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
+            let mut state = std::mem::replace(&mut self.state, Box::new(OamState::new()));
+            self.state = if let Some(next) = state.tick(self) {
+                let mode = next.mode();
+                if mode == Mode::VBlank {
+                    self.dots = 0;
+                    self.lcd.enable();
+                }
+                next
+            } else { state };
+        } else if self.dots == 65664 {
+            self.state = Box::new(VState::immediate());
+        }
         let mode = self.state.mode();
         // TODO move this back to next state.
         self.regs.stat.reset(0);

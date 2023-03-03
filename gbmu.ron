@@ -1,0 +1,36 @@
+(
+    roms: (
+        paths: [
+            "D:\\Projects\\gbmu\\roms",
+        ],
+    ),
+    debug: (
+        breaks: [
+            (
+                kind: Register(PC, U16(298)),
+                once: false,
+                enabled: false,
+            ),
+            (
+                kind: Register(PC, U16(527)),
+                once: false,
+                enabled: true,
+            ),
+        ],
+    ),
+    keys: (
+        bindings: {
+            X: Select,
+            D: Right,
+            W: Up,
+            Space: A,
+            A: Left,
+            S: Down,
+            LShift: B,
+            Z: Start,
+        },
+    ),
+    sound: (
+        dev_name: "Casque (Razer Nari Ultimate - Game)",
+    ),
+)

@@ -15,7 +15,7 @@ use shared::winit::window::Window;
 use shared::mem::{IOBus, MemoryBus};
 use shared::utils::Cell;
 
-use crate::Proxy;
+use crate::{AppConfig, Proxy};
 use crate::render::{Event, Render};
 
 mod joy;
@@ -33,6 +33,7 @@ pub struct Emu {
     pub mbc: mbc::Controller,
     pub dma: bus::Dma,
     pub timer: bus::Timer,
+    pub apu: apu::Apu,
     running: bool
 }
 
@@ -45,15 +46,13 @@ impl Default for Emu {
         let mut ppu = ppu::Controller::new(false, lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new(false);
+        let mut apu = apu::Apu::default();
         let mut bus = bus::Bus::new()
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
-            .with_ppu(&mut ppu)
-            .configure(&mut dma)
-            .configure(&mut timer)
-            .configure(&mut cpu)
-            .configure(&mut joy);
+            .with_ppu(&mut ppu);
         Self {
+            apu,
             speed: Default::default(),
             rom: None,
             lcd,
@@ -72,6 +71,7 @@ impl Default for Emu {
 #[derive(Clone)]
 pub struct Emulator {
     proxy: Proxy,
+    audio: apu::Controller,
     bindings: Rc<RefCell<Keybindings>>,
     breakpoints: Breakpoints,
     emu: Rc<RefCell<Emu>>
@@ -79,9 +79,16 @@ pub struct Emulator {
 
 impl Emulator {
 
-    pub fn new(proxy: Proxy, bindings: Rc<RefCell<Keybindings>>, breaks: Vec<Breakpoint>) -> Self {
-        Self { proxy, bindings, emu: Emu::default().cell(), breakpoints: Breakpoints::new(breaks) }
+    pub fn new(proxy: Proxy, bindings: Rc<RefCell<Keybindings>>, conf: &AppConfig) -> Self {
+        Self {
+            proxy,
+            bindings,
+            emu: Emu::default().cell(),
+            audio: apu::Controller::new(&conf.sound),
+            breakpoints: Breakpoints::new(conf.debug.breaks.clone())
+        }
     }
+
     pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints) }
 
     pub fn is_running(&self) -> bool { self.emu.as_ref().borrow().running }
@@ -97,6 +104,12 @@ impl Emulator {
             n if n < 0 => Emu::CYCLE_TIME * ((1 << -n) as f64),
             _ => unimplemented!()
         }
+    }
+
+    fn insert(&self, rom: Rom, running: bool) {
+        let mut emu = Emu::new(&self.audio, self.bindings.clone(), rom.clone(), running);
+        self.emu.replace(emu);
+        self.proxy.send_event(Events::Reload).ok();
     }
 }
 
@@ -115,14 +128,8 @@ impl Render for Emulator {
 
     fn handle(&mut self, event: &Event, window: &Window) {
         match event {
-            Event::UserEvent(Events::Play(rom)) => {
-                let mut emu = Emu::new(self.bindings.clone(), rom.clone(), true);
-                self.emu.replace(emu);
-                Render::init(self, window);
-            },
-            Event::UserEvent(Events::Reload) => {
-                Render::init(self, window);
-            },
+            Event::UserEvent(Events::Play(rom)) => { self.insert(rom.clone(), true); },
+            Event::UserEvent(Events::Reload) => { Render::init(self, window); },
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
                 if event == &WindowEvent::CloseRequested { self.stop(); }
                 if let WindowEvent::KeyboardInput { input, .. } = event {
@@ -172,11 +179,9 @@ impl dbg::Schedule for Emulator {
     }
 
     fn reset(&self) {
-        let emu = self.emu.as_ref().borrow().rom.clone()
-            .map(|rom| Emu::new(self.bindings.clone(), rom, false))
-            .unwrap_or_else(|| Emu::default());
-        self.emu.replace(emu);
-        self.proxy.send_event(Events::Reload).ok();
+        if let Some(rom) = self.emu.as_ref().borrow().rom.clone() {
+            self.insert(rom, false);
+        }
     }
 
     fn speed(&self) -> i32 { self.emu.as_ref().borrow().speed }
@@ -188,9 +193,10 @@ impl Emu {
     pub const CLOCK_PER_SECOND: u32 = 4_194_304;
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(bindings: Rc<RefCell<Keybindings>>, rom: Rom, running: bool) -> Self {
+    pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, running: bool) -> Self {
         log::info!("starting emu (cgb required: {})", rom.header.kind.requires_gbc());
         let lcd = lcd::Lcd::new();
+        let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
         let mut mbc = mem::mbc::Controller::new(&rom);
         let mut dma = bus::Dma::default();
@@ -204,7 +210,8 @@ impl Emu {
             .configure(&mut dma)
             .configure(&mut timer)
             .configure(&mut cpu)
-            .configure(&mut joy);
+            .configure(&mut joy)
+            .configure(&mut apu);
         timer.offset();
         IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
         IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
@@ -222,6 +229,7 @@ impl Emu {
             timer,
             rom: Some(rom),
             running,
+            apu
         }
     }
 
@@ -236,6 +244,7 @@ impl Emu {
             self.dma.tick(&mut self.bus);
             self.timer.tick();
             self.ppu.tick();
+            self.apu.tick();
             self.running &= bp.tick(&self.cpu);
             self.cpu.reset_finished();
         })) {

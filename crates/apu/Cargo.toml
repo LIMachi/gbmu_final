@@ -6,3 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rodio = "0.17.0"
+anyhow = "1.0.69"
+serde = "1.0.152"
+rtrb = "0.2.3"
+
+[dependencies.shared]
+path = "../shared"

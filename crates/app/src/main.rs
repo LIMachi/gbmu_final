@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::io::Write;
 use std::rc::Rc;
 use winit::{
     event_loop::{ControlFlow, EventLoopWindowTarget}
@@ -11,23 +12,24 @@ mod emulator;
 pub mod app;
 
 use app::Menu;
-use dbg::Debugger;
+use apu::SoundConfig;
+use dbg::{Debugger, Schedule};
 use render::{windows::Windows, WindowType};
-use shared::breakpoints::Breakpoints;
 use shared::{Events, Handle};
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
-use crate::app::AppConfig;
+use crate::app::{AppConfig, DbgConfig, RomConfig};
 use crate::emulator::Keybindings;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
-    bindings: Rc<RefCell<emulator::Keybindings>>,
+    sound: SoundConfig,
+    bindings: Rc<RefCell<Keybindings>>,
+    roms: Rc<RefCell<RomConfig>>,
     emu: emulator::Emulator,
     dbg: Debugger<emulator::Emulator>,
     event_loop: Option<EventLoop>,
-    pub windows: Windows,
-    conf: AppConfig,
+    pub windows: Windows
 }
 
 impl App {
@@ -35,20 +37,19 @@ impl App {
         let e = EventLoopBuilder::with_user_event()
             .build();
         let proxy = e.create_proxy();
-        let conf = AppConfig::try_load().map_err(|x| { log::error!("failed to load rom config with {x:?}"); () }).unwrap_or_else(|_| AppConfig::default());
+        let conf = AppConfig::load();
         let bindings = conf.keys.clone().cell();
-        let mut emu = emulator::Emulator::new(
-            proxy.clone(),
-            bindings.clone(),
-            conf.debug.breaks);
+        let mut emu = emulator::Emulator::new(proxy.clone(), bindings.clone(), &conf);
+        let roms = conf.roms.cell();
         let dbg = Debugger::new(emu.clone());
         Self {
+            sound: conf.sound,
+            roms,
             bindings,
             event_loop: Some(e),
             windows: Windows::new(proxy),
             emu,
-            dbg,
-            conf
+            dbg
         }
     }
 
@@ -60,7 +61,7 @@ impl App {
     }
 
     pub fn menu(&self) -> Menu {
-        Menu::new(&self.conf, self.proxy())
+        Menu::new(self.roms.clone(), self.proxy())
     }
 
     pub fn create(mut self, handle: WindowType) -> Self {
@@ -99,6 +100,20 @@ impl App {
                     handler(&mut self);
                     self.windows.update();
                 },
+                Event::UserEvent(Events::Close) => {
+                    let conf = AppConfig {
+                        sound: self.sound.clone(),
+                        roms: self.roms.as_ref().take(),
+                        debug: DbgConfig {
+                            breaks: self.emu.breakpoints().take()
+                        },
+                        keys: self.bindings.as_ref().take()
+                    };
+                    if let Err(e) = serde_any::ser::to_file_pretty("gbmu.ron", &conf) {
+                        log::warn!("error while saving config {e:?}");
+                    }
+                    flow.set_exit();
+                }
                 Event::RedrawEventsCleared => {
                     //TODO wait, so GPU does not burn
                 },

@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -44,26 +44,18 @@ pub struct DbgConfig {
 #[derive(Default, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     #[serde(default)]
-    roms: RomConfig,
+    pub roms: RomConfig,
     #[serde(default)]
     pub debug: DbgConfig,
-    pub keys: Keybindings
+    #[serde(default)]
+    pub keys: Keybindings,
+    #[serde(default)]
+    pub sound: apu::SoundConfig
 }
 
 impl AppConfig {
-    pub fn try_load() -> anyhow::Result<Self> {
-        let mut file = std::fs::File::open("gbmu.conf")?;
-        let mut buf = String::with_capacity(512);
-        file.read_to_string(&mut buf).ok();
-        Ok(toml::from_str(&buf)?)
-    }
-}
-
-impl Drop for AppConfig {
-    fn drop(&mut self) {
-        if let Ok(mut file) = std::fs::File::create("gbmu.conf") {
-            toml::to_string(self).map(|x| file.write_all(x.as_bytes())).ok();
-        }
+    pub fn load() -> Self {
+        serde_any::from_file("gbmu.ron").unwrap_or_else(|_| Default::default())
     }
 }
 
@@ -71,7 +63,7 @@ pub struct Menu {
     proxy: Proxy,
     textures: HashMap<Texture, TextureHandle>,
     roms: HashMap<String, Rom>,
-    conf: RomConfig,
+    conf: Rc<RefCell<RomConfig>>,
     sender: Sender<(String, Rom)>,
     receiver: Receiver<(String, Rom)>
 }
@@ -117,13 +109,13 @@ impl Menu {
     }
 
     // TODO take conf as param (let App do the conf loading)
-    pub fn new(conf: &AppConfig, proxy: Proxy) -> Self {
+    pub fn new(conf: Rc<RefCell<RomConfig>>, proxy: Proxy) -> Self {
         let (sender, receiver) = std::sync::mpsc::channel();
         Self {
             proxy,
             textures: Default::default(),
             roms: Default::default(),
-            conf: conf.roms.clone(),
+            conf,
             sender,
             receiver
         }
@@ -131,9 +123,10 @@ impl Menu {
 
     pub fn add_path<P: AsRef<Path>>(&mut self, path: P) {
         if let Some(path) = path.as_ref().to_str().map(|x| x.to_string()) {
-            if self.conf.paths.contains(&path) { return }
+            let mut conf = self.conf.as_ref().borrow_mut();
+            if conf.paths.contains(&path) { return }
             self.search(&path);
-            self.conf.paths.push(path);
+            conf.paths.push(path);
         }
     }
 
@@ -216,7 +209,7 @@ impl shared::Ui for Menu {
         self.textures.insert(Texture::Debug, ctx.load_svg::<40, 40>("debug", "assets/icons/debug.svg"));
         self.textures.insert(Texture::Settings, ctx.load_svg::<40, 40>("settings", "assets/icons/settings.svg"));
         self.textures.insert(Texture::Spritesheet, ctx.load_svg::<40, 40>("spritesheet", "assets/icons/palette.svg"));
-        for path in &self.conf.paths {
+        for path in &self.conf.as_ref().borrow().paths {
             self.search(path);
             println!("looking at path {path}");
         }

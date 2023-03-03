@@ -25,25 +25,25 @@ pub struct Mbc1 {
 }
 
 impl Mem for Mbc1 {
-    fn read(&self, addr: u16, _: u16) -> u8 {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
         use mem::*;
-        match addr {
+        match absolute {
             ROM..=ROM_END if !self.bank_mode => self.rom[addr as usize],
             ROM..=ROM_END => {
                 let bank = ((self.rom_reg_2 as usize) << 5) % self.rom_banks;
-                self.rom[addr as usize | (bank << 13)]
+                self.rom[addr as usize | (bank << 14)]
             },
             SROM..=SROM_END => {
                 let mut bank = self.rom_reg_1 as usize;
                 if bank == 0 { bank = 1; }
                 bank |= (self.rom_reg_2 as usize) << 5;
                 bank %= self.rom_banks;
-                self.rom[(addr & 0x3FFF) as usize | (bank << 13)]
+                self.rom[addr as usize | (bank << 14)]
             },
             SRAM..=SRAM_END => {
                 let bank = if self.bank_mode && self.ram_banks > 1 { self.rom_reg_2 } else { 0 };
                 if self.ram_enable {
-                    self.ram[(addr & 0x1FFF) as usize | (bank as usize) << 12]
+                    self.ram[addr as usize | (bank as usize) << 13]
                 } else {
                     0xFF
                 }
@@ -62,7 +62,7 @@ impl Mem for Mbc1 {
             SRAM..=SRAM_END => {
                 if self.ram_enable {
                     let bank = if self.bank_mode && self.ram_banks > 1 { self.ram_bank } else { 0 };
-                    self.ram[(addr & 0x1FFF) as usize | (bank << 12)] = value;
+                    self.ram[(addr & 0x1FFF) as usize | (bank << 13)] = value;
                 }
             },
             _ => {}
