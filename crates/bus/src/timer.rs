@@ -1,18 +1,6 @@
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus};
-
-#[derive(Default)]
-pub struct FEdge {
-    old: bool
-}
-
-impl FEdge {
-    pub fn tick(&mut self, v: bool) -> bool {
-        let r = self.old && !v;
-        self.old = v;
-        r
-    }
-}
+use shared::utils::FEdge;
 
 #[derive(Default)]
 pub struct Timer {

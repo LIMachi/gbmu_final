@@ -60,6 +60,9 @@ pub trait Device {
     fn configure(&mut self, bus: &dyn IOBus) { }
 }
 
+impl Device for () { }
+
+
 pub trait PPU: Device {
     fn vram(&self) -> Rc<RefCell<dyn Mem>>;
     fn oam(&self) -> Rc<RefCell<dyn Mem>>;

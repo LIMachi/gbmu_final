@@ -1,14 +1,15 @@
-use log::info;
 use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus, Mem};
+use shared::mem::{IOBus, Mem};
 
 pub struct IORegs {
-    range: Vec<IOReg>
+    range: Vec<IOReg>,
+    gbc: IOReg
 }
 
 impl IORegs {
-    pub fn init() -> Self {
+    pub fn init(cgb: bool) -> Self {
         Self {
+            gbc: IOReg::rdonly().with_value(cgb as u8),
             range: (0..128).into_iter().map(|i| {
                 let (access, value) = IO::try_from(0xFF00 + i)
                     .map(|x| (x.access(), x.default())).unwrap_or(Default::default());
@@ -19,7 +20,10 @@ impl IORegs {
     }
 
     pub fn io(&self, io: IO) -> IOReg {
-        self.range[io as u16 as usize - shared::mem::IO as usize].clone()
+        match io {
+            IO::CGB => self.gbc.clone(),
+            io => self.range[io as u16 as usize - shared::mem::IO as usize].clone()
+        }
     }
 }
 

@@ -78,7 +78,7 @@ impl shared::Ui for Controller {
     fn init(&mut self, ctx: &mut Context) {
         let ppu = self.ppu.as_ref().borrow();
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        for n in 0..if ppu.cgb { 728 } else { 384 } {
+        for n in 0..if ppu.regs.cgb.read() != 0 { 728 } else { 384 } {
             let s = Textures::Tile(n);
             self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
         }

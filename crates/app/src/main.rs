@@ -1,3 +1,5 @@
+#![feature(let_else)]
+
 use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;

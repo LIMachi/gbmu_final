@@ -32,8 +32,9 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new() -> Self {
+    pub fn new(cgb: bool) -> Self {
         Self {
+            io: io::IORegs::init(cgb),
             rom: Empty { }.cell(),
             srom: Empty { }.cell(),
             sram: Empty { }.cell(),
@@ -43,7 +44,6 @@ impl Bus {
             oam: Empty { }.cell(),
             hram: Hram::new().cell(),
             un_1: Empty { }.cell(),
-            io: io::IORegs::init(),
             ie: IOReg::with_access(IO::IE.access()),
             status: MemStatus::ReqRead(0x100)
         }

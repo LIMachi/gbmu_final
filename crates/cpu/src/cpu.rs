@@ -20,6 +20,7 @@ pub struct Cpu {
     prefixed: bool,
     finished: bool,
     ime: bool,
+    cgb: IOReg,
     int_flags: IOReg,
     ie: IOReg
 }
@@ -32,19 +33,28 @@ impl shared::Cpu for Cpu {
 
 impl Cpu {
 
-    pub fn new(cgb: bool) -> Self {
+    pub fn new() -> Self {
         Self {
             mode: Mode::Running,
             prev: Opcode::Nop,
             instructions: Vec::new(),
-            regs: if cgb { Registers::GBC } else { Registers::GB },
+            regs: Registers::default(),
             cache: Vec::new(),
             prefixed: false,
             finished: false,
             ime: false,
+            cgb: IOReg::unset(),
             int_flags: IOReg::unset(),
             ie: IOReg::unset(),
             at: 0,
+        }
+    }
+
+    pub fn skip_boot(&mut self) {
+        self.regs = if self.cgb.read() != 0 {
+            Registers::GBC
+        } else {
+            Registers::GB
         }
     }
 
@@ -113,6 +123,7 @@ impl Cpu {
 
 impl Device for Cpu {
     fn configure(&mut self, bus: &dyn IOBus) {
+        self.cgb = bus.io(IO::CGB);
         self.ie = bus.io(IO::IE);
         self.int_flags = bus.io(IO::IF);
     }

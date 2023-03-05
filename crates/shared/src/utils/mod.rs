@@ -13,3 +13,17 @@ impl<T> Cell for T {
         Rc::new(RefCell::new(self))
     }
 }
+
+#[derive(Default)]
+pub struct FEdge {
+    old: bool
+}
+
+impl FEdge {
+    pub fn tick(&mut self, v: bool) -> bool {
+        let r = self.old && !v;
+        self.old = v;
+        r
+    }
+}
+

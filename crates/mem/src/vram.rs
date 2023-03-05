@@ -87,9 +87,9 @@ impl Mem for Vram {
 }
 
 impl Vram {
-    pub fn new(cgb: bool) -> Self {
+    pub fn new() -> Self {
         Self {
-            mem: if cgb { Storage::CGB([0; BANK_SIZE as usize * 2]) } else { Storage::DMG([0; BANK_SIZE as usize]) },
+            mem: Storage::DMG([0; BANK_SIZE as usize]),
             bank: IOReg::unset()
         }
     }
@@ -101,7 +101,8 @@ impl Vram {
 
 impl Device for Vram {
     fn configure(&mut self, bus: &dyn IOBus) {
-        if self.mem.cgb() {
+        if bus.io(IO::CGB).read() != 0 {
+            self.mem = Storage::CGB([0; BANK_SIZE as usize * 2]);
             self.bank = bus.io(IO::VBK);
         }
     }

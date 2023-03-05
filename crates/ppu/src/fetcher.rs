@@ -95,7 +95,7 @@ impl Fetcher {
             (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
-        let bank = if ppu.cgb {
+        let bank = if ppu.regs.cgb.read() != 0 {
             if let Mode::Sprite(Sprite { flags, .. }, _) = self.mode { (flags >> 2) & 0x1 } else { 0 }
         } else { 0 };
         // println!("{} ({:#06X}): [{x},{y}] (tile index {})",
@@ -124,8 +124,8 @@ impl Fetcher {
             Mode::Bg | Mode::Window => !(!lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
             Mode::Sprite( .. ) => 0
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
-        let bank = match self.mode {
-            Mode::Sprite(sprite, _) if ppu.cgb => (sprite.flags >> 2) & 0x1,
+        let bank = match (self.mode, ppu.regs.cgb.read()) {
+            (Mode::Sprite(sprite, _), 1) => (sprite.flags >> 2) & 0x1,
             _ => 0
         };
         ppu.vram.read_bank(addr, bank as usize)
@@ -174,7 +174,7 @@ impl Fetcher {
                 self.set_mode(self.prev);
                 bg.enable();
             } else if bg.push(colors.into_iter().map(|x|
-                if !ppu.cgb && !ppu.lcdc.priority() {
+                if ppu.regs.cgb.read() == 0 && !ppu.lcdc.priority() {
                     Pixel::white(ppu.regs.bgp.read())
                 } else {
                     Pixel { color: x, palette: dmg, index, priority }

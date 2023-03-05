@@ -43,11 +43,11 @@ impl Default for Emu {
         let mut joy = joy::Joypad::new(Default::default());
         let mut mbc = mbc::Controller::unplugged();
         let mut dma = bus::Dma::default();
-        let mut ppu = ppu::Controller::new(false, lcd.clone());
+        let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
-        let mut cpu = cpu::Cpu::new(false);
+        let mut cpu = cpu::Cpu::new();
         let mut apu = apu::Apu::default();
-        let mut bus = bus::Bus::new()
+        let mut bus = bus::Bus::new(false)
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
             .with_ppu(&mut ppu);
@@ -107,7 +107,7 @@ impl Emulator {
     }
 
     fn insert(&self, rom: Rom, running: bool) {
-        let mut emu = Emu::new(&self.audio, self.bindings.clone(), rom.clone(), running);
+        let mut emu = Emu::new(&self.audio, self.bindings.clone(), rom, running);
         self.emu.replace(emu);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -179,9 +179,8 @@ impl dbg::Schedule for Emulator {
     }
 
     fn reset(&self) {
-        if let Some(rom) = self.emu.as_ref().borrow().rom.clone() {
-            self.insert(rom, false);
-        }
+        let Some(rom) = self.emu.as_ref().borrow().rom.clone() else { return };
+        self.insert(rom, false);
     }
 
     fn speed(&self) -> i32 { self.emu.as_ref().borrow().speed }
@@ -200,10 +199,10 @@ impl Emu {
         let mut joy = joy::Joypad::new(bindings);
         let mut mbc = mem::mbc::Controller::new(&rom);
         let mut dma = bus::Dma::default();
-        let mut ppu = ppu::Controller::new(rom.header.kind.requires_gbc(), lcd.clone());
+        let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
-        let mut cpu = cpu::Cpu::new(rom.header.kind.requires_gbc());
-        let mut bus = bus::Bus::new()
+        let mut cpu = cpu::Cpu::new();
+        let mut bus = bus::Bus::new(rom.header.kind.requires_gbc())
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(rom.header.kind.requires_gbc()))
             .with_ppu(&mut ppu)
@@ -217,6 +216,8 @@ impl Emu {
         IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
         IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
         IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
+        cpu.skip_boot();
+
         Self {
             speed: Default::default(),
             joy,

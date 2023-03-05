@@ -55,7 +55,8 @@ pub struct Registers {
     ocps: IOReg,
     ocpd: IOReg,
     opri: IOReg,
-    interrupt: IOReg
+    interrupt: IOReg,
+    cgb: IOReg,
 }
 
 impl Device for Registers {
@@ -77,6 +78,7 @@ impl Device for Registers {
         self.ocpd = bus.io(IO::OCPD);
         self.opri = bus.io(IO::OPRI);
         self.interrupt = bus.io(IO::IF);
+        self.cgb = bus.io(IO::CGB);
     }
 }
 
@@ -126,7 +128,6 @@ pub(crate) struct Ppu {
     lcd: Lcd,
     lcdc: LCDC,
     win: Window,
-    cgb: bool,
     sc: Scroll,
     stat: REdge,
     tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>
@@ -435,19 +436,18 @@ impl State for HState {
 }
 
 impl Ppu {
-    pub fn new(cgb: bool, lcd: Lcd) -> Self {
+    pub fn new(lcd: Lcd) -> Self {
         let sprites = Vec::with_capacity(10);
         Self {
             sc: Scroll::default(),
             tile_cache: HashSet::with_capacity(384),
             dots: 0,
             oam: Oam::new(),
-            vram: Vram::new(cgb),
+            vram: Vram::new(),
             regs: Registers::default(),
             state: Box::new(VState::new()),
             sprites,
             lcd,
-            cgb,
             lcdc: LCDC(0),
             win: Default::default(),
             tiledata: vec![],
@@ -546,13 +546,13 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new(cgb: bool, lcd: Lcd) -> Self {
+    pub fn new(lcd: Lcd) -> Self {
         Self {
             tab: render::Tabs::Oam,
             clock: 0,
             init: false,
             storage: HashMap::with_capacity(256),
-            ppu: Ppu::new(cgb, lcd).cell()
+            ppu: Ppu::new(lcd).cell()
         }
     }
 

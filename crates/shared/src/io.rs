@@ -54,6 +54,7 @@ impl LCDC {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum IO {
+    CGB              = 0x0100,
     JOYP             = 0xFF00,
     SB               = 0xFF01,
     SC               = 0xFF02,
@@ -133,6 +134,7 @@ pub enum IO {
 impl IO {
     pub fn name(&self) -> &str {
         match self {
+            IO::CGB => "CGB",
             IO::JOYP => "JOY",
             IO::SB => "SB",
             IO::SC => "SC",
@@ -299,6 +301,7 @@ impl IO {
         use Access::*;
         use AccessMode::*;
         match self {
+            IO::CGB      => Generic(R),
             IO::JOYP     => Custom([R, R, R, R, RW, RW, U, U]),
             IO::SB       => Generic(RW),
             IO::SC       => Generic(RW),
