@@ -19,21 +19,75 @@ struct Registers {
     wave2: IOReg,
 }
 
-pub struct Channel {
-    envelope: Envelope,
-    sweep: bool,
+#[derive(Default)]
+struct Sweep {
     shadow: u16,
+    pace: u8,
+    timer: u8,
+    negate: bool,
+    shift: u8,
+    ran: bool,
+    enabled: bool
+}
+
+impl Sweep {
+    pub fn update(&mut self, data: u8) {
+        self.pace = (data >> 4) & 0x7;
+        self.timer = self.pace;
+        self.negate = data & 0x4 != 0;
+        self.shift = data & 0x7;
+    }
+
+    pub fn trigger(&mut self, freq: u16) -> u16 {
+        self.shadow = freq;
+        self.timer = self.pace;
+        self.enabled = self.pace != 0 || self.shift != 0;
+        self.ran = false;
+        if self.shift != 0 { self.calc() } else { 0 }
+    }
+
+    pub fn calc(&mut self) -> u16 {
+        self.ran = true;
+        let f = self.shadow >> self.shift;
+        if self.negate { self.shadow.wrapping_sub(f) } else { self.shadow + f }
+    }
+
+    pub fn tick(&mut self, wave1: &mut IOReg, wave2: &mut IOReg) -> bool {
+        if !self.enabled { return false }
+        self.timer -= 1;
+        if self.timer == 0 {
+            let f = self.calc();
+            if f > 2047 { return true }
+            if self.shift != 0 {
+                wave1.direct_write(f as u8);
+                wave2.direct_write((wave2.value() & 0x40) | (f >> 8) as u8);
+            }
+            self.timer = self.pace;
+            if self.timer == 0 { self.timer = 8; }
+            self.calc() > 2047
+        } else {
+            false
+        }
+    }
+}
+
+pub struct Channel {
+    cycle: usize,
+    freq_timer: u16,
+    envelope: Envelope,
+    sweep: Sweep,
+    has_sweep: bool,
     registers: Registers,
-    sweep_negate: bool
 }
 
 impl Channel {
     pub fn new(sweep: bool) -> Self {
         Self {
+            cycle: 0,
+            freq_timer: 0,
             envelope: Envelope::default(),
-            sweep,
-            sweep_negate: false,
-            shadow: 0,
+            has_sweep: sweep,
+            sweep: Sweep::default(),
             registers: Registers::default(),
         }
     }
@@ -45,7 +99,7 @@ impl Channel {
     fn update_sweep(&mut self) {
         if self.registers.sweep.dirty() {
             self.registers.sweep.reset_dirty();
-            self.sweep_negate = self.registers.sweep.bit(3) == 0;
+            self.sweep.update(self.registers.sweep.value());
         }
     }
 
@@ -58,12 +112,13 @@ impl Channel {
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> f32 {
-        todo!()
+    fn output(&self) -> u8 {
+        let waveform = self.registers.length.value() >> 6;
+        DUTY_CYCLES[waveform as usize][self.cycle] * self.envelope.volume()
     }
 
     fn channel(&self) -> Channels {
-        if self.sweep { Channels::Sweep } else { Channels::Pulse }
+        if self.has_sweep { Channels::Sweep } else { Channels::Pulse }
     }
 
     fn dac_enabled(&self) -> bool {
@@ -71,35 +126,37 @@ impl SoundChannel for Channel {
     }
 
     fn clock(&mut self) {
-        self.update_sweep();
         self.update_envelope();
+        self.update_sweep();
+        if self.freq_timer == 0 {
+            self.cycle = (self.cycle + 1) & 0x7;
+            self.freq_timer = 4 * (0x7FF - self.frequency());
+        } else {
+            self.freq_timer -= 1;
+        }
     }
 
-    fn trigger(&mut self) {
+    fn trigger(&mut self) -> bool {
         self.envelope.trigger();
+        self.freq_timer = 4 * (0x7FF - self.frequency()) | (self.freq_timer & 0x3);
+        self.sweep.trigger(self.frequency()) > 2047
     }
 
     fn sweep(&mut self) -> bool {
-        if self.sweep {
-            false
-        }
-        else {
-            false
-        }
+        if self.has_sweep { self.sweep.tick(&mut self.registers.wave1, &mut self.registers.wave2) }
+        else { false }
     }
 
     fn envelope(&mut self) {
         self.envelope.clock();
     }
 
-    fn length(&self) -> u8 {
-        todo!()
-    }
+    fn length(&self) -> u8 { 0x3F }
 }
 
 impl Device for Channel {
     fn configure(&mut self, bus: &dyn IOBus) {
-        if self.sweep {
+        if self.has_sweep {
             self.registers.sweep = bus.io(IO::NR10);
             self.registers.length = bus.io(IO::NR11);
             self.registers.volume = bus.io(IO::NR12);

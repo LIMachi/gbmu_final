@@ -27,7 +27,7 @@ pub(crate) enum Channels {
 
 // inner waveform generator
 pub(crate) trait SoundChannel: Device {
-    fn output(&self) -> f32;
+    fn output(&self) -> u8;
 
     fn channel(&self) -> Channels;
     fn enable(&mut self) { }
@@ -35,25 +35,29 @@ pub(crate) trait SoundChannel: Device {
     fn dac_enabled(&self) -> bool { false }
 
     fn clock(&mut self);
-    fn trigger(&mut self);
+    fn trigger(&mut self) -> bool;
     fn sweep(&mut self) -> bool { false }
     fn envelope(&mut self) { }
 
     fn length(&self) -> u8;
+
+    fn on_enable(&mut self) {  }
+    fn on_disable(&mut self) {  }
 }
 
 impl SoundChannel for () {
-    fn output(&self) -> f32 { 0. }
+    fn output(&self) -> u8 { 0 }
     fn channel(&self) -> Channels { Channels::Noise }
     fn clock(&mut self) { }
-    fn trigger(&mut self) {}
+    fn trigger(&mut self) -> bool { false }
     fn length(&self) -> u8 { 0 }
 }
 
 // handles DAC output/switches/volume/length
 pub(crate) struct Channel {
-    enabled: bool,
+    pub enabled: bool,
     length_timer: u8,
+    nr1: IOReg,
     nr4: IOReg,
     inner: Box<dyn SoundChannel + 'static>
 }
@@ -64,6 +68,7 @@ impl Channel {
             length_timer: 0,
             enabled: false,
             inner: Box::new(channel),
+            nr1: IOReg::unset(),
             nr4: IOReg::unset(),
         }
     }
@@ -81,28 +86,29 @@ impl Channel {
         Self::new(NoiseChannel::new())
     }
 
-    pub fn enable(&mut self) { self.enabled = true; }
-    pub fn disable(&mut self) { self.enabled = false; }
+    pub fn enable(&mut self) { self.enabled = true; self.inner.on_enable(); }
+    pub fn disable(&mut self) { self.enabled = false; self.inner.on_disable(); }
 
     pub fn event(&mut self, event: Event) {
         match event {
-            Event::Length if self.nr4.bit(6) != 0 => {
-                if self.length_timer != 0 {
-                    self.length_timer -= 1;
-                    self.enabled = false;
-                }
+            Event::Length if self.nr4.bit(6) != 0 && self.length_timer != 0 => {
+                self.length_timer -= 1;
+                if self.length_timer == 0 { self.enabled = false; }
             },
             Event::Sweep => if self.inner.sweep() { self.disable(); },
             Event::Envelope => self.inner.envelope(),
             _ => {}
         }
     }
+
+    fn reload_length(&mut self) {
+        let mask = self.inner.length();
+        self.length_timer = (mask - (self.nr1.value() & mask)) + 1;
+    }
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> f32 {
-        0.
-    }
+    fn output(&self) -> u8 { self.inner.output() }
 
     fn channel(&self) -> Channels {
         self.inner.channel()
@@ -117,19 +123,22 @@ impl SoundChannel for Channel {
             self.nr4.reset_dirty();
             if self.nr4.bit(7) != 0 { self.trigger(); }
         }
-        self.inner.clock();
+        if self.nr1.dirty() {
+            self.nr1.reset_dirty();
+            self.reload_length();
+        }
         if !self.inner.dac_enabled() { self.disable(); }
+        if self.enabled { self.inner.clock(); }
     }
 
-    fn trigger(&mut self) {
-        self.inner.trigger();
+    fn trigger(&mut self) -> bool {
         self.enable();
-        self.length_timer = self.inner.length();
+        if self.inner.trigger() { self.disable(); }
+        self.reload_length();
+        false
     }
 
-    fn length(&self) -> u8 {
-        self.inner.length()
-    }
+    fn length(&self) -> u8 { 0 }
 }
 
 impl Device for Channel {

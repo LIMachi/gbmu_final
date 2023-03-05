@@ -21,8 +21,16 @@ impl Device for Channel {
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> f32 {
+    fn output(&self) -> u8 {
         todo!()
+    }
+
+    fn on_disable(&mut self) {
+        // TODO enable wave ram access
+    }
+
+    fn on_enable(&mut self) {
+        // TODO disable wave ram access
     }
 
     fn channel(&self) -> Channels { Channels::Wave }
@@ -31,11 +39,7 @@ impl SoundChannel for Channel {
         todo!()
     }
 
-    fn trigger(&mut self) {
-        todo!()
-    }
+    fn trigger(&mut self) -> bool { false }
 
-    fn length(&self) -> u8 {
-        todo!()
-    }
+    fn length(&self) -> u8 { 0xFF }
 }

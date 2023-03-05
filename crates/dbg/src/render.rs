@@ -307,7 +307,10 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                 body.row(240., |mut row| {
                                     const CPU: &[IO] = &[IO::JOYP, IO::DIV, IO::TAC, IO::TIMA, IO::TMA, IO::IF, IO::IE, IO::SB, IO::SC];
                                     const MEM: &[IO] = &[IO::KEY1, IO::DMA, IO::VBK, IO::SVBK, IO::HDMA1, IO::HDMA2, IO::HDMA3, IO::HDMA4, IO::HDMA5];
-                                    const AUDIO: &[IO] = &[IO::WaveRam0];
+                                    const AUDIO: &[IO] = &[IO::NR50, IO::NR51, IO::NR52, IO::NR10, IO::NR11, IO::NR12, IO::NR13, IO::NR14, IO::NR21, IO::NR22, IO::NR23, IO::NR24,
+                                                                                         IO::NR30, IO::NR31, IO::NR32, IO::NR33, IO::NR34, IO::NR41, IO::NR42, IO::NR43, IO::NR44,
+                                                           IO::WaveRam0, IO::WaveRam1, IO::WaveRam2, IO::WaveRam3, IO::WaveRam4, IO::WaveRam5, IO::WaveRam6, IO::WaveRam7,
+                                                           IO::WaveRam8, IO::WaveRam9, IO::WaveRamA, IO::WaveRamB, IO::WaveRamC, IO::WaveRamD, IO::WaveRamE, IO::WaveRamF];
                                     const VIDEO: &[IO] = &[IO::LCDC, IO::STAT, IO::SCX, IO::SCY, IO::LY, IO::LYC, IO::DMA, IO::WX, IO::WY, IO::BGP, IO::OBP0, IO::OBP1, IO::BCPS, IO::BCPD, IO::OPRI, IO::OCPS];
                                     row.col(|ui| { io_table(ui, CPU, bus.as_ref(), "CPU", |_| {}); });
                                     row.col(|ui| { io_table(ui, MEM, bus.as_ref(), "MEM", |ui: &mut Ui| {

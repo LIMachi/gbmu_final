@@ -1,7 +1,6 @@
 mod channel;
 pub(crate) use channel::{Event, SoundChannel, Channel};
 use shared::io::{IO, IOReg};
-use crate::apu::dsg::channel::Channels;
 
 #[repr(u8)]
 enum Panning {
@@ -11,8 +10,8 @@ enum Panning {
 
 impl std::ops::AddAssign<&Channel> for DSG {
     fn add_assign(&mut self, rhs: &Channel) {
-        self.panned(Panning::Left, rhs);
-        self.panned(Panning::Right, rhs);
+        self.output[0] += self.panned(Panning::Left, rhs);
+        self.output[1] += self.panned(Panning::Right, rhs);
     }
 }
 
@@ -52,7 +51,7 @@ impl DSG {
 
     fn panned(&self, side: Panning, channel: &Channel) -> f32 {
         if self.ctrl.value() & (1 << (side as u8 + channel.channel() as u8)) != 0 {
-            channel.output()
+            channel.output() as f32 / 7.5 - 1.
         } else { 0. }
     }
 
@@ -64,7 +63,9 @@ impl DSG {
             *self += c;
         });
         self.tick += 1;
-        let a = (2. * std::f32::consts::PI * 220. * self.tick as f32 / 44800.).sin();
+        let a = (2. * std::f32::consts::PI * 440. * self.tick as f32 / 44800.).sin();
+        let h = self.hpf();
+        return [0.; 2];
         if any_dac { self.hpf() } else { [0.; 2] }
     }
 }

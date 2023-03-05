@@ -30,8 +30,8 @@ impl Apu {
 
     pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
         let channels = vec![
-            // Channel::sweep(),
-            // Channel::pulse(),
+            Channel::sweep(),
+            Channel::pulse(),
             // Channel::wave(),
             // Channel::noise(),
         ];

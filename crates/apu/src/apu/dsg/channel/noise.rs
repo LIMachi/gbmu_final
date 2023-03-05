@@ -20,7 +20,7 @@ impl Device for Channel {
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> f32 {
+    fn output(&self) -> u8 {
         todo!()
     }
 
@@ -30,11 +30,9 @@ impl SoundChannel for Channel {
         todo!()
     }
 
-    fn trigger(&mut self) {
-        todo!()
-    }
+    fn trigger(&mut self) -> bool { false }
 
     fn length(&self) -> u8 {
-        todo!()
+        0x3F
     }
 }
