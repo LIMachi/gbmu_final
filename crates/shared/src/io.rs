@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::mem::{IOBus, Mem};
@@ -386,8 +388,20 @@ impl IO {
     }
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Access { W, R, RW, U }
 pub enum AccessMode { Generic(Access), Custom([Access; 8]) }
+
+impl Access {
+    pub fn format(&self) -> &'static str {
+        match self {
+            Access::R => "R",
+            Access::W => "W",
+            Access::RW => "R/W",
+            Access::U => "U"
+        }
+    }
+}
 
 impl Default for AccessMode {
     fn default() -> Self { Self::Generic(Access::U) }

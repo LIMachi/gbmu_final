@@ -1,9 +1,11 @@
+use std::cell::RefMut;
 use std::collections::HashMap;
 use std::ops::{Range, RangeBounds};
 use egui_extras::{Column, TableBuilder};
+use shared::breakpoints::{Break, Breakpoint, Breakpoints};
 use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
-use shared::egui::{Align, Color32, Rounding, Ui};
+use shared::egui::{Align, Color32, Rounding, Sense, Ui, Vec2};
 use shared::mem::*;
 use crate::Emulator;
 
@@ -158,6 +160,7 @@ pub trait MemRange<E: Emulator> {
 pub struct Disassembly<E: Emulator> {
     ranges: Vec<Box<dyn MemRange<E>>>,
     cursor: Cursor,
+    hover: Option<usize>,
 }
 
 impl<E: Emulator> Disassembly<E> {
@@ -170,7 +173,8 @@ impl<E: Emulator> Disassembly<E> {
                 DynRange::new(RAM, RAM_END).boxed(),
                 DynRange::new(SRAM, SRAM_END).boxed(),
                 DynRange::new(HRAM, HRAM_END).boxed()
-            ]
+            ],
+            hover: None
         }
     }
 
@@ -224,7 +228,7 @@ impl<E: Emulator> Disassembly<E> {
         self.ranges.iter_mut().for_each(|x| x.reload());
     }
 
-    pub fn render(&mut self, emu: &E, ui: &mut Ui) {
+    pub fn render(&mut self, emu: &E, ui: &mut Ui, breakpoints: &Breakpoints) {
         let pc = emu.cpu_register(Reg::PC).u16();
         let cursor = match self.cursor {
             Cursor::Follow => self.row(pc),
@@ -254,6 +258,7 @@ impl<E: Emulator> Disassembly<E> {
             })
             .body(|body| {
             let lines = self.lines();
+            let mut hover = None;
             body.rows(30., lines, |index, mut row| {
                 let mut st = index;
                 if let Some(current) = self.ranges.iter_mut()
@@ -269,33 +274,36 @@ impl<E: Emulator> Disassembly<E> {
                     }) {
                     let addr = current.range().start;
                     let op = &current.ops().ops[st];
-                    row.col(|ui| {
-                        if index == cursor {
-                            let mut rect = ui.available_rect_before_wrap();
-                            rect.max.x += 8.;
-                            rect.min.x -= 8.;
-                            ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::DARK_GREEN);
-                        }
+                    if (row.col(|ui| {
+                        let rect = ui.available_rect_before_wrap().expand2(Vec2::new(8., 0.));
+                        if Some(index) == self.hover {  ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::from_white_alpha(20)) }
+                        else if index == cursor { ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::DARK_GREEN); }
                         ui.label(egui::RichText::new(format!("{:#06X}", addr + op.offset)));
-                    });
-                    row.col(|ui| {
-                        if index == cursor {
-                            let mut rect = ui.available_rect_before_wrap();
-                            rect.max.x += 8.;
-                            ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN);
-                        }
+                    }).1 | row.col(|ui| {
+                        let mut rect = ui.available_rect_before_wrap();
+                        rect.max.x += 8.;
+                        if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
+                        else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
                         ui.label(egui::RichText::new(&op.instruction));
-                    });
-                    row.col(|ui| {
-                        if index == cursor {
-                            ui.painter().rect_filled(ui.available_rect_before_wrap(), 0., Color32::DARK_GREEN);
-                        }
+                    }).1 | row.col(|ui| {
+                        let mut rect = ui.available_rect_before_wrap();
+                        rect.max.x += 8.;
+                        if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
+                        else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
                         let mut code = String::new();
                         for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
                         ui.label(egui::RichText::new(code));
-                    });
+                    }).1).context_menu(|ui| {
+                        if ui.button("Run to cursor").clicked() {
+                            breakpoints.schedule(Breakpoint::address(addr + op.offset).once());
+                            emu.play();
+                        }
+                    }).hovered() {
+                        hover = Some(index);
+                    };
                 }
             });
+            self.hover = hover;
         });
     }
 }

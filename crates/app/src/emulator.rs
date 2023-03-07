@@ -246,7 +246,7 @@ impl Emu {
             self.timer.tick();
             self.ppu.tick();
             self.apu.tick();
-            self.running &= bp.tick(&self.cpu);
+            self.running &= bp.tick(&self.cpu, self.bus.status());
             self.cpu.reset_finished();
         })) {
             Ok(_) => {},
