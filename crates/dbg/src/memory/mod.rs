@@ -1,9 +1,11 @@
-
+use std::cell::RefMut;
 use std::ops::Range;
+use shared::breakpoints::{Breakpoint, Breakpoints};
 
 use shared::egui;
 use shared::egui::{Color32, Label, ScrollArea, Sense, TextStyle, Vec2};
 use shared::egui::RichText;
+use shared::io::Access;
 use shared::mem::*;
 use crate::Bus;
 use super::render::DARK_BLACK;
@@ -42,23 +44,35 @@ impl Default for ViewerOptions {
 
 pub struct Viewer {
     options: ViewerOptions,
-    ranges: [View; 6],
+    ranges: [View; 7],
     current: usize,
+    hover: Option<u16>,
+    breakpoints: Breakpoints,
 }
 
-impl Default for Viewer {
+impl Viewer {
     fn default() -> Self {
         Self {
             options: Default::default(),
             ranges: [
                 View::new("ROM", ROM..VRAM),
                 View::new("VRAM", VRAM..SRAM),
-                View::new("EXT_RAM", SRAM..RAM),
+                View::new("SRAM", SRAM..RAM),
                 View::new("RAM", RAM..ECHO),
                 View::new("OAM", OAM..UN_1),
+                View::new("IO", IO..HRAM),
                 View::new("HRAM", HRAM..END)
             ],
-            current: 0
+            current: 0,
+            hover: None,
+            breakpoints: Breakpoints::default()
+        }
+    }
+
+    pub fn new(breakpoints: Breakpoints) -> Self {
+        Self {
+            breakpoints,
+            ..Viewer::default()
         }
     }
 }
@@ -91,8 +105,8 @@ impl Viewer {
                 });
                 let ViewerOptions {
                     zero_color,
-                    
-                    
+
+
                     text_style,
                     address_text_style,
                     ..
@@ -112,9 +126,15 @@ impl Viewer {
                         .show(ui, |ui| {
                             ui.style_mut().wrap = Some(false);
                             ui.style_mut().spacing.item_spacing.x = 3.0;
+                            let mut hover = None;
                             for row in range {
                                 let addr = space.range.start + COLUMNS * row as u16;
-                                let text = RichText::new(format!("0x{:04X}:", addr))
+                                let mut print = addr;
+                                let mut color = ui.style().visuals.text_color();
+                                if let Some(h) = self.hover {
+                                    if h & 0xFFF0 == addr { print = h; color = Color32::GREEN }
+                                }
+                                let text = RichText::new(format!("0x{:04X}:", print)).color(color)
                                     .text_style(address_text_style.clone());
                                 ui.label(text);
                                 for col in 0..2 {
@@ -126,13 +146,22 @@ impl Viewer {
                                             let v = bus.read(addr);
                                             let text = format!("{:02X}", v);
                                             let text = RichText::new(text).text_style(text_style.clone())
-                                                .color(if v == 0 { zero_color } else { ui.style().visuals.text_color() });
-                                            let _res = ui.add(Label::new(text).sense(Sense::click()));
+                                                .color(if Some(addr) == self.hover { Color32::GREEN } else if v == 0 { zero_color } else { ui.style().visuals.text_color() });
+                                            let label = Label::new(text).sense(Sense::click());
+                                            let ret = ui.add(label);
+                                            if ret.hovered() { hover = Some(addr) }
+                                            ret.context_menu(|ui| {
+                                                ui.label("Break on:");
+                                                if ui.button("Read").clicked() { self.breakpoints.schedule(Breakpoint::access(addr, Access::R)); }
+                                                if ui.button("Write").clicked() { self.breakpoints.schedule(Breakpoint::access(addr, Access::W)); }
+                                                if ui.button("R/W").clicked() { self.breakpoints.schedule(Breakpoint::access(addr, Access::RW)); }
+                                            });
                                         }
                                     });
                                 }
                                 ui.end_row();
                             }
+                            self.hover = hover;
                         });
                 });
             });

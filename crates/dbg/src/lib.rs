@@ -10,6 +10,7 @@ mod memory;
 mod render;
 
 use disassembly::Disassembly;
+use shared::breakpoints::Break;
 use shared::egui::{TextureHandle, TextureId};
 use shared::mem::{IOBus};
 
@@ -65,7 +66,7 @@ impl<E: Emulator> Ninja<E> {
             render_data: Default::default(),
             disassembly: Disassembly::new(),
             breakpoints: emu.breakpoints(),
-            viewer: memory::Viewer::default(),
+            viewer: memory::Viewer::new(emu.breakpoints()),
             emu,
         }
     }
