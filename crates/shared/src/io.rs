@@ -534,4 +534,12 @@ impl IOReg {
 
     pub fn reset_dirty(&mut self) { self.0.as_ref().borrow_mut().reset_dirty(); }
     pub fn dirty(&self) -> bool { self.0.as_ref().borrow().dirty }
+
+    pub fn set_read_mask(&self, rmask: u8) {
+        self.0.borrow_mut().rmask = rmask;
+    }
+
+    pub fn set_write_mask(&self, wmask: u8) {
+        self.0.borrow_mut().wmask = wmask;
+    }
 }

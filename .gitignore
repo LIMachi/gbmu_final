@@ -8,3 +8,4 @@ Cargo.lock
 tests/
 gbmu.conf
 gbmu.ron
+roms/lsdj9_2_L.gb
