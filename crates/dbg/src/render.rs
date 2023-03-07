@@ -216,7 +216,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                         egui::Frame::group(ui.style())
                             .fill(DARK_BLACK)
                             .show(ui, |ui| {
-                                ui.push_id("disassembly", |ui| { self.disassembly.render(&self.emu, ui); });
+                                ui.push_id("disassembly", |ui| { self.disassembly.render(&self.emu, ui, &self.breakpoints); });
                             });
                     });
                     ui.allocate_ui_with_layout(Vec2::new(340., 364.), Layout::top_down(Align::LEFT), |ui| {

@@ -32,15 +32,19 @@ struct Sweep {
 
 impl Sweep {
     pub fn update(&mut self, data: u8) {
+        let neg = self.negate;
+
         self.pace = (data >> 4) & 0x7;
-        self.timer = self.pace;
-        self.negate = data & 0x4 != 0;
+        self.timer = if self.pace != 0 { self.pace } else { 8 };
+        self.negate = data & 0x8 != 0;
         self.shift = data & 0x7;
+        if neg && !self.negate && self.ran { self.enabled = false; }
+        self.ran = false;
     }
 
     pub fn trigger(&mut self, freq: u16) -> u16 {
         self.shadow = freq;
-        self.timer = self.pace;
+        self.timer = if self.pace != 0 { self.pace } else { 8 };
         self.enabled = self.pace != 0 || self.shift != 0;
         self.ran = false;
         if self.shift != 0 { self.calc() } else { 0 }
@@ -56,15 +60,18 @@ impl Sweep {
         if !self.enabled { return false }
         self.timer -= 1;
         if self.timer == 0 {
-            let f = self.calc();
-            if f > 2047 { return true }
-            if self.shift != 0 {
-                wave1.direct_write(f as u8);
-                wave2.direct_write((wave2.value() & 0x40) | (f >> 8) as u8);
-            }
             self.timer = self.pace;
-            if self.timer == 0 { self.timer = 8; }
-            self.calc() > 2047
+            if self.timer == 0 { self.timer = 8 }
+            if self.enabled && self.pace != 0 {
+                let f = self.calc();
+                if f <= 2047 && self.shift != 0 {
+                    wave1.direct_write(f as u8);
+                    wave2.direct_write((wave2.value() & 0x40) | ((f & 0x7FF) >> 8) as u8);
+                    log::info!("freq {}", 131072 as f32 / (2048 - f) as f32);
+                    self.shadow = f;
+                }
+                f > 2047 || self.calc() > 2047
+            } else { false }
         } else {
             false
         }
@@ -78,11 +85,13 @@ pub struct Channel {
     sweep: Sweep,
     has_sweep: bool,
     registers: Registers,
+    triggered: bool
 }
 
 impl Channel {
     pub fn new(sweep: bool) -> Self {
         Self {
+            triggered: false,
             cycle: 0,
             freq_timer: 0,
             envelope: Envelope::default(),
@@ -92,22 +101,40 @@ impl Channel {
         }
     }
 
+    pub fn test(frequency: u16) -> Self {
+        let mut channel = Self {
+            triggered: false,
+            cycle: 0,
+            freq_timer: 0,
+            envelope: Envelope::default(),
+            has_sweep: false,
+            sweep: Sweep::default(),
+            registers: Registers {
+                sweep: IOReg::rw(),
+                length: IOReg::rw().with_value(0x80),
+                volume: IOReg::rw().with_value(0x10),
+                wave1: IOReg::rw().with_value(frequency as u8),
+                wave2: IOReg::rw().with_value((frequency >> 8) as u8)
+            }
+        };
+        channel.update_envelope();
+        channel.update_sweep();
+        channel.trigger();
+        channel
+    }
+
     fn frequency(&self) -> u16 {
         self.registers.wave1.read() as u16 | ((self.registers.wave2.read() as u16 & 0x7) << 8)
     }
 
     fn update_sweep(&mut self) {
-        if self.registers.sweep.dirty() {
-            self.registers.sweep.reset_dirty();
-            self.sweep.update(self.registers.sweep.value());
-        }
+        self.registers.sweep.reset_dirty();
+        self.sweep.update(self.registers.sweep.value());
     }
 
     fn update_envelope(&mut self) {
-        if self.registers.volume.dirty() {
-            self.envelope.update(self.registers.volume.value());
-            self.registers.volume.reset_dirty();
-        }
+        self.envelope.update(self.registers.volume.value());
+        self.registers.volume.reset_dirty();
     }
 }
 
@@ -126,8 +153,9 @@ impl SoundChannel for Channel {
     }
 
     fn clock(&mut self) {
-        self.update_envelope();
-        self.update_sweep();
+        if self.registers.volume.dirty() { self.update_envelope(); }
+        if self.registers.sweep.dirty() { self.update_sweep(); }
+        if !self.triggered { return }
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x7;
             self.freq_timer = 4 * (0x7FF - self.frequency());
@@ -137,6 +165,7 @@ impl SoundChannel for Channel {
     }
 
     fn trigger(&mut self) -> bool {
+        self.triggered = true;
         self.envelope.trigger();
         self.freq_timer = 4 * (0x7FF - self.frequency()) | (self.freq_timer & 0x3);
         self.sweep.trigger(self.frequency()) > 2047

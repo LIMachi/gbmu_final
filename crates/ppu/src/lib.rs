@@ -8,6 +8,7 @@ use std::collections::vec_deque::VecDeque;
 
 use std::fmt::{Debug, Formatter, Write};
 use std::rc::Rc;
+use log::debug;
 use lcd::{LCD, Lcd};
 use mem::{Oam, oam::Sprite, Vram};
 use shared::io::{IO, IOReg, LCDC};

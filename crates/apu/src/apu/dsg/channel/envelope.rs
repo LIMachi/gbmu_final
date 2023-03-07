@@ -21,6 +21,7 @@ impl Envelope {
         if self.timer == 0 { return };
         self.timer -= 1;
         if self.timer == 0 {
+            if self.period == 0 { self.timer = 8; return }
             let t = if self.increase { self.value + 1 } else { self.value.wrapping_sub(1) };
             if t <= 0xF {
                 self.value = t;
@@ -35,6 +36,7 @@ impl Envelope {
 
     pub fn trigger(&mut self) {
         self.timer = self.period;
+        if self.timer == 0 { self.timer = 8 }
         self.value = self.base;
     }
 }

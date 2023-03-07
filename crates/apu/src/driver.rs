@@ -34,6 +34,7 @@ impl Input {
 }
 
 pub(crate)struct Output {
+    delay: usize,
     sample_rate: u32,
     consumer: Consumer<f32>
 }
@@ -41,6 +42,7 @@ pub(crate)struct Output {
 impl Output {
     fn new(sample_rate: u32, consumer: Consumer<f32>) -> Self {
         Self {
+            delay: 500,
             sample_rate,
             consumer,
         }

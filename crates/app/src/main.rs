@@ -157,9 +157,11 @@ fn main() {
             } else {
                 st.pause();
             }
-            if s != st.elapsed().as_secs() {
-                s = st.elapsed().as_secs();
+            if st.elapsed().as_secs() != 0 {
                 log::debug!("cycles: {}", cycles as f64 / st.elapsed().as_secs_f64());
+                st.stop();
+                st.start();
+                cycles = 0;
             }
         });
 }
