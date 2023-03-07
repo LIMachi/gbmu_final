@@ -5,11 +5,10 @@ mod wave;
 mod pulse;
 mod noise;
 mod envelope;
-use envelope::Envelope;
 
-use pulse::Channel as PulseChannel;
-use wave::Channel as WaveChannel;
-use noise::Channel as NoiseChannel;
+pub use pulse::Channel as PulseChannel;
+pub use wave::Channel as WaveChannel;
+pub use noise::Channel as NoiseChannel;
 
 pub enum Event {
     Envelope,

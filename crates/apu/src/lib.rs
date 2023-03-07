@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::ops::Not;

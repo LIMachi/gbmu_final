@@ -1,5 +1,5 @@
 mod channel;
-pub(crate) use channel::{Event, SoundChannel, Channel};
+pub(crate) use channel::{Event, SoundChannel, Channel, PulseChannel};
 use shared::io::{IO, IOReg};
 
 #[repr(u8)]
@@ -15,7 +15,7 @@ impl std::ops::AddAssign<&Channel> for DSG {
     }
 }
 
-#[derive(Default)]
+
 pub(crate) struct DSG {
     ctrl: IOReg,
     volume: IOReg,
@@ -23,11 +23,13 @@ pub(crate) struct DSG {
     capacitor: [f32; 2],
     tick: usize,
     charge_factor: f32,
+    pulse: PulseChannel
 }
 
 impl DSG {
     pub fn new(charge_factor: f32) -> Self {
         Self {
+            pulse: PulseChannel::test(1750),
             ctrl: Default::default(),
             volume: Default::default(),
             output: [0.; 2],
@@ -63,10 +65,11 @@ impl DSG {
             *self += c;
         });
         self.tick += 1;
-        let a = (2. * std::f32::consts::PI * 440. * self.tick as f32 / 44800.).sin();
-        let h = self.hpf();
-        return [0.; 2];
         if any_dac { self.hpf() } else { [0.; 2] }
+    }
+
+    pub fn clock(&mut self) {
+        self.pulse.clock();
     }
 }
 

@@ -7,7 +7,6 @@ use shared::io::{IO, IOReg};
 use dsg::{Channel, Event, SoundChannel};
 use shared::utils::FEdge;
 
-#[derive(Default)]
 pub struct Apu {
     fedge: FEdge,
     div_apu: u8,
@@ -20,6 +19,25 @@ pub struct Apu {
     div: IOReg,
     ds: IOReg,
     channels: Vec<Channel>
+}
+
+impl Default for Apu {
+    fn default() -> Self {
+        let sample_rate = 44100;
+        Self {
+            fedge: Default::default(),
+            div_apu: 0,
+            sample: 0.,
+            sample_rate,
+            tick: 4_194_304. / sample_rate as f64,
+            input: Input::default(),
+            dsg: dsg::DSG::new(0.),
+            channels: vec![],
+            sound: Default::default(),
+            div: Default::default(),
+            ds: Default::default()
+        }
+    }
 }
 
 impl Apu {
@@ -67,6 +85,7 @@ impl Apu {
         for channel in self.channels.iter_mut() {
             channel.clock();
         }
+        self.dsg.clock();
         if self.fedge.tick(self.div.bit(if self.ds.bit(7) != 0 { 5 } else { 4 }) != 0) {
             match self.div_apu {
                 0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length)),
