@@ -67,7 +67,6 @@ impl Sweep {
                 if f <= 2047 && self.shift != 0 {
                     wave1.direct_write(f as u8);
                     wave2.direct_write((wave2.value() & 0x40) | ((f & 0x7FF) >> 8) as u8);
-                    log::info!("freq {}", 131072 as f32 / (2048 - f) as f32);
                     self.shadow = f;
                 }
                 f > 2047 || self.calc() > 2047
@@ -124,7 +123,7 @@ impl Channel {
     }
 
     fn frequency(&self) -> u16 {
-        self.registers.wave1.read() as u16 | ((self.registers.wave2.read() as u16 & 0x7) << 8)
+        self.registers.wave1.value() as u16 | ((self.registers.wave2.value() as u16 & 0x7) << 8)
     }
 
     fn update_sweep(&mut self) {

@@ -9,6 +9,10 @@ pub trait Mem {
         0xFF
     }
 
+    fn value(&self, addr: u16, absolute: u16) -> u8 {
+        self.read(addr, absolute)
+    }
+
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
     }
 
@@ -18,6 +22,10 @@ pub trait Mem {
 impl<T: Mem> Mem for Rc<RefCell<T>> {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         self.as_ref().borrow().read(addr, absolute)
+    }
+
+    fn value(&self, addr: u16, absolute: u16) -> u8 {
+        self.as_ref().borrow().value(addr, absolute)
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
@@ -54,6 +62,7 @@ pub trait IOBus {
     fn io(&self, io: IO) -> IOReg;
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, value: u8);
+    fn value(&self, addr: u16) -> u8;
 }
 
 pub trait Device {

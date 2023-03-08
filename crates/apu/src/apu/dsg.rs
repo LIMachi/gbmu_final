@@ -29,7 +29,7 @@ pub(crate) struct DSG {
 impl DSG {
     pub fn new(charge_factor: f32) -> Self {
         Self {
-            pulse: PulseChannel::test(1750),
+            pulse: PulseChannel::new(true),
             ctrl: Default::default(),
             volume: Default::default(),
             output: [0.; 2],

@@ -66,6 +66,23 @@ impl Bus {
         }
     }
 
+    fn value(&self, addr: u16) -> u8 {
+        match addr {
+            ROM..=ROM_END => self.rom.borrow().value(addr - ROM, addr),
+            SROM..=SROM_END => self.srom.borrow().value(addr - SROM, addr),
+            VRAM..=VRAM_END => self.vram.borrow().value(addr - VRAM, addr),
+            SRAM..=SRAM_END => self.sram.borrow().value(addr - SRAM, addr),
+            RAM..=RAM_END => self.ram.borrow().value(addr - RAM, addr),
+            ECHO..=ECHO_END => self.ram.borrow().value(addr - ECHO, addr),
+            OAM..=OAM_END => self.oam.borrow().value(addr - OAM, addr),
+            UN_1..=UN_1_END => self.un_1.borrow().value(addr - UN_1, addr),
+            IO..=IO_END => self.io.value(addr - IO, addr),
+            HRAM..=HRAM_END => self.hram.borrow().value(addr - HRAM, addr),
+            END => self.ie.read(),
+            _=> unreachable!()
+        }
+    }
+
     fn write(&mut self, addr: u16, value: u8) {
         match addr {
             ROM..=ROM_END => self.rom.as_ref().borrow_mut().write(addr - ROM, value, addr),
@@ -117,6 +134,10 @@ impl IOBus for Bus {
 
     fn read(&self, addr: u16) -> u8 {
         self.read(addr)
+    }
+
+    fn value(&self, addr: u16) -> u8 {
+        self.value(addr)
     }
 
     fn write(&mut self, addr: u16, value: u8) {

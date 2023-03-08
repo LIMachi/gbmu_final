@@ -490,6 +490,10 @@ impl Mem for HReg {
         self.v | !self.rmask
     }
 
+    fn value(&self, addr: u16, absolute: u16) -> u8 {
+        self.v
+    }
+
     fn write(&mut self, _: u16, value: u8, io: u16) {
         self.v = (self.v & !self.wmask) | (value & self.wmask);
         self.dirty = true;
@@ -509,6 +513,11 @@ impl Mem for IOReg {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         if addr != 0 { panic!("IO reg is only 1 byte") }
         self.0.borrow().read(addr, absolute)
+    }
+
+    fn value(&self, addr: u16, absolute: u16) -> u8 {
+        if addr != 0 { panic!("IO reg is only 1 byte") }
+        self.0.borrow().value(addr, absolute)
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
