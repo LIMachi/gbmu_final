@@ -193,7 +193,7 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, running: bool) -> Self {
-        log::info!("starting emu (cgb required: {})", rom.header.kind.requires_gbc());
+        let gbc = false;
         let lcd = lcd::Lcd::new();
         let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
@@ -202,9 +202,9 @@ impl Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
-        let mut bus = bus::Bus::new(rom.header.kind.requires_gbc())
+        let mut bus = bus::Bus::new(gbc)
             .with_mbc(&mut mbc)
-            .with_wram(Wram::new(rom.header.kind.requires_gbc()))
+            .with_wram(Wram::new(gbc))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
             .configure(&mut timer)

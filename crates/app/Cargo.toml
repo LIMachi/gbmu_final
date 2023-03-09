@@ -32,6 +32,7 @@ features = ["derive"]
 
 [features]
 debug = ["cpu/log_opcode"]
+doctor = ["bus/doctor", "cpu/doctor", "shared/doctor"]
 file_log = []
 
 [dependencies.shared]

@@ -86,7 +86,7 @@ pub fn adc(state: &mut State) -> Flow {
     state.flags().set_zero(r == 0)
         .set_sub(false)
         .set_half(((a & 0xF) + (n & 0xF) + cr) & 0x10 != 0)
-        .set_carry(o);
+        .set_carry(o || c);
     CONTINUE
 }
 
@@ -144,7 +144,7 @@ pub fn daa(state: &mut State) -> Flow {
             if state.flags().half() || (a & 0xF) > 0x9 { a += 0x6; }
         },
         true => {
-            if state.flags().carry() { a = a.wrapping_sub(0x60); }
+            if state.flags().carry() { a = a.wrapping_sub(0x60); c = true; }
             if state.flags().half() { a = a.wrapping_sub(0x6); }
         }
     }

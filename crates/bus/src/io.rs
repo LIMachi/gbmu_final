@@ -29,6 +29,8 @@ impl IORegs {
 
 impl Mem for IORegs {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
+        #[cfg(feature = "doctor")]
+        if absolute == 0xFF44 { return 0x90 }
         self.range.get(addr as usize).map(|x| x.read()).expect(format!("read outside of IOReg range {addr:#06X}").as_str())
     }
 

@@ -9,6 +9,9 @@ edition = "2021"
 log = "0.4.17"
 thiserror = "1.0.38"
 
+[features]
+doctor = []
+
 [dependencies.shared]
 path = "../shared"
 

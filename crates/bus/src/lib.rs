@@ -162,6 +162,11 @@ impl shared::cpu::Bus for Bus {
         };
     }
 
+    #[cfg(feature = "doctor")]
+    fn direct_read(&self, offset: u16) -> u8 {
+        self.read(offset)
+    }
+
     /// Debug function
     /// will return a range starting from start and up to len bytes long, if possible.
     /// Will end early if the underlying memory range is smaller.

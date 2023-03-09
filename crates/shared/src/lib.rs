@@ -59,6 +59,11 @@ pub mod cpu {
         fn tick(&mut self);
         fn get_range(&self, start: u16, len: u16) -> Vec<u8>;
         fn write(&mut self, addr: u16, value: u8);
+
+        /// DONT USE
+        /// this exists only for debugging purposes.
+        #[cfg(feature = "doctor")]
+        fn direct_read(&self, offset: u16) -> u8;
     }
 
     #[derive(Copy, Debug, Clone, Eq, PartialEq)]

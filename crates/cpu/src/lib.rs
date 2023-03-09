@@ -1,3 +1,4 @@
+#![feature(let_else)]
 extern crate core;
 
 mod cpu;
@@ -183,10 +184,10 @@ impl<'a> State<'a> {
             (Reg::C, Value::U8(v)) => self.regs.set_c(v),
             (Reg::D, Value::U8(v)) => self.regs.set_d(v),
             (Reg::E, Value::U8(v)) => self.regs.set_e(v),
-            (Reg::F, Value::U8(v)) => self.regs.set_f(v),
+            (Reg::F, Value::U8(v)) => self.regs.set_f(v & 0xF0),
             (Reg::H, Value::U8(v)) => self.regs.set_h(v),
             (Reg::L, Value::U8(v)) => self.regs.set_l(v),
-            (Reg::AF, Value::U16(v)) => self.regs.set_af(v),
+            (Reg::AF, Value::U16(v)) => self.regs.set_af(v & 0xFFF0),
             (Reg::BC, Value::U16(v)) => self.regs.set_bc(v),
             (Reg::DE, Value::U16(v)) => self.regs.set_de(v),
             (Reg::HL, Value::U16(v)) => self.regs.set_hl(v),

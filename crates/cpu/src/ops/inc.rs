@@ -25,7 +25,7 @@ pub fn inc(state: &mut State) -> Flow {
 
     state.flags().set_zero(v == 0)
         .set_sub(false)
-        .set_half((v & 0x10) != 0);
+        .set_half(v & 0xF == 0);
     state.push(v);
     CONTINUE
 }

@@ -14,3 +14,4 @@ path = "../shared"
 
 [features]
 log_opcode = []
+doctor = []
