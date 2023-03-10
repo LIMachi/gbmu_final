@@ -53,13 +53,14 @@ pub fn add(state: &mut State) -> Flow {
 
 pub fn add_sp(state: &mut State) -> Flow {
     let n = state.pop().u8() as i8 as u16;
-    let r = state.register(Reg::SP).u16().wrapping_add(n);
+    let r = state.register(Reg::SP).u16();
+    let res = r.wrapping_add(n);
     state.flags()
         .set_zero(false)
         .set_sub(false)
         .set_half((n & 0xF) + (r & 0xF) > 0xF)
         .set_carry((n & 0xFF) + (r & 0xFF) > 0xFF);
-    state.push(r);
+    state.push(res);
     CONTINUE
 }
 
