@@ -10,6 +10,7 @@ use winit::event_loop::EventLoopBuilder;
 
 mod log;
 mod render;
+mod settings;
 mod emulator;
 pub mod app;
 
@@ -80,11 +81,11 @@ impl App {
             },
             Event::UserEvent(Events::Open(handle)) => {
               self.open(match handle {
-                  Handle::Main => unimplemented!(),
+                  Handle::Main => unreachable!(),
                   Handle::Debug => WindowType::Debug(self.dbg.clone()),
                   Handle::Game => WindowType::Game(self.emu.clone()),
                   Handle::Sprites => WindowType::Sprites(self.emu.clone()),
-                  Handle::Settings => unimplemented!()
+                  Handle::Settings => WindowType::Settings(self.emu.clone()),
               }, target);
             },
             _ => {}
@@ -109,7 +110,8 @@ impl App {
                         debug: DbgConfig {
                             breaks: self.emu.breakpoints().take()
                         },
-                        keys: self.bindings.as_ref().take()
+                        keys: self.bindings.as_ref().take(),
+                        mode: self.emu.mode()
                     };
                     if let Err(e) = serde_any::ser::to_file_pretty("gbmu.ron", &conf) {
                         log::warn!("error while saving config {e:?}");

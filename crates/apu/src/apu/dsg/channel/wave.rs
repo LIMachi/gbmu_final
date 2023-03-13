@@ -65,21 +65,11 @@ impl SoundChannel for Channel {
         ((self.registers.pattern[self.cycle / 2].value() >> ((self.cycle & 1) * 4)) & 0xF) >> (v - 1)
     }
 
-    fn on_disable(&mut self) {
-        for w in self.registers.pattern.iter() {
-            w.set_read_mask(0xFF);
-            w.set_write_mask(0xFF);
-        }
-    }
-
-    fn on_enable(&mut self) {
-        for w in self.registers.pattern.iter() {
-            w.set_read_mask(0);
-            w.set_write_mask(0);
-        }
-    }
-
     fn channel(&self) -> Channels { Channels::Wave }
+
+    fn dac_enabled(&self) -> bool {
+        self.registers.dac_enable.bit(7) != 0
+    }
 
     fn clock(&mut self) {
         if self.freq_timer == 0 {
@@ -98,7 +88,17 @@ impl SoundChannel for Channel {
 
     fn length(&self) -> u8 { 0xFF }
 
-    fn dac_enabled(&self) -> bool {
-        self.registers.dac_enable.bit(7) != 0
+    fn on_enable(&mut self) {
+        for w in self.registers.pattern.iter() {
+            w.set_read_mask(0);
+            w.set_write_mask(0);
+        }
+    }
+
+    fn on_disable(&mut self) {
+        for w in self.registers.pattern.iter() {
+            w.set_read_mask(0xFF);
+            w.set_write_mask(0xFF);
+        }
     }
 }

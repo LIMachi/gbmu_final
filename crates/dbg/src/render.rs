@@ -78,6 +78,7 @@ impl Data {
         let opcode = u16::convert(&self.raw_op);
         let prefix = opcode & 0xFF00 == 0xCB00;
         if let Ok(opcode) = Opcode::try_from((opcode as u8, prefix)) {
+            println!("{} {:?}", self.raw_op, opcode);
             self.ins = opcode;
             self.op = shared::cpu::dbg::dbg_opcodes(opcode).1;
         }

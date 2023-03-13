@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
@@ -50,7 +49,9 @@ pub struct AppConfig {
     #[serde(default)]
     pub keys: Keybindings,
     #[serde(default)]
-    pub sound: apu::SoundConfig
+    pub sound: apu::SoundConfig,
+    #[serde(default)]
+    pub mode: super::settings::Mode,
 }
 
 impl AppConfig {
@@ -247,7 +248,7 @@ impl shared::Ui for Menu {
                     r.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         if ui.add(debug).clicked() { self.proxy.send_event(Events::Open(Handle::Debug)).ok(); };
                         if ui.add(spritesheet).clicked() { self.proxy.send_event(Events::Open(Handle::Sprites)).ok(); };
-                        ui.add(setting);
+                        if ui.add(setting).clicked() { self.proxy.send_event(Events::Open(Handle::Settings)).ok(); };
                     });
                 })
             });

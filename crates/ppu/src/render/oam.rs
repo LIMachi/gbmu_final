@@ -41,10 +41,10 @@ impl Widget for Oam<'_> {
                     ui.spacing_mut().item_spacing.y = sp;
                     for i in 0..8 {
                         let index = i + j * 8;
-                        let sprite = &self.1.oam.sprites[index];
+                        let sprite = self.1.sprite(index);
                         let h = self.0.get(&if sprite.x > 0 && sprite.y > 0 { Textures::Tile(sprite.tile as usize) } else { Textures::Placeholder }).unwrap().id();
                         let h2 = self.0.get(&if self.1.lcdc.obj_tall() { Textures::Tile(sprite.tile as usize + 1) } else { Textures::Placeholder }).unwrap().id();
-                        if ui.add(Sprite(sprite, h, h2)).hovered() {
+                        if ui.add(Sprite(&sprite, h, h2)).hovered() {
                         }
                     }
                 });

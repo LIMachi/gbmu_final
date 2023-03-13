@@ -52,6 +52,7 @@ impl Cpu {
     }
 
     pub fn skip_boot(&mut self) {
+        println!("mode: {}", if self.cgb.read() != 0 { "CGB" } else {"DMG"});
         self.regs = if self.cgb.read() != 0 {
             Registers::GBC
         } else {
@@ -107,21 +108,27 @@ impl Cpu {
                 }
             }
             let opcode = state.read();
-            if let Ok(opcode) = Opcode::try_from((opcode, prefixed)) {
-                self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
-                self.prev = opcode;
-                self.at = state.register(Reg::PC).u16();
-            } else {
-                self.instructions = vec![vec![inc::pc]];
-                self.prev = Opcode::Nop;
-                log::warn!("invalid opcode {opcode:x}");
+            let Ok(opcode) = Opcode::try_from((opcode, prefixed)) else { unreachable!(); };
+            self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
+            self.prev = opcode;
+            self.at = state.register(Reg::PC).u16();
+            if let Opcode::Invalid(n) = opcode {
+                log::warn!("invalid opcode {n:#02x}");
             }
         }
+        #[cfg(feature = "log_opcode")]
+        static mut OUT: Option<std::fs::File> = None;
+
         let mut ok = true;
         for op in self.instructions.pop().expect("this can never be empty") {
             if op(&mut state) == BREAK {
                 #[cfg(feature = "log_opcode")]
-                log::debug!("[0x{:x}] instruction {:?} [BREAK]", self.at, self.prev);
+                {
+                    let file = unsafe { OUT.as_mut().unwrap_or_else(|| {
+                        OUT = Some(std::fs::File::create("opcodes.log").unwrap()); OUT.as_mut().unwrap()
+                    } ) };
+                    file.write_all(format!("[0x{:x}] instruction {:?} [BREAK]", self.at, self.prev).as_bytes());
+                }
                 state.clear();
                 self.instructions.clear();
                 ok = false;
@@ -133,10 +140,15 @@ impl Cpu {
             Opcode::Calla16, Opcode::CallNZa16, Opcode::CallZa16, Opcode::CallNCa16,Opcode::CallCa16,
             Opcode::Rst00H, Opcode::Rst08H, Opcode::Rst10H, Opcode::Rst18H, Opcode::Rst28H, Opcode::Rst20H, Opcode::Rst30H, Opcode::Rst38H,
             Opcode::Jpa16, Opcode::Jrr8, Opcode::JpHL, Opcode::JrCr8, Opcode::JrZr8, Opcode::JrNCr8, Opcode::JrNZr8,
-            Opcode::JpCa16, Opcode::JpZa16, Opcode::JpNZa16, Opcode::JpNCa16, Opcode::Ei, Opcode::Di, Opcode::LdhInda8A, Opcode::LdhAInda8
+            Opcode::JpCa16, Opcode::JpZa16, Opcode::JpNZa16, Opcode::JpNCa16, Opcode::Ei, Opcode::Di
         ].contains(&self.prev) {
             #[cfg(feature = "log_opcode")]
-            log::debug!("[0x{:x}] instruction {:?}", self.at, self.prev);
+            {
+                let file = unsafe { OUT.as_mut().unwrap_or_else(|| {
+                    OUT = Some(std::fs::File::create("opcodes.log").unwrap()); OUT.as_mut().unwrap()
+                } ) };
+                file.write_all(format!("[0x{:x}] instruction {:?}", self.at, self.prev).as_bytes());
+            }
         }
         self.finished = self.instructions.is_empty();
     }

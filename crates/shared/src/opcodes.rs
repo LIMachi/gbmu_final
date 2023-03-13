@@ -257,7 +257,8 @@ pub enum Opcode {
     Ei              = 0xfb,
     Cpd8            = 0xfe,
     Rst38H          = 0xff,
-    CB(CBOpcode)    = 0x100
+    CB(CBOpcode)    = 0x100,
+    Invalid(u8)     = 0xffff
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -771,7 +772,7 @@ impl TryFrom<(u8, bool)> for Opcode {
             0xfb => Opcode::Ei,
             0xfe => Opcode::Cpd8,
             0xff => Opcode::Rst38H,
-            _ => return Err(Error::Invalid)
+            n => Opcode::Invalid(n)
         })
     }
 }

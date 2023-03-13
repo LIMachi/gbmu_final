@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::collections::HashMap;
-use std::ops::Deref;
 use winit::event::{WindowEvent};
 use winit::event_loop::{ControlFlow};
 use winit::window::{WindowId};

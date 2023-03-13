@@ -1,7 +1,9 @@
 use mem::oam::Sprite;
 use shared::io::LCDC;
 use shared::mem::{Mem};
-use crate::{Pixel, Ppu};
+use shared::winit::event::VirtualKeyCode::At;
+use crate::ppu::pixel::Attributes;
+use super::{Pixel, Ppu, fifo::*};
 
 #[derive(Debug)]
 enum State {
@@ -24,8 +26,7 @@ pub struct Fetcher {
     x: u8,
     y: u8,
     scanline: u8,
-    flip_x: bool,
-    flip_y: bool,
+    attrs: Attributes,
     tile: u16,
     mode: Mode,
     prev: Mode,
@@ -48,8 +49,7 @@ impl Fetcher {
             x: 0,
             y: tile_y,
             scanline,
-            flip_x: false,
-            flip_y: false,
+            attrs: Attributes::default(),
             tile: 0,
             mode: Mode::Bg,
             prev: Mode::Bg,
@@ -67,8 +67,7 @@ impl Fetcher {
         if let Mode::Sprite(Sprite { tile, flags, .. }, .. ) = mode {
             self.tile = tile as u16;
             self.state = State::DataLow;
-            self.flip_x = (flags & 0x20) != 0;
-            self.flip_y = (flags & 0x40) != 0;
+            self.attrs = Attributes(flags);
         }
         self.mode = mode;
         changed
@@ -84,8 +83,7 @@ impl Fetcher {
             return State::Tile;
         }
         self.clock = 0;
-        self.flip_y = false;
-        self.flip_x = false;
+        self.attrs = Attributes::default();
         let lcdc = LCDC(ppu.regs.lcdc.read());
         let ly = ppu.regs.ly.read();
         let scx = ppu.regs.scx.read();
@@ -95,15 +93,8 @@ impl Fetcher {
             (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
-        let bank = if ppu.regs.cgb.read() != 0 {
-            if let Mode::Sprite(Sprite { flags, .. }, _) = self.mode { (flags >> 2) & 0x1 } else { 0 }
-        } else { 0 };
-        // println!("{} ({:#06X}): [{x},{y}] (tile index {})",
-        //     if self.window_active() { "WINDOW" } else { "BG" },
-        //     if offset { 0x9C00 } else { 0x9800 },
-        //     (offset as u16) << 10 | y << 5 as u16 | x as u16
-        // );
-        self.tile = ppu.vram.read_bank(addr, bank as usize) as u16;
+        self.tile = ppu.vram.read_bank(addr, 0) as u16;
+        if ppu.regs.cgb.read() != 0 { self.attrs = Attributes(ppu.vram.read_bank(addr, 1)); }
         State::DataLow
     }
 
@@ -119,16 +110,12 @@ impl Fetcher {
             Mode::Window => ppu.win.y,
             Mode::Sprite(s, ..) => ly.wrapping_sub(s.y),
         } & wrap) as u16;
-        let y = if self.flip_y { wrap as u16 - y } else { y };
+        let y = if self.attrs.flip_y() { wrap as u16 - y } else { y };
         let addr = (match self.mode {
             Mode::Bg | Mode::Window => !(!lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
             Mode::Sprite( .. ) => 0
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
-        let bank = match (self.mode, ppu.regs.cgb.read()) {
-            (Mode::Sprite(sprite, _), 1) => (sprite.flags >> 2) & 0x1,
-            _ => 0
-        };
-        ppu.vram.read_bank(addr, bank as usize)
+        ppu.vram.read_bank(addr, self.attrs.bank())
     }
 
     fn data_low(&mut self, ppu: &Ppu) -> State {
@@ -141,7 +128,7 @@ impl Fetcher {
         State::DataHigh
     }
 
-    fn data_high(&mut self, ppu: &Ppu, fifo: &mut super::BgFifo, oam: &mut super::ObjFifo) -> State {
+    fn data_high(&mut self, ppu: &Ppu, fifo: &mut BgFifo, oam: &mut ObjFifo) -> State {
         if self.clock == 0 {
             self.clock = 1;
             return State::DataHigh;
@@ -155,30 +142,23 @@ impl Fetcher {
         }
     }
 
-    fn push(&mut self, ppu: &Ppu, bg: &mut super::BgFifo, oam: &mut super::ObjFifo) -> State {
+    fn push(&mut self, ppu: &Ppu, bg: &mut BgFifo, oam: &mut ObjFifo) -> State {
         if let (Some(low), Some(high)) = (self.low.take(), self.high.take()) {
-            let dmg = ppu.regs.bgp.read();
-            let index = if let Mode::Sprite(_, x) = self.mode { Some(x) } else { None };
-            let priority = if let Mode::Sprite(sp, _) = self.mode { Some((sp.flags >> 7) != 0) } else { None };
             let mut colors = [0; 8];
             colors.iter_mut().enumerate().for_each(|(i, c)| {
                 let x = 7 - i;
                 *c = ((low >> x) & 0x1) | (((high >> x) & 0x1) << 1);
             });
-            if self.flip_x { colors.reverse(); }
-            if let Mode::Sprite(sp, _n) = self.mode {
+            if self.attrs.flip_x() { colors.reverse(); }
+            if let Mode::Sprite(sp, n) = self.mode {
                 let s = 8u8.saturating_sub(sp.x) as usize;
                 colors.rotate_left(s);
                 colors[8-s..].iter_mut().for_each(|x| *x = 0);
-                oam.merge(colors.into_iter().map(|x| Pixel { color: x, palette: dmg, index, priority }).collect());
+                oam.merge(colors.into_iter().map(|x| Pixel::sprite(x, n, self.attrs)).collect());
                 self.set_mode(self.prev);
                 bg.enable();
             } else if bg.push(colors.into_iter().map(|x|
-                if ppu.regs.cgb.read() == 0 && !ppu.lcdc.priority() {
-                    Pixel::white(ppu.regs.bgp.read())
-                } else {
-                    Pixel { color: x, palette: dmg, index, priority }
-                }
+                Pixel::bg(if ppu.regs.cgb.read() == 0 && !ppu.lcdc.priority() { 0 } else { x }, self.attrs)
             ).collect()) {
                 self.x += 1;
             } else {
@@ -204,7 +184,7 @@ impl Fetcher {
         matches!(self.mode, Mode::Sprite( .. ))
     }
 
-    pub(crate) fn tick(&mut self, ppu: &Ppu, bg: &mut super::BgFifo, oam: &mut super::ObjFifo) {
+    pub(crate) fn tick(&mut self, ppu: &Ppu, bg: &mut BgFifo, oam: &mut ObjFifo) {
         self.state = match self.state {
             State::Tile => self.get_tile(ppu),
             State::DataLow => self.data_low(ppu),

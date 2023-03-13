@@ -17,7 +17,7 @@ pub enum WindowType {
     Debug(Debugger<Emulator>),
     Game(Emulator),
     Sprites(Emulator),
-    Keybindings
+    Settings(Emulator)
 }
 
 impl WindowType {
@@ -27,7 +27,7 @@ impl WindowType {
             WindowType::Game(_) => Handle::Game,
             WindowType::Debug(_) => Handle::Debug,
             WindowType::Sprites(_) => Handle::Sprites,
-            WindowType::Keybindings => Handle::Settings
+            WindowType::Settings(_) => Handle::Settings
         }
     }
 
@@ -37,7 +37,7 @@ impl WindowType {
                 .with_title("GBMU")
                 .with_min_inner_size(PhysicalSize::new(800, 600)),
             WindowType::Sprites(_) => WindowBuilder::new()
-                .with_title("Spritesheet")
+                .with_title("GBMU - Spritesheet")
                 .with_min_inner_size(PhysicalSize::new(1200, 860))
                 .with_resizable(false),
             WindowType::Game(_) => WindowBuilder::new()
@@ -48,7 +48,10 @@ impl WindowType {
                 .with_title("GBMU - debugger")
                 .with_min_inner_size(PhysicalSize::<u32>::from((1000, 750)))
                 .with_inner_size(PhysicalSize::new(1280, 720)),
-            WindowType::Keybindings => unimplemented!()
+            WindowType::Settings(_) => WindowBuilder::new()
+                .with_title("GBMU - settings")
+                .with_min_inner_size(PhysicalSize::<u32>::from((500, 500)))
+                .with_resizable(false),
         }.build(evt).unwrap()
     }
 
@@ -58,6 +61,7 @@ impl WindowType {
             WindowType::Game(emu) => RawContext::builder(emu),
             WindowType::Debug(ninja) => EguiContext::builder(ninja),
             WindowType::Sprites(emu) => EguiContext::builder(emu),
+            WindowType::Settings(emu) => EguiContext::builder(emu.settings()),
             _ => unimplemented!()
         }
     }
@@ -97,3 +101,4 @@ use shared::{Events, Handle};
 use shared::rom::Rom;
 use crate::emulator::Emulator;
 use crate::Menu;
+use crate::settings::Settings;

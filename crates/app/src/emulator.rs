@@ -21,6 +21,7 @@ use crate::render::{Event, Render};
 mod joy;
 
 pub use joy::Keybindings;
+use crate::settings::{Settings, Mode};
 
 pub struct Emu {
     speed: i32,
@@ -74,7 +75,8 @@ pub struct Emulator {
     audio: apu::Controller,
     bindings: Rc<RefCell<Keybindings>>,
     breakpoints: Breakpoints,
-    emu: Rc<RefCell<Emu>>
+    emu: Rc<RefCell<Emu>>,
+    cgb: Rc<RefCell<Mode>>,
 }
 
 impl Emulator {
@@ -85,8 +87,17 @@ impl Emulator {
             bindings,
             emu: Emu::default().cell(),
             audio: apu::Controller::new(&conf.sound),
-            breakpoints: Breakpoints::new(conf.debug.breaks.clone())
+            breakpoints: Breakpoints::new(conf.debug.breaks.clone()),
+            cgb: conf.mode.cell()
         }
+    }
+
+    pub fn settings(&self) -> Settings {
+        Settings::new(self.bindings.clone(), self.cgb.clone())
+    }
+
+    pub fn mode(&self) -> Mode {
+        *self.cgb.as_ref().borrow()
     }
 
     pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints) }
@@ -107,7 +118,7 @@ impl Emulator {
     }
 
     fn insert(&self, rom: Rom, running: bool) {
-        let mut emu = Emu::new(&self.audio, self.bindings.clone(), rom, running);
+        let mut emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(), running);
         self.emu.replace(emu);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -192,8 +203,7 @@ impl Emu {
     pub const CLOCK_PER_SECOND: u32 = 4_194_304;
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, running: bool) -> Self {
-        let gbc = false;
+    pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, cgb: bool, running: bool) -> Self {
         let lcd = lcd::Lcd::new();
         let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
@@ -202,9 +212,9 @@ impl Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
-        let mut bus = bus::Bus::new(gbc)
+        let mut bus = bus::Bus::new(cgb)
             .with_mbc(&mut mbc)
-            .with_wram(Wram::new(gbc))
+            .with_wram(Wram::new(cgb))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
             .configure(&mut timer)

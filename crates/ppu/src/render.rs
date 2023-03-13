@@ -2,6 +2,7 @@ use shared::egui::*;
 use shared::egui::epaint::ImageDelta;
 
 use super::*;
+use ppu::Ppu;
 
 mod tabs;
 mod tilemap;

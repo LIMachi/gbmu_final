@@ -258,6 +258,7 @@ pub fn decode(opcode: Opcode) -> &'static [&'static [Op]] {
         Opcode::Ei           => &[&[inc::pc, int::on]],
         Opcode::Cpd8         => &[&[inc::pc], &[read::mem, inc::pc, alu::cmp]],
         Opcode::Rst38H       => &[&[inc::pc, read::FIXED_38], &[dec::sp, read::pc, mem::split, mem::write_sp], &[write::mem, dec::sp, mem::write_sp], &[write::mem, write::pc]],
+        Opcode::Invalid(n)         => &[&[inc::pc]],
         Opcode::CB(opcode)   => decode_cb(opcode)
     }
 }
