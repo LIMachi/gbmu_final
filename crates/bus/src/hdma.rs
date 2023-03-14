@@ -48,6 +48,7 @@ pub struct Hdma {
     dest_low: IOReg, // FF54
     control: IOReg, // FF55
     stat: IOReg,
+    cgb: IOReg,
     transfer: Option<Transfer>
 }
 
@@ -55,6 +56,7 @@ impl Default for Hdma {
     fn default() -> Self {
         Self {
             transfer: None,
+            cgb: IOReg::unset(),
             stat: IOReg::unset(),
             src_high: IOReg::unset(),
             src_low: IOReg::unset(),
@@ -67,6 +69,7 @@ impl Default for Hdma {
 
 impl Hdma {
     pub fn tick(&mut self, bus: &mut dyn IOBus) -> bool {
+        if self.cgb.read() == 0 { return false };
         if self.control.dirty() {
             log::info!("HDMA started");
             self.control.reset_dirty();
@@ -108,6 +111,7 @@ impl Hdma {
 impl Device for Hdma {
     fn configure(&mut self, bus: &dyn IOBus) {
         self.stat = bus.io(IO::STAT);
+        self.cgb = bus.io(IO::CGB);
         self.src_high = bus.io(IO::HDMA1);
         self.src_low = bus.io(IO::HDMA2);
         self.dest_high = bus.io(IO::HDMA3);

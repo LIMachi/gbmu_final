@@ -138,12 +138,12 @@ impl IOBus for Bus {
         self.read(addr)
     }
 
-    fn value(&self, addr: u16) -> u8 {
-        self.value(addr)
-    }
-
     fn write(&mut self, addr: u16, value: u8) {
         self.write(addr, value)
+    }
+
+    fn value(&self, addr: u16) -> u8 {
+        self.value(addr)
     }
 }
 
@@ -162,11 +162,6 @@ impl shared::cpu::Bus for Bus {
             MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
             st => st
         };
-    }
-
-    #[cfg(feature = "doctor")]
-    fn direct_read(&self, offset: u16) -> u8 {
-        self.read(offset)
     }
 
     /// Debug function
@@ -191,5 +186,10 @@ impl shared::cpu::Bus for Bus {
 
     fn write(&mut self, addr: u16, value: u8) {
         self.write(addr, value);
+    }
+
+    #[cfg(feature = "doctor")]
+    fn direct_read(&self, offset: u16) -> u8 {
+        self.read(offset)
     }
 }

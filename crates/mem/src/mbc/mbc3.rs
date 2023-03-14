@@ -56,15 +56,20 @@ impl Mem for Mbc3 {
             ROM_BANK..=ROM_BANK_END => { let bank = value as usize % self.rom_banks;
                 self.rom_bank = if bank == 0 { 1 } else { bank };
             },
-            RAM_BANK..=RAM_BANK_END => self.ram_bank = (value as usize & 0xF) % self.ram_banks,
+            RAM_BANK..=RAM_BANK_END => self.ram_bank = value as usize & 0xF,
             LATCH..=LATCH_END => {
                 let old = self.latch;
                 self.latch = value != 0;
                 if !old && self.latch { self.rtc.latch(); }
             },
             SRAM..=SRAM_END => {
-                let addr = addr as usize + self.ram_bank as usize * RAM_SIZE;
-                self.ram[addr] = value;
+                match self.ram_bank {
+                    n @ 0x8..=0xC => self.rtc.write(n as u8, value),
+                    n => {
+                        let addr = addr as usize + n as usize * RAM_SIZE;
+                        self.ram[addr] = value;
+                    }
+                }
             },
             _ => {}
         }
@@ -80,7 +85,7 @@ impl Mem for Mbc3 {
                 let st = s + self.rom_bank * BANK_SIZE;
                 self.rom[st..end].to_vec()
             },
-            SRAM..=SRAM_END => {
+            SRAM..=SRAM_END if self.ram_bank < self.ram_banks => {
                 let s = s - SRAM as usize;
                 let st = s + RAM_SIZE * self.ram_bank as usize;
                 let end = (st + len as usize).min((self.ram_bank + 1) as usize * RAM_SIZE);

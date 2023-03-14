@@ -72,8 +72,9 @@ impl RtcSave {
     }
 
     pub fn deserialize(raw: Vec<u8>) -> Option<Self> {
-        let [ls, lm, lh, dl, dh] = raw[0..5] else { return None };
-        let [e0, e1, e2, e3, e4, e5, e6, e7] = raw[5..13] else { return None };
+        if raw.len() != 13 { return None; }
+        let [ls, lm, lh, dl, dh] = raw[0..5] else { unreachable!()  };
+        let [e0, e1, e2, e3, e4, e5, e6, e7] = raw[5..13] else { unreachable!() };
         let epoch = u64::from_le_bytes([e0, e1, e2, e3, e4, e5, e6, e7]);
         Some(Self { ls, lm, lh, dl, dh, epoch })
     }
