@@ -7,10 +7,12 @@ use shared::io::{IO, IOReg};
 use shared::utils::Cell;
 
 mod io;
+mod hdma;
 mod dma;
 mod timer;
 
 pub use dma::Dma;
+pub use hdma::Hdma;
 pub use timer::Timer;
 
 pub struct Empty {}

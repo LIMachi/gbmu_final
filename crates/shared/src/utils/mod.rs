@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 pub mod image;
 pub mod clock;
+pub mod rtc;
 
 pub trait Cell {
     fn cell(self) -> Rc<RefCell<Self>>;

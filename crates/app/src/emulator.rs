@@ -33,6 +33,7 @@ pub struct Emu {
     pub ppu: ppu::Controller,
     pub mbc: mbc::Controller,
     pub dma: bus::Dma,
+    pub hdma: bus::Hdma,
     pub timer: bus::Timer,
     pub apu: apu::Apu,
     running: bool
@@ -44,6 +45,7 @@ impl Default for Emu {
         let mut joy = joy::Joypad::new(Default::default());
         let mut mbc = mbc::Controller::unplugged();
         let mut dma = bus::Dma::default();
+        let mut hdma = bus::Hdma::default();
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
@@ -62,6 +64,7 @@ impl Default for Emu {
             mbc,
             cpu,
             dma,
+            hdma,
             bus,
             timer,
             running: false
@@ -209,6 +212,7 @@ impl Emu {
         let mut joy = joy::Joypad::new(bindings);
         let mut mbc = mem::mbc::Controller::new(&rom);
         let mut dma = bus::Dma::default();
+        let mut hdma = bus::Hdma::default();
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
@@ -217,6 +221,7 @@ impl Emu {
             .with_wram(Wram::new(cgb))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
+            .configure(&mut hdma)
             .configure(&mut timer)
             .configure(&mut cpu)
             .configure(&mut joy)
@@ -237,6 +242,7 @@ impl Emu {
             ppu,
             mbc,
             dma,
+            hdma,
             timer,
             rom: Some(rom),
             running,
@@ -248,11 +254,12 @@ impl Emu {
         if !self.running { return false; }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
             self.joy.tick();
-            if clock == 0 { // OR clock == 2 && cpu.double_speed()
+            self.dma.tick(&mut self.bus);
+            let tick = self.hdma.tick(&mut self.bus);
+            if !tick && (clock == 0 /*|| clock == 2 && self.cpu.double_speed()*/) { // OR clock == 2 && cpu.double_speed()
                 self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
             }
-            self.dma.tick(&mut self.bus);
             self.timer.tick();
             self.ppu.tick();
             self.apu.tick();

@@ -55,7 +55,7 @@ impl Controller {
             Mbcs::MBC0 => mbc0::Mbc0::new(rom, ram).cell(),
             Mbcs::MBC1 => mbc1::Mbc1::new(rom, ram).cell(),
             Mbcs::MBC2 => unimplemented!(),
-            Mbcs::MBC3 => unimplemented!(),
+            Mbcs::MBC3 => mbc3::Mbc3::new(rom, ram).cell(),
             Mbcs::MBC5 => mbc5::Mbc5::new(rom, ram).cell(),
             Mbcs::Unknown => unimplemented!()
         };

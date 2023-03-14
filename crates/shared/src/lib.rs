@@ -1,4 +1,5 @@
 #![feature(drain_filter)]
+#![feature(let_else)]
 
 use std::borrow::BorrowMut;
 pub use egui;
