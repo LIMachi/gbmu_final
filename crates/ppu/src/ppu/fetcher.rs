@@ -1,3 +1,4 @@
+use mem::lock::Source;
 use mem::oam::Sprite;
 use shared::io::LCDC;
 use shared::mem::{Mem};
@@ -93,8 +94,8 @@ impl Fetcher {
             (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
-        self.tile = ppu.vram.read_bank(addr, 0) as u16;
-        if ppu.regs.cgb.read() != 0 { self.attrs = Attributes(ppu.vram.read_bank(addr, 1)); }
+        self.tile = ppu.vram.get(Source::Ppu, |vram| vram.read_bank(addr, 0)) as u16;
+        if ppu.regs.cgb.read() != 0 { self.attrs = Attributes(ppu.vram.get(Source::Ppu, |v| v.read_bank(addr, 1))); }
         State::DataLow
     }
 
@@ -115,7 +116,7 @@ impl Fetcher {
             Mode::Bg | Mode::Window => !(!lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
             Mode::Sprite( .. ) => 0
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
-        ppu.vram.read_bank(addr, self.attrs.bank())
+        ppu.vram.get(Source::Ppu, |v| v.read_bank(addr, self.attrs.bank()))
     }
 
     fn data_low(&mut self, ppu: &Ppu) -> State {

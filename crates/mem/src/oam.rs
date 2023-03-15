@@ -11,6 +11,10 @@ pub struct Sprite {
 impl Sprite {
     pub fn screen_x(&self) -> u8 { self.x.wrapping_sub(8) }
     pub fn screen_y(&self) -> u8 { self.y.wrapping_sub(16) }
+
+    pub fn unavailable() -> Self {
+        Self { x: 0xFF, y: 0xFF, tile: 0xFF, flags: 0xFF }
+    }
 }
 
 impl Mem for Sprite {

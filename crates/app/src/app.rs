@@ -217,7 +217,7 @@ impl shared::Ui for Menu {
     }
 
     fn draw(&mut self, ctx: &mut Context) {
-        for (path, mut rom) in self.receiver.try_recv() {
+        while let Ok((path, mut rom)) = self.receiver.try_recv() {
             println!("found rom {:?} at {}", rom.header, path);
             if !self.roms.contains_key(&path) {
                 self.add_cover(&path, &mut rom, ctx);

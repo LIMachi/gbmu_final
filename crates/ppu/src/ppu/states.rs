@@ -1,4 +1,6 @@
 use std::fmt::{Debug, Formatter, Write};
+use mem::lock::Source;
+use mem::oam::Sprite;
 use super::{
     Ppu, fifo::{BgFifo, ObjFifo}, Scroll, fetcher::{self, Fetcher}
 };
@@ -71,9 +73,9 @@ impl State for OamState {
             ppu.sprites.clear();
             ppu.win.scan_enabled = ppu.regs.wy.read() <= ly;
         }
-        let oam = ppu.oam.sprites[self.sprite];
-        if ly + if ppu.lcdc.obj_tall() { 0 } else { 8 } < oam.y && ly + 16 >= oam.y && ppu.sprites.len() < 10 {
-            ppu.sprites.push(oam);
+        let y = ppu.oam.get(Source::Ppu, |oam| oam.sprites[self.sprite].y);
+        if ly + if ppu.lcdc.obj_tall() { 0 } else { 8 } < y && ly + 16 >= y && ppu.sprites.len() < 10 {
+            ppu.sprites.push(self.sprite);
         }
         self.sprite += 1;
         if self.sprite == 40 {
@@ -109,9 +111,11 @@ impl State for TransferState {
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled() && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
             for i in idx..ppu.sprites.len() {
-                if ppu.sprites[i].screen_x() == self.lx || (ppu.sprites[i].x != 0 && ppu.sprites[i].x < 8 && self.lx == 0) {
+                let sprite = ppu.oam.get_mut(Some(Source::Ppu)).map(|x| x.sprites[ppu.sprites[i]])
+                    .unwrap_or_else(|| Sprite::unavailable());
+                if sprite.screen_x() == self.lx || (sprite.x != 0 && sprite.x < 8 && self.lx == 0) {
                     self.sprite = Some(i);
-                    self.fetcher.set_mode(fetcher::Mode::Sprite(ppu.sprites[i], self.lx));
+                    self.fetcher.set_mode(fetcher::Mode::Sprite(sprite, self.lx));
                     self.bg.disable();
                     break ;
                 }

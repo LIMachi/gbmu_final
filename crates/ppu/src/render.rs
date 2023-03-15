@@ -98,7 +98,7 @@ impl shared::Ui for Controller {
         let tiles: Vec<usize> = { self.ppu.as_ref().borrow_mut().tile_cache.drain().collect() };
         let ppu = self.ppu.as_ref().borrow();
         for n in tiles {
-            let buf = PixelBuffer::<8, 8>::new(ppu.vram.tile_data(n, 0)).image::<64, 64>();
+            let buf = PixelBuffer::<8, 8>::new(ppu.vram.inner().tile_data(n, 0)).image::<64, 64>();
             ctx.tex_manager()
                 .write()
                 .set(self.storage.get(&Textures::Tile(n)).unwrap().id(), ImageDelta::full(buf, TextureOptions::NEAREST));

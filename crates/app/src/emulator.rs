@@ -203,10 +203,11 @@ impl dbg::Schedule for Emulator {
 
 impl Emu {
     // pub const CLOCK_PER_SECOND: u32 = 4_194_304 / 8;
-    pub const CLOCK_PER_SECOND: u32 = 4_194_304;
+    pub const CLOCK_PER_SECOND: u32 = 4_194_304 / 2;
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, cgb: bool, running: bool) -> Self {
+        let compat = cgb && !rom.header.kind.requires_gbc();
         let lcd = lcd::Lcd::new();
         let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
@@ -216,7 +217,7 @@ impl Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
-        let mut bus = bus::Bus::new(cgb, !rom.header.kind.requires_gbc())
+        let mut bus = bus::Bus::new(cgb, compat)
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(cgb))
             .with_ppu(&mut ppu)
@@ -232,7 +233,9 @@ impl Emu {
         IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
         IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
         cpu.skip_boot();
-
+        log::info!("cartridge: {} | device: {} DMG compatibility mode: {}",
+            rom.header.title, if cgb { "CGB" } else { "DMG" }, if compat { "enabled" } else { "disabled" }
+        );
         Self {
             speed: Default::default(),
             joy,
@@ -256,7 +259,7 @@ impl Emu {
             self.joy.tick();
             self.dma.tick(&mut self.bus);
             let tick = self.hdma.tick(&mut self.bus);
-            if !tick && (clock == 0 /*|| clock == 2 && self.cpu.double_speed()*/) { // OR clock == 2 && cpu.double_speed()
+            if !tick && (clock == 0 /*|| clock == 2 && self.cpu.double_speed()*/) {
                 self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
                 self.cpu.cycle(&mut self.bus);
             }

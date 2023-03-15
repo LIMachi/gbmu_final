@@ -50,7 +50,7 @@ impl Apu {
         let channels = vec![
             Channel::sweep(),
             Channel::pulse(),
-            // Channel::wave(),
+            Channel::wave(),
             // Channel::noise(),
         ];
         Self {

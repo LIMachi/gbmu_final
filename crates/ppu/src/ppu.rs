@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use lcd::{Lcd, LCD};
 use mem::oam::Sprite;
-use mem::{Oam, Vram};
+use mem::{Lock, Oam, Vram};
 use shared::io::LCDC;
 use shared::mem::{Device, IOBus, Mem, *};
 use shared::utils::image::Image;
@@ -54,29 +54,32 @@ pub(crate) struct Scroll {
 pub(crate) struct Ppu {
     pub(crate) tile_cache: HashSet<usize>,
     pub(crate) dots: usize,
-    pub(crate) oam: Oam,
-    pub(crate) vram: Vram,
+    pub(crate) oam: Lock<Oam>,
+    pub(crate) vram: Lock<Vram>,
     pub(crate) state: Box<dyn State>,
     pub(crate) regs: Registers,
     pub(crate) cram: cram::CRAM,
-    pub(crate) sprites: Vec<Sprite>,
+    pub(crate) sprites: Vec<usize>,
     pub(crate) lcd: Lcd,
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
     pub(crate) tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>,
     pub(crate) lcdc: LCDC,
+    locked: bool
 }
 
 impl Ppu {
     pub fn new(lcd: Lcd) -> Self {
+        use mem::lock::Locked;
         let sprites = Vec::with_capacity(10);
         Self {
+            locked: false,
             sc: Scroll::default(),
             tile_cache: HashSet::with_capacity(384),
             dots: 0,
-            oam: Oam::new(),
-            vram: Vram::new(),
+            oam: Oam::new().lock(),
+            vram: Vram::new().lock(),
             regs: Registers::default(),
             cram: cram::CRAM::default(),
             state: Box::new(VState::new()),
@@ -133,7 +136,7 @@ impl Ppu {
     }
 
     pub fn sprite(&self, index: usize) -> Sprite {
-        self.oam.sprites[index]
+        self.oam.inner().sprites[index]
     }
 
     pub fn set(&mut self, lx: usize, ly: usize, pixel: Pixel) {
