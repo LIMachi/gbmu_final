@@ -89,6 +89,22 @@ impl Ppu {
         }
     }
 
+    fn set_state(&mut self, state: Box<dyn State>) {
+        let mode = state.mode();
+        self.state = state;
+        self.regs.stat.reset(0);
+        self.regs.stat.reset(1);
+        if (mode as u8 & 0x1) != 0 { self.regs.stat.set(0); }
+        if (mode as u8 & 0x2) != 0 { self.regs.stat.set(1); }
+        let input = self.regs.stat.bit(3) != 0 && mode == Mode::HBlank;
+        let input = input || (self.regs.stat.bit(4) != 0 && mode == Mode::VBlank);
+        let input = input || (self.regs.stat.bit(5) != 0 && mode == Mode::Search);
+        let input = input || (self.regs.stat.bit(6) != 0 && self.regs.stat.bit(2) != 0);
+        if self.stat.tick(input) {
+            self.regs.interrupt.set(1);
+        }
+    }
+
     pub(crate) fn tick(&mut self) {
         self.cram.tick();
         let lcdc = LCDC(self.regs.lcdc.read());
@@ -102,30 +118,17 @@ impl Ppu {
         self.dots += 1;
         if self.lcdc.enabled() {
             if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
-            let mut state = std::mem::replace(&mut self.state, Box::new(OamState::new()));
-            self.state = if let Some(next) = state.tick(self) {
+            let mut state = std::mem::replace(&mut self.state, OamState::new().boxed());
+            if let Some(next) = state.tick(self) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     self.dots = 0;
                     self.lcd.enable();
                 }
-                next
-            } else { state };
+                self.set_state(next);
+            } else { self.state = state; };
         } else if self.dots == 65664 {
-            self.state = Box::new(VState::immediate());
-        }
-        let mode = self.state.mode();
-        // TODO move this back to next state.
-        self.regs.stat.reset(0);
-        self.regs.stat.reset(1);
-        if (mode as u8 & 0x1) != 0 { self.regs.stat.set(0); }
-        if (mode as u8 & 0x2) != 0 { self.regs.stat.set(1); }
-        let input = self.regs.stat.bit(3) != 0 && mode == Mode::HBlank;
-        let input = input || (self.regs.stat.bit(4) != 0 && mode == Mode::VBlank);
-        let input = input || (self.regs.stat.bit(5) != 0 && mode == Mode::Search);
-        let input = input || (self.regs.stat.bit(6) != 0 && self.regs.stat.bit(2) != 0);
-        if self.stat.tick(input) {
-            self.regs.interrupt.set(1);
+            self.set_state(VState::immediate().boxed());
         }
     }
 

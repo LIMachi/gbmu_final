@@ -62,7 +62,8 @@ impl Mem for Mbc1 {
             SRAM..=SRAM_END => {
                 if self.ram_enable {
                     let bank = if self.bank_mode && self.ram_banks > 1 { self.ram_bank } else { 0 };
-                    self.ram[(addr & 0x1FFF) as usize | (bank << 13)] = value;
+                    let addr = (addr & 0x1FFF) as usize | (bank << 13);
+                    if addr < self.ram.len() { self.ram[addr] = value; }
                 }
             },
             _ => {}

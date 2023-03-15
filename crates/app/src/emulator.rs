@@ -50,7 +50,7 @@ impl Default for Emu {
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
         let mut apu = apu::Apu::default();
-        let mut bus = bus::Bus::new(false)
+        let mut bus = bus::Bus::new(false, false)
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
             .with_ppu(&mut ppu);
@@ -216,7 +216,7 @@ impl Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();
-        let mut bus = bus::Bus::new(cgb)
+        let mut bus = bus::Bus::new(cgb, !rom.header.kind.requires_gbc())
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(cgb))
             .with_ppu(&mut ppu)

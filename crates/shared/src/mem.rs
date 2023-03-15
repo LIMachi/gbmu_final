@@ -63,6 +63,8 @@ pub trait IOBus {
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, value: u8);
     fn value(&self, addr: u16) -> u8;
+
+    fn is_cgb(&self) -> bool;
 }
 
 pub trait Device {

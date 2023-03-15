@@ -40,6 +40,10 @@ impl Op {
     pub fn is_call(&self) -> bool {
         self.instruction.contains("CALL") || self.instruction.contains("RST")
     }
+
+    pub fn is_jmp(&self) -> bool {
+        self.instruction.contains("JR") || self.instruction.contains("JP")
+    }
 }
 
 impl Default for Op {

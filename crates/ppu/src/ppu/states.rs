@@ -128,6 +128,9 @@ impl State for TransferState {
             if self.lx == 160 {
                 if ppu.win.enabled { ppu.win.y += 1; }
                 ppu.win.enabled = false;
+                if self.dots > 289 {
+                    log::warn!("transfer took {} dots", self.dots);
+                }
                 return Some(HState::new(376usize.saturating_sub(self.dots)).boxed())
             }
         }

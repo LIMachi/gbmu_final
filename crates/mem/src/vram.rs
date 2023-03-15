@@ -101,7 +101,7 @@ impl Vram {
 
 impl Device for Vram {
     fn configure(&mut self, bus: &dyn IOBus) {
-        if bus.io(IO::CGB).read() != 0 {
+        if bus.is_cgb() {
             self.mem = Storage::CGB([0; BANK_SIZE as usize * 2]);
             self.bank = bus.io(IO::VBK);
         }

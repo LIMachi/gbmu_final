@@ -31,6 +31,19 @@ impl Default for CRAM {
     }
 }
 
+trait Rgb555 {
+    fn to_bytes(self) -> [u8; 3];
+}
+
+impl Rgb555 for u16 {
+    fn to_bytes(self) -> [u8; 3] {
+        let r = (self & 0x1F) as u8;
+        let g = (self >> 5) as u8 & 0x1F;
+        let b = (self >> 10) as u8 & 0x1F;
+        [r << 3 | r >> 2, g << 3 | g >> 2, b << 3 | b >> 2]
+    }
+}
+
 impl CRAM {
     pub fn color(&self, pixel: super::Pixel) -> [u8; 3] {
         const DMG_COLORS: [[u8; 3]; 4] = [[0xBF; 3], [0x7F; 3], [0x3F; 3], [0; 3]];
@@ -47,12 +60,12 @@ impl CRAM {
             (c, a, true, true) => {
                 let palette = a.palette();
                 let rgb555 = self.objdata[palette * 8 + c as usize * 2] as u16 | (self.objdata[palette * 8 + c as usize * 2 + 1] as u16) << 8;
-                [((rgb555 & 0x1F) as u8) << 2, (((rgb555 >> 5) as u8) & 0x1F) << 2, (((rgb555 >> 10) as u8) & 0x1F) << 2]
+                rgb555.to_bytes()
             },
             (c, a, false, true) => {
                 let palette = a.palette();
                 let rgb555 = self.bgdata[palette * 8 + c as usize * 2] as u16 | (self.bgdata[palette * 8 + c as usize * 2 + 1] as u16) << 8;
-                [((rgb555 & 0x1F) as u8) << 2, (((rgb555 >> 5) as u8) & 0x1F) << 2, (((rgb555 >> 10) as u8) & 0x1F) << 2]
+                rgb555.to_bytes()
             },
         }
     }

@@ -84,8 +84,8 @@ impl<E: Emulator> Ninja<E> {
 
     pub fn step(&mut self) {
         if let Some((pc, op)) = self.disassembly.next(&self.emu) {
-            if op.is_call() { self.breakpoints.schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()); }
-            else { self.breakpoints.step(); }
+            if op.is_jmp() { self.breakpoints.step() }
+            else { self.breakpoints.schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()) }
         } else { self.breakpoints.step(); }
         self.play();
     }

@@ -30,13 +30,15 @@ pub struct Bus {
     un_1: Rc<RefCell<dyn Mem>>,
     io: io::IORegs,
     ie: IOReg,
-    status: MemStatus
+    status: MemStatus,
+    cgb: bool,
 }
 
 impl Bus {
-    pub fn new(cgb: bool) -> Self {
+    pub fn new(cgb: bool, compat: bool) -> Self {
         Self {
-            io: io::IORegs::init(cgb),
+            cgb,
+            io: io::IORegs::init(compat),
             rom: Empty { }.cell(),
             srom: Empty { }.cell(),
             sram: Empty { }.cell(),
@@ -145,6 +147,8 @@ impl IOBus for Bus {
     fn value(&self, addr: u16) -> u8 {
         self.value(addr)
     }
+
+    fn is_cgb(&self) -> bool { self.cgb }
 }
 
 impl shared::cpu::Bus for Bus {

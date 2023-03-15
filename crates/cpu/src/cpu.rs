@@ -135,6 +135,7 @@ impl Cpu {
                 break;
             }
         }
+        #[cfg(feature = "log_opcode")]
         if ok && self.instructions.is_empty() && [
             Opcode::Ret, Opcode::Reti, Opcode::RetNZ, Opcode::RetNC, Opcode::RetC, Opcode::RetZ,
             Opcode::Calla16, Opcode::CallNZa16, Opcode::CallZa16, Opcode::CallNCa16,Opcode::CallCa16,
@@ -142,13 +143,10 @@ impl Cpu {
             Opcode::Jpa16, Opcode::Jrr8, Opcode::JpHL, Opcode::JrCr8, Opcode::JrZr8, Opcode::JrNCr8, Opcode::JrNZr8,
             Opcode::JpCa16, Opcode::JpZa16, Opcode::JpNZa16, Opcode::JpNCa16, Opcode::Ei, Opcode::Di
         ].contains(&self.prev) {
-            #[cfg(feature = "log_opcode")]
-            {
-                let file = unsafe { OUT.as_mut().unwrap_or_else(|| {
-                    OUT = Some(std::fs::File::create("opcodes.log").unwrap()); OUT.as_mut().unwrap()
-                } ) };
-                file.write_all(format!("[0x{:x}] instruction {:?}", self.at, self.prev).as_bytes());
-            }
+            let file = unsafe { OUT.as_mut().unwrap_or_else(|| {
+                OUT = Some(std::fs::File::create("opcodes.log").unwrap()); OUT.as_mut().unwrap()
+            } ) };
+            file.write_all(format!("[0x{:x}] instruction {:?}", self.at, self.prev).as_bytes());
         }
         self.finished = self.instructions.is_empty();
     }
