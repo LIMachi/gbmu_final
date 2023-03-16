@@ -5,6 +5,7 @@
 Cargo.lock
 *.log
 *.sav
+*.rtc
 tests/
 gbmu.conf
 gbmu.ron
