@@ -204,7 +204,11 @@ impl dbg::Schedule for Emulator {
 
 impl Emu {
     // pub const CLOCK_PER_SECOND: u32 = 4_194_304 / 8;
+    #[cfg(feature = "debug")]
     pub const CLOCK_PER_SECOND: u32 = 4_194_304 / 2;
+    #[cfg(not(feature = "debug"))]
+    pub const CLOCK_PER_SECOND: u32 = 4_194_304;
+
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, cgb: bool, running: bool) -> Self {

@@ -47,11 +47,14 @@ impl Apu {
     }
 
     pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
+        #[cfg(feature = "debug")]
+        let channels = vec![];
+        #[cfg(not(feature = "debug"))]
         let channels = vec![
             Channel::sweep(),
             Channel::pulse(),
             Channel::wave(),
-            // Channel::noise(),
+            Channel::noise(),
         ];
         Self {
             fedge: FEdge::default(),
