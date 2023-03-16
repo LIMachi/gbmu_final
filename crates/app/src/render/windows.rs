@@ -42,7 +42,7 @@ impl Windows {
     }
 
     pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow) {
-        for (_, mut win) in &mut self.windows {
+        for (_, win) in &mut self.windows {
             win.handle(event);
         }
         match event {
@@ -68,7 +68,7 @@ impl Windows {
     }
 
     pub fn update(&mut self) {
-        for mut window in self.windows.values_mut() {
+        for window in self.windows.values_mut() {
             window.request_redraw();
         }
     }

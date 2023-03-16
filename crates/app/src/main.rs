@@ -42,7 +42,7 @@ impl App {
         let proxy = e.create_proxy();
         let conf = AppConfig::load();
         let bindings = conf.keys.clone().cell();
-        let mut emu = emulator::Emulator::new(proxy.clone(), bindings.clone(), &conf);
+        let emu = emulator::Emulator::new(proxy.clone(), bindings.clone(), &conf);
         let roms = conf.roms.cell();
         let dbg = Debugger::new(emu.clone());
         Self {
@@ -95,7 +95,7 @@ impl App {
 
     pub fn run<F: 'static + FnMut(&mut App)>(mut self, mut handler: F) -> ! {
         let event = self.event_loop.take().expect("yeah no");
-        event.run(move |mut event: Event, target: &EventLoopWindowTarget<Events>, flow: &mut ControlFlow| {
+        event.run(move |event: Event, target: &EventLoopWindowTarget<Events>, flow: &mut ControlFlow| {
             flow.set_poll();
             self.handle_events(&event, target, flow);
             match event {
@@ -129,11 +129,10 @@ impl App {
 
 fn main() {
     log::init();
-    let mut app = App::new();
+    let app = App::new();
     let menu = WindowType::Main(app.menu());
     let mut st = Chrono::new();
     let mut current = std::time::Instant::now();
-    let mut s = 0;
     let mut acc = 0.0;
     let mut cycles = 0;
     let mut clock = Clock::new(4);

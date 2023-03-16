@@ -89,7 +89,7 @@ impl TransferState {
     pub(crate) fn new(ppu: &Ppu) -> Self where Self: Sized {
         let ly = ppu.regs.ly.read();
         let scx = ppu.regs.scx.read() & 0x7;
-        Self { sprite: None, dots: 0, lx: 0, ly, scx, fetcher: Fetcher::new(ly / 8, ly % 8), bg: BgFifo::new(), oam: ObjFifo::new() }
+        Self { sprite: None, dots: 0, lx: 0, ly, scx, fetcher: Fetcher::new(), bg: BgFifo::new(), oam: ObjFifo::new() }
     }
 }
 

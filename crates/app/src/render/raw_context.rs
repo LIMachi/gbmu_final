@@ -3,15 +3,14 @@ use super::*;
 
 pub struct RawContext<Data: 'static + Render> {
     inner: Data,
-    proxy: Proxy,
     window: Window
 }
 
 impl<Data: 'static + Render> RawContext<Data> {
     pub fn builder(mut data: Data) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
-        Box::new(move |instance, window, proxy| {
+        Box::new(move |instance, window, _proxy| {
             data.init(&window);
-            Box::new(Self { inner: data, proxy, window })
+            Box::new(Self { inner: data, window })
         })
     }
 }
@@ -21,8 +20,8 @@ impl<Data: 'static + Render> Context for RawContext<Data> {
         &mut self.window
     }
 
-    fn redraw(&mut self) -> Flow {
-        self.inner.render(); CONTINUE
+    fn redraw(&mut self) {
+        self.inner.render();
     }
 
     fn request_redraw(&mut self) {

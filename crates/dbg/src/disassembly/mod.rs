@@ -1,11 +1,10 @@
-use std::cell::RefMut;
 use std::collections::HashMap;
-use std::ops::{Range, RangeBounds};
+use std::ops::Range;
 use egui_extras::{Column, TableBuilder};
-use shared::breakpoints::{Break, Breakpoint, Breakpoints};
+use shared::breakpoints::{Breakpoint, Breakpoints};
 use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
-use shared::egui::{Align, Color32, Rounding, Sense, Ui, Vec2};
+use shared::egui::{Align, Color32, Rounding, Ui, Vec2};
 use shared::mem::*;
 use crate::Emulator;
 
@@ -37,9 +36,9 @@ impl Op {
         })
     }
 
-    pub fn is_call(&self) -> bool {
-        self.instruction.contains("CALL") || self.instruction.contains("RST")
-    }
+    // pub fn is_call(&self) -> bool {
+    //     self.instruction.contains("CALL") || self.instruction.contains("RST")
+    // }
 
     pub fn is_jmp(&self) -> bool {
         self.instruction.contains("JR") || self.instruction.contains("JP")
@@ -94,8 +93,6 @@ impl OpRange {
 
 #[derive(Default)]
 struct RomRange(OpRange);
-
-struct RawRange(u16, u16, OpRange);
 
 struct DynRange(u16, u16, OpRange);
 

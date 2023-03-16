@@ -10,7 +10,6 @@ mod memory;
 mod render;
 
 use disassembly::Disassembly;
-use shared::breakpoints::Break;
 use shared::egui::{TextureHandle, TextureId};
 use shared::mem::{IOBus};
 

@@ -81,9 +81,7 @@ impl Channel {
     pub fn wave() -> Self {
         Self::new(WaveChannel::new())
     }
-    pub fn noise() -> Self {
-        Self::new(NoiseChannel::new())
-    }
+    pub fn noise() -> Self { Self::new(NoiseChannel::new()) }
 
     pub fn enable(&mut self) { self.enabled = true; self.inner.on_enable(); }
     pub fn disable(&mut self) { self.enabled = false; self.inner.on_disable(); }

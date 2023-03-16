@@ -272,11 +272,11 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         self.schedule(self.render_data.breakpoint());
                                     }
                                 });
-                                let mut table = egui_extras::TableBuilder::new(ui)
+                                egui_extras::TableBuilder::new(ui)
                                     .columns(Column::remainder(), 3)
                                     .striped(true)
-                                    .cell_layout(Layout::left_to_right(Align::Center));
-                                table.body(|mut body| {
+                                    .cell_layout(Layout::left_to_right(Align::Center))
+                                    .body(|mut body| {
                                         self.breakpoints().drain_filter(|bp| {
                                             if bp.temp() { return false };
                                             let mut rem = false;

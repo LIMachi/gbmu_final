@@ -1,8 +1,6 @@
 use mem::lock::Source;
 use mem::oam::Sprite;
 use shared::io::LCDC;
-use shared::mem::{Mem};
-use shared::winit::event::VirtualKeyCode::At;
 use crate::ppu::pixel::Attributes;
 use super::{Pixel, Ppu, fifo::*};
 
@@ -25,8 +23,6 @@ pub enum Mode {
 pub struct Fetcher {
     clock: u8,
     x: u8,
-    y: u8,
-    scanline: u8,
     attrs: Attributes,
     tile: u16,
     mode: Mode,
@@ -36,20 +32,12 @@ pub struct Fetcher {
     state: State,
 }
 
-const TILE_MAP_1: u16 = 0x9800;
-const TILE_MAP_2: u16 = 0x9C00;
-const RELATIVE: u16 = 0x9000;
-
 impl Fetcher {
-    const WIN_OFFSET: u8 = 7;
-
-    pub fn new(tile_y: u8, scanline: u8) -> Self {
+    pub fn new() -> Self {
         Fetcher {
             clock: 0,
             state: State::Tile,
             x: 0,
-            y: tile_y,
-            scanline,
             attrs: Attributes::default(),
             tile: 0,
             mode: Mode::Bg,
@@ -91,7 +79,7 @@ impl Fetcher {
         let scy = ppu.regs.scy.read();
         let (offset, y, x) = match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
             (false, n , _) => (n, ly.wrapping_add(scy) as u16 / 8, (self.x + scx / 8) & 0x1F), //bg tile (LCDC.3)
-            (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6)
+            (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6) TODO INVESTIGATE THIS, IT STINKS (self.x)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
         self.tile = ppu.vram.get(Source::Ppu, |vram| vram.read_bank(addr, 0)) as u16;

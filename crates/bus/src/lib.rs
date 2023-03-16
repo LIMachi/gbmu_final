@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
 use mem::Hram;
@@ -24,7 +23,6 @@ pub struct Bus {
     vram: Rc<RefCell<dyn Mem>>,
     sram: Rc<RefCell<dyn Mem>>,
     ram: Rc<RefCell<dyn Mem>>,
-    echo: Rc<RefCell<dyn Mem>>, // Fuck off
     oam: Rc<RefCell<dyn Mem>>,
     hram: Rc<RefCell<dyn Mem>>,
     un_1: Rc<RefCell<dyn Mem>>,
@@ -44,7 +42,6 @@ impl Bus {
             sram: Empty { }.cell(),
             vram: Empty { }.cell(),
             ram: Empty { }.cell(),
-            echo: Empty { }.cell(),
             oam: Empty { }.cell(),
             hram: Hram::new().cell(),
             un_1: Empty { }.cell(),
@@ -65,8 +62,7 @@ impl Bus {
             UN_1..=UN_1_END => self.un_1.borrow().read(addr - UN_1, addr),
             IO..=IO_END => self.io.read(addr - IO, addr),
             HRAM..=HRAM_END => self.hram.borrow().read(addr - HRAM, addr),
-            END => self.ie.read(),
-            _=> unreachable!()
+            END => self.ie.read()
         }
     }
 
@@ -82,8 +78,7 @@ impl Bus {
             UN_1..=UN_1_END => self.un_1.borrow().value(addr - UN_1, addr),
             IO..=IO_END => self.io.value(addr - IO, addr),
             HRAM..=HRAM_END => self.hram.borrow().value(addr - HRAM, addr),
-            END => self.ie.read(),
-            _=> unreachable!()
+            END => self.ie.read()
         }
     }
 
@@ -99,8 +94,7 @@ impl Bus {
             UN_1..=UN_1_END => self.un_1.as_ref().borrow_mut().write(addr - UN_1, value, addr),
             IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.as_ref().borrow_mut().write(addr - HRAM, value, addr),
-            END => { self.ie.write(0, value, addr) },
-            e => unreachable!("wrote address {e:#06X}")
+            END => { self.ie.write(0, value, addr) }
         }
     }
 }
@@ -183,8 +177,7 @@ impl shared::cpu::Bus for Bus {
             IO..=IO_END => self.io.get_range(start, len),
             HRAM..=HRAM_END => self.hram.as_ref().borrow_mut().get_range(start, len),
             END => self.rom.as_ref().borrow_mut().get_range(start, len),
-            ECHO..=ECHO_END => self.ram.as_ref().borrow_mut().get_range(start - ECHO + RAM, len),
-            _ => unreachable!()
+            ECHO..=ECHO_END => self.ram.as_ref().borrow_mut().get_range(start - ECHO + RAM, len)
         }
     }
 

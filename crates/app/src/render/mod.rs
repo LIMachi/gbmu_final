@@ -71,13 +71,9 @@ pub type Event<'a> = winit::event::Event<'a, Events>;
 pub type Proxy = winit::event_loop::EventLoopProxy<Events>;
 pub type EventLoop = winit::event_loop::EventLoop<Events>;
 
-pub type Flow = std::ops::ControlFlow<()>;
-pub const CONTINUE: Flow = Flow::Continue(());
-pub const BREAK: Flow = Flow::Break(());
-
 pub trait Context {
     fn inner(&mut self) -> &mut Window;
-    fn redraw(&mut self) -> Flow;
+    fn redraw(&mut self);
     fn request_redraw(&mut self);
 
     fn resize(&mut self, physical: PhysicalSize<u32>);

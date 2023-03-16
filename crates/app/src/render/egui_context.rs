@@ -13,7 +13,6 @@ pub struct EguiContext<U: Ui> {
     window: Window,
     surface: wgpu::Surface,
     rpass: RenderPass,
-    proxy: Proxy,
     platform: Platform,
     inner: egui::Context,
     config: SurfaceConfiguration,
@@ -23,7 +22,7 @@ pub struct EguiContext<U: Ui> {
 }
 
 impl<U: 'static + Ui> EguiContext<U> {
-    pub fn new(instance: &Instance, window: Window, proxy: Proxy, mut data: U) -> Self {
+    pub fn new(instance: &Instance, window: Window, mut data: U) -> Self {
         let surface = unsafe { instance.create_surface(&window) };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -72,15 +71,14 @@ impl<U: 'static + Ui> EguiContext<U> {
             platform,
             rpass,
             device,
-            proxy,
             queue,
             descriptor
         }
     }
 
     pub fn builder(data: U) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
-        Box::new(move |instance, window, event|
-            Box::new(Self::new(instance, window, event, data)))
+        Box::new(move |instance, window, _|
+            Box::new(Self::new(instance, window, data)))
     }
 }
 
@@ -89,13 +87,13 @@ impl<U: 'static + Ui> Context for EguiContext<U> {
         &mut self.window
     }
 
-    fn redraw(&mut self) -> Flow {
+    fn redraw(&mut self) {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
-            Err(wgpu::SurfaceError::Outdated) => return CONTINUE,
+            Err(wgpu::SurfaceError::Outdated) => return,
             Err(e) => {
                 error!("Dropped frame: {e:?}");
-                return CONTINUE;
+                return ;
             }
         };
         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -118,7 +116,6 @@ impl<U: 'static + Ui> Context for EguiContext<U> {
         self.queue.submit(std::iter::once(encoder.finish()));
         frame.present();
         self.rpass.remove_textures(delta).expect("gpu crashed. oh well.");
-        CONTINUE
     }
 
     fn request_redraw(&mut self) {

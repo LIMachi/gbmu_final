@@ -1,8 +1,6 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use shared::io::IOReg;
 use shared::utils::Cell;
 use shared::winit as winit;
 
@@ -23,7 +21,7 @@ impl LCD for Lcd {
         if !lcd.enabled {
             return ;
         }
-        if let Some(mut pixels) = lcd.pixels.as_mut() {
+        if let Some(pixels) = lcd.pixels.as_mut() {
             let frame = pixels.get_frame_mut();
             let f = (Lcd::WIDTH * 4) as usize;
             frame[x * 4 + 0 + y * f] = color[0];
@@ -40,7 +38,7 @@ impl LCD for Lcd {
     fn disable(&mut self) {
         let mut lcd = self.inner.as_ref().borrow_mut();
         lcd.enabled = false;
-        if let Some(mut pixels) = lcd.pixels.as_mut() {
+        if let Some(pixels) = lcd.pixels.as_mut() {
             let pixels = pixels.get_frame_mut();
             for i in 0..(4 * Lcd::WIDTH * Lcd::HEIGHT) as usize {
                 pixels[i] = if i % 4 == 3 { 0xFF } else { 0xAA };

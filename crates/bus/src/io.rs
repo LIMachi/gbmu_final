@@ -1,5 +1,5 @@
 use shared::io::{IO, IOReg};
-use shared::mem::{IOBus, Mem};
+use shared::mem::Mem;
 
 pub struct IORegs {
     range: Vec<IOReg>,
@@ -28,12 +28,12 @@ impl IORegs {
 }
 
 impl Mem for IORegs {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
+    fn read(&self, addr: u16, _absolute: u16) -> u8 {
         self.range.get(addr as usize).map(|x| x.read()).expect(format!("read outside of IOReg range {addr:#06X}").as_str())
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        self.range.get_mut(addr as usize).map(|mut x| x.write(0, value, absolute)).expect(format!("write outside of IOReg range {addr:#06X}").as_str());
+        self.range.get_mut(addr as usize).map(|x| x.write(0, value, absolute)).expect(format!("write outside of IOReg range {addr:#06X}").as_str());
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {

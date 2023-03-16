@@ -1,6 +1,5 @@
 
 use shared::egui;
-use shared::mem::{PPU};
 use super::*;
 
 struct Sprite<'a>(&'a mem::oam::Sprite, TextureId, TextureId);

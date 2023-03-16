@@ -100,6 +100,7 @@ impl Channel {
         }
     }
 
+    /*
     pub fn test(frequency: u16) -> Self {
         let mut channel = Self {
             triggered: false,
@@ -120,7 +121,7 @@ impl Channel {
         channel.update_sweep();
         channel.trigger();
         channel
-    }
+    }*/
 
     fn frequency(&self) -> u16 {
         self.registers.wave1.value() as u16 | ((self.registers.wave2.value() as u16 & 0x7) << 8)

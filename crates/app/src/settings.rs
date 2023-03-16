@@ -5,24 +5,16 @@ use serde::{Deserialize, Serialize};
 use shared::egui::{CentralPanel, Context, TextureHandle, Ui};
 use crate::Keybindings;
 
-#[derive(Copy, Clone, Hash, PartialOrd, PartialEq, Eq)]
-pub enum Texture {
-    GameBoy,
-    ColorGameBoy
-}
-
 pub struct Settings {
     bindings: Rc<RefCell<Keybindings>>,
-    cgb: Rc<RefCell<Mode>>,
-    textures: HashMap<Texture, TextureHandle>
+    cgb: Rc<RefCell<Mode>>
 }
 
 impl Settings {
     pub fn new(bindings: Rc<RefCell<Keybindings>>, cgb: Rc<RefCell<Mode>>) -> Self {
         Self {
             bindings,
-            cgb,
-            textures: Default::default(),
+            cgb
         }
     }
 }
@@ -50,7 +42,7 @@ impl Mode {
 }
 
 impl shared::Ui for Settings {
-    fn init(&mut self, ctx: &mut Context) {
+    fn init(&mut self, _ctx: &mut Context) {
     }
 
     fn draw(&mut self, ctx: &mut Context) {

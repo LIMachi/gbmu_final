@@ -14,7 +14,7 @@ impl Channel {
 }
 
 impl Device for Channel {
-    fn configure(&mut self, bus: &dyn IOBus) {
+    fn configure(&mut self, _bus: &dyn IOBus) {
 
     }
 }

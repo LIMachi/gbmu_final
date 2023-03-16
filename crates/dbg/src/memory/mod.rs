@@ -1,4 +1,3 @@
-use std::cell::RefMut;
 use std::ops::Range;
 use shared::breakpoints::{Breakpoint, Breakpoints};
 
@@ -105,11 +104,10 @@ impl Viewer {
                 });
                 let ViewerOptions {
                     zero_color,
-
-
+                    address_color,
+                    highlight_color,
                     text_style,
                     address_text_style,
-                    ..
                 } = self.options.clone();
                 let space = &self.ranges[self.current];
                 ui.separator();
@@ -130,7 +128,7 @@ impl Viewer {
                             for row in range {
                                 let addr = space.range.start + COLUMNS * row as u16;
                                 let mut print = addr;
-                                let mut color = ui.style().visuals.text_color();
+                                let mut color = address_color;
                                 if let Some(h) = self.hover {
                                     if h & 0xFFF0 == addr { print = h; color = Color32::GREEN }
                                 }
@@ -146,7 +144,7 @@ impl Viewer {
                                             let v = bus.read(addr);
                                             let text = format!("{:02X}", v);
                                             let text = RichText::new(text).text_style(text_style.clone())
-                                                .color(if Some(addr) == self.hover { Color32::GREEN } else if v == 0 { zero_color } else { ui.style().visuals.text_color() });
+                                                .color(if Some(addr) == self.hover { highlight_color } else if v == 0 { zero_color } else { ui.style().visuals.text_color() });
                                             let label = Label::new(text).sense(Sense::click());
                                             let ret = ui.add(label);
                                             if ret.hovered() { hover = Some(addr) }

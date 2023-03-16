@@ -162,7 +162,6 @@ impl Menu {
     }
 }
 
-const MENU_HEIGHT: f32 = 32.;
 const ROM_GRID: f32 = 128.;
 
 struct RomView<'a> {
@@ -226,7 +225,7 @@ impl shared::Ui for Menu {
         }
         let style = ctx.style();
         ctx.set_debug_on_hover(true);
-        let mut frame = egui::Frame::side_top_panel(&style)
+        let frame = egui::Frame::side_top_panel(&style)
             .inner_margin(Margin::symmetric(8., 8.))
             .rounding(Rounding::none());
         egui::containers::TopBottomPanel::top("menu")
@@ -254,7 +253,6 @@ impl shared::Ui for Menu {
             });
         egui::containers::CentralPanel::default()
             .show(ctx, |ui| {
-                let w = ui.available_width();
                 egui::containers::ScrollArea::vertical()
                     .auto_shrink([false, true])
                     .show(ui, |ui| {

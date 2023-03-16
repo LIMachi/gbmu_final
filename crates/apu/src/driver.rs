@@ -2,7 +2,6 @@ use rodio::{cpal, Source, Device, OutputStream, OutputStreamHandle, Sink, Suppor
 use cpal::{
     traits::{HostTrait, DeviceTrait},
     SampleRate,
-    FromSample,
     SampleFormat
 };
 use rtrb::{Consumer, Producer, RingBuffer};
@@ -34,7 +33,6 @@ impl Input {
 }
 
 pub(crate)struct Output {
-    delay: usize,
     sample_rate: u32,
     consumer: Consumer<f32>
 }
@@ -42,7 +40,6 @@ pub(crate)struct Output {
 impl Output {
     fn new(sample_rate: u32, consumer: Consumer<f32>) -> Self {
         Self {
-            delay: 500,
             sample_rate,
             consumer,
         }
@@ -113,10 +110,6 @@ impl Audio {
             self.sink = sink;
         }
         Ok(self)
-    }
-
-    pub(crate) fn has_device(&self) -> bool {
-        self.handle.is_some()
     }
 
     pub(crate) fn bind(&self, input: &mut Input) {

@@ -42,15 +42,16 @@ pub struct Emu {
 impl Default for Emu {
     fn default() -> Self {
         let lcd = lcd::Lcd::new();
-        let mut joy = joy::Joypad::new(Default::default());
         let mut mbc = mbc::Controller::unplugged();
-        let mut dma = bus::Dma::default();
-        let mut hdma = bus::Hdma::default();
         let mut ppu = ppu::Controller::new(lcd.clone());
-        let mut timer = bus::Timer::default();
-        let mut cpu = cpu::Cpu::new();
-        let mut apu = apu::Apu::default();
-        let mut bus = bus::Bus::new(false, false)
+
+        let joy = joy::Joypad::new(Default::default());
+        let dma = bus::Dma::default();
+        let hdma = bus::Hdma::default();
+        let timer = bus::Timer::default();
+        let cpu = cpu::Cpu::new();
+        let apu = apu::Apu::default();
+        let bus = bus::Bus::new(false, false)
             .with_mbc(&mut mbc)
             .with_wram(Wram::new(false))
             .with_ppu(&mut ppu);
@@ -121,7 +122,7 @@ impl Emulator {
     }
 
     fn insert(&self, rom: Rom, running: bool) {
-        let mut emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(), running);
+        let emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(), running);
         self.emu.replace(emu);
         self.proxy.send_event(Events::Reload).ok();
     }
