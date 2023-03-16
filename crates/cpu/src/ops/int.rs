@@ -10,7 +10,7 @@ pub fn off(state: &mut State) -> Flow {
     CONTINUE
 }
 
-pub fn stop(state: &mut State) -> Flow {    //TODO pas fini
+pub fn stop(_state: &mut State) -> Flow {    //TODO pas fini
     CONTINUE
 }
 

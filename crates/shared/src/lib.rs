@@ -1,7 +1,6 @@
 #![feature(drain_filter)]
 #![feature(let_else)]
 
-use std::borrow::BorrowMut;
 pub use egui;
 pub use winit;
 use crate::cpu::Opcode;
@@ -79,9 +78,9 @@ pub mod cpu {
 }
 
 pub trait Ui {
-    fn init(&mut self, ctx: &mut egui::Context) { }
-    fn draw(&mut self, ctx: &mut egui::Context) { }
-    fn handle(&mut self, event: &winit::event::Event<Events>) { }
+    fn init(&mut self, _ctx: &mut egui::Context) { }
+    fn draw(&mut self, _ctx: &mut egui::Context) { }
+    fn handle(&mut self, _event: &winit::event::Event<Events>) { }
 }
 
 impl Ui for () { }

@@ -25,7 +25,7 @@ impl<M: MemoryController + Mem> Mbc for M { }
 pub struct Unplugged { }
 
 impl MemoryController for Unplugged {
-    fn new(rom: &Rom, ram: Vec<u8>) -> Self where Self: Sized {
+    fn new(_rom: &Rom, _ram: Vec<u8>) -> Self where Self: Sized {
         Self { }
     }
     fn ram_dump(&self) -> Vec<u8> { vec![] }

@@ -1,11 +1,9 @@
-use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::rc::Rc;
-use log::warn;
 use crate::io::{IO, IOReg};
 
 pub trait Mem {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
+    fn read(&self, _addr: u16, _absolute: u16) -> u8 {
         0xFF
     }
 
@@ -13,10 +11,9 @@ pub trait Mem {
         self.read(addr, absolute)
     }
 
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-    }
+    fn write(&mut self, _addr: u16, _value: u8, _absolute: u16) { }
 
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> { vec![] }
+    fn get_range(&self, _st: u16, _len: u16) -> Vec<u8> { vec![] }
 }
 
 impl<T: Mem> Mem for Rc<RefCell<T>> {
@@ -68,7 +65,7 @@ pub trait IOBus {
 }
 
 pub trait Device {
-    fn configure(&mut self, bus: &dyn IOBus) { }
+    fn configure(&mut self, _bus: &dyn IOBus) { }
 }
 
 impl Device for () { }

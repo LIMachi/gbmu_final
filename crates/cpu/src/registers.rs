@@ -1,8 +1,5 @@
 use shared::cpu::{Reg, Value};
 
-const HIGH: usize = 1;
-const LOW: usize = 0;
-
 #[derive(Default, Clone)]
 pub struct Registers {
     a: u8,

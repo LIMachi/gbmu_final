@@ -1,5 +1,3 @@
-use std::io::{Read, Write};
-use std::path::PathBuf;
 use shared::{mem::*, rom::Rom};
 
 pub struct Mbc0 {

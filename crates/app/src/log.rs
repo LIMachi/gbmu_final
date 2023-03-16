@@ -20,6 +20,6 @@ pub fn init() {
     let mut builder = Builder::from_env(env);
     builder.target(match file_writer() {
         Ok(writer) => Target::Pipe(Box::new(writer)),
-        Err(e) => Target::Stdout
+        Err(_e) => Target::Stdout
     }).init();
 }

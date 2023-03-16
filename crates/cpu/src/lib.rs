@@ -6,14 +6,10 @@ mod ops;
 mod registers;
 mod decode;
 
-use std::fmt::{LowerHex, Write};
-use log::{info, warn};
-
 use registers::*;
 use shared::cpu::{Value, Opcode, CBOpcode, Reg, MemStatus, Bus, regs};
 pub use cpu::Cpu;
 use crate::cpu::Mode;
-use crate::ops::alu::add;
 
 trait RWStatus {
     fn read(&mut self) -> u8;

@@ -48,11 +48,11 @@ pub fn l(state: &mut State) -> Flow {
     CONTINUE
 }
 
-pub fn af(state: &mut State) -> Flow {
+/*pub fn af(state: &mut State) -> Flow {
     let value = state.pop();
     state.set_register(Reg::AF, value);
     CONTINUE
-}
+}*/
 
 pub fn bc(state: &mut State) -> Flow {
     let value = state.pop();

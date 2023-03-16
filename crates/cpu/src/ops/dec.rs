@@ -1,10 +1,10 @@
 use super::*;
 
-pub fn pc(state: &mut State) -> Flow {
+/*pub fn pc(state: &mut State) -> Flow {
     let pc = state.register(Reg::PC).u16().wrapping_sub(1);
     state.set_register(Reg::PC, pc);
     CONTINUE
-}
+}*/
 
 pub fn sp(state: &mut State) -> Flow {
     let sp = state.register(Reg::SP).u16() - 1;

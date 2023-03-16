@@ -25,15 +25,15 @@ impl<M: Mem, O: Ord + Eq + Copy> Lock<M, O> {
         Self { inner, lock: vec![] }
     }
 
-    fn lock(&mut self, level: O) {
+    /*fn lock(&mut self, level: O) {
         if self.lock.iter().find(|&&x| x < level).is_none() {
             self.lock.push(level);
         }
     }
-
     fn unlock(&mut self, level: O) {
         self.lock.drain_filter(|x| *x == level);
-    }
+    }*/
+
 
     pub fn get<F: Fn(&M) -> u8>(&self, source: O, f: F) -> u8 {
         match source {

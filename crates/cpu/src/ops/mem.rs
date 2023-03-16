@@ -6,7 +6,7 @@ pub fn cb(state: &mut State) -> Flow {
     CONTINUE
 }
 
-pub fn read_pc(state: &mut State) -> Flow {
+/*pub fn read_pc(state: &mut State) -> Flow {
     if let Value::U16(addr) = state.register(Reg::PC) {
         state.req_read(addr);
     }
@@ -18,7 +18,7 @@ pub fn read_sp(state: &mut State) -> Flow {
     state.req_read(sp);
     CONTINUE
 }
-
+*/
 pub fn write_sp(state: &mut State) -> Flow {
     let sp = state.register(Reg::SP).u16();
     state.req_write(sp);

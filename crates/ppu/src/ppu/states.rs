@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Formatter, Write};
+use std::fmt::{Debug, Formatter};
 use mem::lock::Source;
 use mem::oam::Sprite;
 use super::{

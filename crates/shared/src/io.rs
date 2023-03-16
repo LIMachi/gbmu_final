@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::mem::{IOBus, Mem};
+use crate::mem::Mem;
 use crate::utils::Cell;
 
 #[derive(Debug, Copy, Clone)]
@@ -486,15 +486,15 @@ impl HReg {
 }
 
 impl Mem for HReg {
-    fn read(&self, _: u16, absolute: u16) -> u8 {
+    fn read(&self, _: u16, _absolute: u16) -> u8 {
         self.v | !self.rmask
     }
 
-    fn value(&self, addr: u16, absolute: u16) -> u8 {
+    fn value(&self, _addr: u16, _absolute: u16) -> u8 {
         self.v
     }
 
-    fn write(&mut self, _: u16, value: u8, io: u16) {
+    fn write(&mut self, _: u16, value: u8, _io: u16) {
         self.v = (self.v & !self.wmask) | (value & self.wmask);
         self.dirty = true;
     }

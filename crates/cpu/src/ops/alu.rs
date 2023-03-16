@@ -34,7 +34,7 @@ pub fn sbc(state: &mut State) -> Flow {
     state.set_register(Reg::A, r);
     state.flags().set_zero(r == 0)
         .set_sub(true)
-        .set_half(((a & 0xF) < (n & 0xF) + cr))
+        .set_half((a & 0xF) < (n & 0xF) + cr)
         .set_carry(o || c);
     CONTINUE
 }

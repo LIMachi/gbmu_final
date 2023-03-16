@@ -1,7 +1,6 @@
 #![feature(let_else)]
 
 use std::cell::RefCell;
-use std::io::Write;
 use std::rc::Rc;
 use winit::{
     event_loop::{ControlFlow, EventLoopWindowTarget}
