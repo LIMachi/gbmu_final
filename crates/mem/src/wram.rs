@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use shared::io::{IO, IOReg};
 use shared::mem::*;
 
@@ -25,7 +24,7 @@ impl Mem for Storage {
         let b = self.bank();
         match self {
             Storage::Dmg(v) => v[addr],
-            Storage::Cgb(bank, banks) => {
+            Storage::Cgb(_bank, banks) => {
                 match addr as usize {
                     0..BANK_SIZE => banks[0][addr],
                     BANK_SIZE..WRAM_SIZE => banks[b][addr - BANK_SIZE],
@@ -40,7 +39,7 @@ impl Mem for Storage {
         let b = self.bank();
         match self {
             Storage::Dmg(v) => v[addr] = value,
-            Storage::Cgb(bank, banks) => {
+            Storage::Cgb(_bank, banks) => {
                 match addr as usize {
                     0..BANK_SIZE => banks[0][addr] = value,
                     BANK_SIZE..WRAM_SIZE => banks[b][addr - BANK_SIZE] = value,
@@ -55,7 +54,7 @@ impl Mem for Storage {
         let len = len as usize;
         match self {
             Storage::Dmg(v) => v[st..(st + len).min(WRAM_SIZE)].to_vec(),
-            Storage::Cgb(bank, banks) => {
+            Storage::Cgb(_bank, banks) => {
                 let bank = self.bank();
                 match (st, len) {
                     (st @ BANK_SIZE..WRAM_SIZE, len) => banks[bank][(st - BANK_SIZE)..(st + len - BANK_SIZE).min(BANK_SIZE)].to_vec(),

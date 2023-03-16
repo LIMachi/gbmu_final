@@ -1,8 +1,7 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use serde::{Deserialize, Serialize};
-use shared::egui::{CentralPanel, Context, TextureHandle, Ui};
+use shared::egui::{CentralPanel, Context, Ui};
 use crate::Keybindings;
 
 pub struct Settings {

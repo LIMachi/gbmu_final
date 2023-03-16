@@ -8,7 +8,7 @@ pub struct RawContext<Data: 'static + Render> {
 
 impl<Data: 'static + Render> RawContext<Data> {
     pub fn builder(mut data: Data) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
-        Box::new(move |instance, window, _proxy| {
+        Box::new(move |_instance, window, _proxy| {
             data.init(&window);
             Box::new(Self { inner: data, window })
         })

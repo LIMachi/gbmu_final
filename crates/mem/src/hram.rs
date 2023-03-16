@@ -7,11 +7,11 @@ pub struct Hram {
 }
 
 impl Mem for Hram {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
+    fn read(&self, addr: u16, _absolute: u16) -> u8 {
         self.mem[addr as usize]
     }
 
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+    fn write(&mut self, addr: u16, value: u8, _absolute: u16) {
         self.mem[addr as usize] = value;
     }
 

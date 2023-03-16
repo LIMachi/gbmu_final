@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use winit::event::{ElementState, KeyboardInput, ScanCode, VirtualKeyCode};
+use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus, Mem};
+use shared::mem::{Device, IOBus};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]

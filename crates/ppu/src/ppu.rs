@@ -153,7 +153,6 @@ impl Device for Ppu {
 }
 
 const TILE_DATA_END: u16 = 0x97FF;
-const TILEMAP: u16 = 0x9800;
 
 impl Mem for Ppu {
     fn read(&self, addr: u16, absolute: u16) -> u8 {

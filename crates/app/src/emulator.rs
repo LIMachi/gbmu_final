@@ -1,13 +1,11 @@
-use std::borrow::{Borrow, BorrowMut};
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
-use std::io::Read;
 use std::panic::AssertUnwindSafe;
-use log::{error, log, warn};
+use log::error;
 use winit::event::WindowEvent;
 use dbg::BusWrapper;
 use mem::{mbc, Wram};
-use shared::breakpoints::{Breakpoint, Breakpoints};
+use shared::breakpoints::Breakpoints;
 use shared::rom::Rom;
 use shared::{io::IO, Events, Ui, egui::Context};
 use shared::cpu::Bus;

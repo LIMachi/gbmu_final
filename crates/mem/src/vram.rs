@@ -25,7 +25,7 @@ impl Storage {
 }
 
 impl Mem for Storage {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
+    fn read(&self, addr: u16, _absolute: u16) -> u8 {
         use Storage::*;
         match self {
             DMG(mem) => mem[addr as usize],
@@ -33,7 +33,7 @@ impl Mem for Storage {
         }
     }
 
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+    fn write(&mut self, addr: u16, value: u8, _absolute: u16) {
         use Storage::*;
         match self {
             DMG(mem) => mem[addr as usize] = value,
@@ -41,7 +41,7 @@ impl Mem for Storage {
         }
     }
 
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+    fn get_range(&self, _st: u16, _len: u16) -> Vec<u8> {
         use Storage::*;
         match self {
             DMG(mem) => mem[..].to_vec(),

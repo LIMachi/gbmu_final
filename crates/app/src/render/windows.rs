@@ -47,7 +47,7 @@ impl Windows {
         }
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, window_id }  => {
-                if let Some((&h, &id)) = self.handles.iter().find(|(_, v)| v == &window_id) {
+                if let Some((&h, &_id)) = self.handles.iter().find(|(_, v)| v == &window_id) {
                     if self.windows.contains_key(window_id) && self.windows.len() == 1 || h == Handle::Main {
                         self.proxy.send_event(Events::Close).ok();
                         flow.set_exit();

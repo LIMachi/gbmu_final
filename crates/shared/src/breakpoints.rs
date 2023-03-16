@@ -1,9 +1,8 @@
-use std::borrow::{Borrow, BorrowMut};
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 use super::{Cpu, registers, value};
 use serde::{Serialize, Deserialize};
-use crate::cpu::{self, MemStatus, Opcode, Reg};
+use crate::cpu::{self, MemStatus, Opcode};
 use crate::utils::Cell;
 
 #[derive(Clone, Default)]

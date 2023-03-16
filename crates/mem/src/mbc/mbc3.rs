@@ -33,7 +33,7 @@ impl Mem for Mbc3 {
         match absolute {
             ROM..=ROM_END => self.rom[addr as usize],
             SROM..=SROM_END => {
-                let mut bank = self.rom_bank % self.rom_banks;
+                let bank = self.rom_bank % self.rom_banks;
                 let addr = addr as usize + bank * BANK_SIZE;
                 if addr > self.rom.len() { eprintln!("out of bounds cartridge rom read at {absolute}"); 0xFF } else { self.rom[addr] }
             },

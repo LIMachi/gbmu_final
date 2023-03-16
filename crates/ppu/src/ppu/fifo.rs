@@ -16,10 +16,6 @@ impl ObjFifo {
         ObjFifo { inner: VecDeque::with_capacity(8) }
     }
 
-    pub fn clear(&mut self) {
-        self.inner.clear();
-    }
-
     pub fn pop(&mut self) -> Option<Pixel> {
         self.inner.pop_front()
     }

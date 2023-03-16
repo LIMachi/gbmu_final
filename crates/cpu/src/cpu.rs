@@ -1,6 +1,5 @@
-use std::io::Write;
 use crate::Bus;
-use shared::{Target, cpu::{Reg, Value, Opcode}};
+use shared::{cpu::{Reg, Value, Opcode}};
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus};
 use super::{ops::*, State, Registers, decode::decode};
