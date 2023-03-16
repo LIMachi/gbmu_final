@@ -81,6 +81,7 @@ impl Cpu {
         if self.instructions.is_empty() {
             #[cfg(feature = "log_opcode")]
             {
+                use std::io::Write;
                 static mut OUT: Option<std::fs::File> = None;
                 let file = unsafe { OUT.as_mut().unwrap_or_else(|| {
                     OUT = Some(std::fs::File::create("out.log").unwrap()); OUT.as_mut().unwrap()
@@ -107,12 +108,10 @@ impl Cpu {
                 log::warn!("invalid opcode {n:#02x}");
             }
         }
-        let mut ok = true;
         for op in self.instructions.pop().expect("this can never be empty") {
             if op(&mut state) == BREAK {
                 state.clear();
                 self.instructions.clear();
-                ok = false;
                 break;
             }
         }

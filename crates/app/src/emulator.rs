@@ -30,8 +30,8 @@ pub struct Emu {
     pub cpu: cpu::Cpu,
     pub ppu: ppu::Controller,
     pub mbc: mbc::Controller,
-    pub dma: bus::Dma,
-    pub hdma: bus::Hdma,
+    pub dma: ppu::Dma,
+    pub hdma: ppu::Hdma,
     pub timer: bus::Timer,
     pub apu: apu::Apu,
     running: bool
@@ -44,8 +44,8 @@ impl Default for Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
 
         let joy = joy::Joypad::new(Default::default());
-        let dma = bus::Dma::default();
-        let hdma = bus::Hdma::default();
+        let dma = ppu::Dma::default();
+        let hdma = ppu::Hdma::default();
         let timer = bus::Timer::default();
         let cpu = cpu::Cpu::new();
         let apu = apu::Apu::default();
@@ -215,8 +215,8 @@ impl Emu {
         let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
         let mut mbc = mem::mbc::Controller::new(&rom);
-        let mut dma = bus::Dma::default();
-        let mut hdma = bus::Hdma::default();
+        let mut dma = ppu::Dma::default();
+        let mut hdma = ppu::Hdma::default();
         let mut ppu = ppu::Controller::new(lcd.clone());
         let mut timer = bus::Timer::default();
         let mut cpu = cpu::Cpu::new();

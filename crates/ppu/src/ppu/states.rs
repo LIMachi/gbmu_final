@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Formatter};
-use mem::lock::Source;
 use mem::oam::Sprite;
+use shared::mem::Source;
+
 use super::{
     Ppu, fifo::{BgFifo, ObjFifo}, Scroll, fetcher::{self, Fetcher}
 };
@@ -73,7 +74,7 @@ impl State for OamState {
             ppu.sprites.clear();
             ppu.win.scan_enabled = ppu.regs.wy.read() <= ly;
         }
-        let y = ppu.oam.get(Source::Ppu, |oam| oam.sprites[self.sprite].y);
+        let y = ppu.oam().get(Source::Ppu, |oam| oam.sprites[self.sprite].y);
         if ly + if ppu.lcdc.obj_tall() { 0 } else { 8 } < y && ly + 16 >= y && ppu.sprites.len() < 10 {
             ppu.sprites.push(self.sprite);
         }
@@ -111,7 +112,8 @@ impl State for TransferState {
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled() && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
             for i in idx..ppu.sprites.len() {
-                let sprite = ppu.oam.get_mut(Some(Source::Ppu)).map(|x| x.sprites[ppu.sprites[i]])
+                let sprite = ppu.oam_mut().get_mut(Source::Ppu)
+                    .map(|x| x.sprites[ppu.sprites[i]])
                     .unwrap_or_else(|| Sprite::unavailable());
                 if sprite.screen_x() == self.lx || (sprite.x != 0 && sprite.x < 8 && self.lx == 0) {
                     self.sprite = Some(i);

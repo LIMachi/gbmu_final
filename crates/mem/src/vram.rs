@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus, Mem};
 
@@ -51,6 +52,7 @@ impl Mem for Storage {
 }
 
 pub struct Vram {
+    pub tile_cache: HashSet<usize>,
     mem: Storage,
     bank: IOReg,
 }
@@ -77,7 +79,9 @@ impl Mem for Vram {
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        let addr = addr + if self.mem.cgb() { (self.bank.read() & 0x1) as u16 * BANK_SIZE } else { 0 };
+        let bank = if self.mem.cgb() { (self.bank.read() & 0x1) as u16 } else { 0 };
+        let addr = addr + bank * BANK_SIZE;
+        if absolute < 0x9800 { self.tile_cache.insert(addr as usize / 16 + bank as usize * 384); }
         self.mem.write(addr, value, absolute);
     }
 
@@ -89,6 +93,7 @@ impl Mem for Vram {
 impl Vram {
     pub fn new() -> Self {
         Self {
+            tile_cache: HashSet::with_capacity(728),
             mem: Storage::DMG([0; BANK_SIZE as usize]),
             bank: IOReg::unset()
         }

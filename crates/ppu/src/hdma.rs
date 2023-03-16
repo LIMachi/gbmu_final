@@ -1,5 +1,5 @@
 use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus};
+use shared::mem::{Device, IOBus, Source};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Mode {
@@ -94,15 +94,19 @@ impl Hdma {
             if tr.should_tick(self.stat.value() & 0x3, (self.control.value() as usize) & 0x7F) {
                 tick = true;
                 tr.len -= 1;
-                let v = bus.read(tr.src);
+                let v = bus.read_with(tr.src, Source::Hdma);
                 log::info!("cp {:#06X}({:#02X}) to {:#06X}", tr.src, v, tr.dst);
-                bus.write(tr.dst, v);
+                bus.write_with(tr.dst, v, Source::Hdma);
                 tr.src += 1;
                 tr.dst += 1;
                 blocks = (tr.len / 16).wrapping_sub(1) as u8 | 0x80;
                 self.control.direct_write(blocks);
             }
-            if blocks == 0xFF { None } else { Some(tr) }
+            if blocks == 0xFF {
+                None
+            } else {
+                Some(tr)
+            }
         } else { None };
         tick
     }

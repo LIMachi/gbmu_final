@@ -1,11 +1,13 @@
 use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus, OAM};
+use shared::mem::{Device, IOBus, OAM, Source};
+
 
 #[derive(Default)]
 pub struct Dma {
     reg: IOReg,
     st: u16,
     p: usize,
+    running: bool,
 }
 
 impl Dma {
@@ -13,7 +15,8 @@ impl Dma {
         Self {
             reg: Default::default(),
             st: 0,
-            p: 160
+            p: 160,
+            running: false
         }
     }
 
@@ -21,12 +24,18 @@ impl Dma {
         if self.reg.dirty() {
             self.reg.reset_dirty();
             self.p = 0;
+            self.running = true;
             self.st = (self.reg.value() as u16) << 8;
+            bus.lock();
         }
+        if !self.running { return ; }
         if self.p != 160 {
-            let v = bus.read(self.st + self.p as u16);
-            bus.write(OAM + self.p as u16, v);
+            let v = bus.read_with(self.st + self.p as u16, Source::Dma);
+            bus.write_with(OAM + self.p as u16, v, Source::Dma);
             self.p += 1;
+        } else {
+            bus.unlock();
+            self.running = false;
         }
     }
 }

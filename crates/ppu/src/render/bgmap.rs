@@ -27,7 +27,7 @@ impl Widget for BgMap<'_> {
                     ui.spacing_mut().item_spacing.y = 0.;
                     for i in 0..32 {
                         let addr = i + j * 32 + if self.1.lcdc.bg_area() { 0x1C00 } else { 0x1800 };
-                        let tile = self.1.vram.inner().read_bank(addr, 0);
+                        let tile = self.1.vram().inner().read_bank(addr, 0);
                         let tile = if self.1.lcdc.relative_addr() {
                             (256 + (tile as i8) as isize) as usize
                         } else {
