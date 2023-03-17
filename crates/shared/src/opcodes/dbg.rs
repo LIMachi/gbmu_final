@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 use crate::cpu::*;
 
 pub struct DebugInfo {
+    #[allow(dead_code)]
     sz: usize,
     op: &'static str
 }

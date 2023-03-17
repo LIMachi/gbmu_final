@@ -1,7 +1,8 @@
-use std::collections::HashSet;
+use std::borrow::BorrowMut;
+use std::cell::{Ref, RefCell, RefMut};
+use std::rc::Rc;
 use lcd::{Lcd, LCD};
-use mem::oam::Sprite;
-use mem::{Lock, Oam, Vram};
+use mem::{oam::{Oam, Sprite}, Vram};
 use shared::io::LCDC;
 use shared::mem::{Device, IOBus, Mem, *};
 use shared::utils::image::Image;
@@ -16,18 +17,18 @@ mod states;
 
 use states::*;
 use pixel::Pixel;
+use shared::utils::Cell;
 
 const TILEDATA_WIDTH: usize = 16 * 16;
 const TILEDATA_HEIGHT: usize = 24 * 16;
 
 pub(crate) struct REdge {
-    inner: bool,
-    input: bool
+    inner: bool
 }
 
 impl REdge {
     fn new() -> Self {
-        Self { inner: false, input: false }
+        Self { inner: false }
     }
 
     fn tick(&mut self, input: bool) -> bool {
@@ -41,7 +42,6 @@ impl REdge {
 pub(crate) struct Window {
     pub scan_enabled: bool,
     pub enabled: bool,
-    pub x: u8,
     pub y: u8
 }
 
@@ -52,10 +52,9 @@ pub(crate) struct Scroll {
 }
 
 pub(crate) struct Ppu {
-    pub(crate) tile_cache: HashSet<usize>,
     pub(crate) dots: usize,
-    pub(crate) oam: Lock<Oam>,
-    pub(crate) vram: Lock<Vram>,
+    pub(crate) oam: Rc<RefCell<Lock<Oam>>>,
+    pub(crate) vram: Rc<RefCell<Lock<Vram>>>,
     pub(crate) state: Box<dyn State>,
     pub(crate) regs: Registers,
     pub(crate) cram: cram::CRAM,
@@ -64,22 +63,19 @@ pub(crate) struct Ppu {
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
-    pub(crate) tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>,
     pub(crate) lcdc: LCDC,
-    locked: bool
+    pub(crate) tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>
 }
 
 impl Ppu {
     pub fn new(lcd: Lcd) -> Self {
-        use mem::lock::Locked;
+        use shared::mem::Locked;
         let sprites = Vec::with_capacity(10);
         Self {
-            locked: false,
             sc: Scroll::default(),
-            tile_cache: HashSet::with_capacity(384),
             dots: 0,
-            oam: Oam::new().lock(),
-            vram: Vram::new().lock(),
+            oam: Oam::new().locked().cell(),
+            vram: Vram::new().locked().cell(),
             regs: Registers::default(),
             cram: cram::CRAM::default(),
             state: Box::new(VState::new()),
@@ -91,6 +87,11 @@ impl Ppu {
             stat: REdge::new()
         }
     }
+
+    pub(crate) fn oam(&self) -> Ref<Lock<Oam>> { self.oam.as_ref().borrow() }
+    pub(crate) fn vram(&self) -> Ref<Lock<Vram>> { self.vram.as_ref().borrow() }
+    pub(crate) fn oam_mut(&self) -> RefMut<Lock<Oam>> { self.oam.as_ref().borrow_mut() }
+    pub(crate) fn vram_mut(&self) -> RefMut<Lock<Vram>> { self.vram.as_ref().borrow_mut() }
 
     fn set_state(&mut self, state: Box<dyn State>) {
         let mode = state.mode();
@@ -106,6 +107,16 @@ impl Ppu {
         if self.stat.tick(input) {
             self.regs.interrupt.set(1);
         }
+
+        match mode {
+            Mode::Search => self.oam_mut().lock(Source::Ppu),
+            Mode::Transfer => self.vram_mut().lock(Source::Ppu),
+            Mode::HBlank => {
+                self.oam_mut().unlock(Source::Ppu);
+                self.vram_mut().unlock(Source::Ppu);
+            }
+            _ => {}
+        };
     }
 
     pub(crate) fn tick(&mut self) {
@@ -114,7 +125,7 @@ impl Ppu {
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
             self.regs.ly.direct_write(0);
-            self.state = Box::new(HState::last());
+            self.set_state(Box::new(HState::last()));
             self.lcd.disable();
         }
         self.lcdc = lcdc;
@@ -136,7 +147,7 @@ impl Ppu {
     }
 
     pub fn sprite(&self, index: usize) -> Sprite {
-        self.oam.inner().sprites[index]
+        self.oam().inner().sprites[index]
     }
 
     pub fn set(&mut self, lx: usize, ly: usize, pixel: Pixel) {
@@ -148,41 +159,6 @@ impl Device for Ppu {
     fn configure(&mut self, bus: &dyn IOBus) {
         self.regs.configure(bus);
         self.cram.configure(bus);
-        self.vram.configure(bus);
-    }
-}
-
-const TILE_DATA_END: u16 = 0x97FF;
-
-impl Mem for Ppu {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
-        match absolute {
-            OAM..=OAM_END => self.oam.read(addr, absolute),
-            VRAM..=VRAM_END => self.vram.read(addr, absolute),
-            _ => unreachable!()
-        }
-    }
-
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        // TODO prevent write access if oam / vram locked
-        match absolute {
-            OAM..=OAM_END => self.oam.write(addr, value, absolute),
-            VRAM..=TILE_DATA_END => {
-                self.tile_cache.insert(addr as usize / 16);
-                self.vram.write(addr, value, absolute)
-            }
-            VRAM..=VRAM_END => {
-                self.vram.write(addr, value, absolute)
-            },
-            _ => unreachable!()
-        }
-    }
-
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        match st {
-            OAM => self.oam.get_range(st, len),
-            VRAM => self.vram.get_range(st, len),
-            _ => unimplemented!()
-        }
+        self.vram_mut().configure(bus);
     }
 }

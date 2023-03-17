@@ -2,6 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use crate::io::{IO, IOReg};
 
+pub mod lock;
+pub use lock::*;
+
 pub trait Mem {
     fn read(&self, _addr: u16, _absolute: u16) -> u8 {
         0xFF
@@ -14,6 +17,46 @@ pub trait Mem {
     fn write(&mut self, _addr: u16, _value: u8, _absolute: u16) { }
 
     fn get_range(&self, _st: u16, _len: u16) -> Vec<u8> { vec![] }
+
+    fn read_with(&self, addr: u16, absolute: u16, _access: lock::Source) -> u8 {
+        self.read(addr, absolute)
+    }
+
+    fn write_with(&mut self, addr: u16, value: u8, absolute: u16, _access: lock::Source) {
+        self.write(addr, value, absolute)
+    }
+
+    fn lock(&mut self, access: Source) { }
+    fn unlock(&mut self, access: Source) { }
+}
+
+impl Mem for Rc<RefCell<dyn Mem>> {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
+        self.as_ref().borrow().read(addr, absolute)
+    }
+
+    fn value(&self, addr: u16, absolute: u16) -> u8 {
+        self.as_ref().borrow().value(addr, absolute)
+    }
+
+    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        self.as_ref().borrow_mut().write(addr, value, absolute)
+    }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        self.as_ref().borrow().get_range(st, len)
+    }
+
+    fn read_with(&self, addr: u16, absolute: u16, access: Source) -> u8 {
+        self.as_ref().borrow().read_with(addr, absolute, access)
+    }
+
+    fn write_with(&mut self, addr: u16, value: u8, absolute: u16, access: Source) {
+        self.as_ref().borrow_mut().write_with(addr, value, absolute, access)
+    }
+
+    fn lock(&mut self, access: Source) { self.as_ref().borrow_mut().lock(access); }
+    fn unlock(&mut self, access: Source) { self.as_ref().borrow_mut().unlock(access); }
 }
 
 impl<T: Mem> Mem for Rc<RefCell<T>> {
@@ -32,21 +75,18 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
         self.as_ref().borrow().get_range(st, len)
     }
+
+    fn read_with(&self, addr: u16, absolute: u16, access: Source) -> u8 {
+        self.as_ref().borrow().read_with(addr, absolute, access)
+    }
+
+    fn write_with(&mut self, addr: u16, value: u8, absolute: u16, access: Source) {
+        self.as_ref().borrow_mut().write_with(addr, value, absolute, access)
+    }
+    fn lock(&mut self, access: Source) { self.as_ref().borrow_mut().lock(access); }
+    fn unlock(&mut self, access: Source) { self.as_ref().borrow_mut().unlock(access); }
 }
-//
-// impl Mem for Box<dyn Mem + 'static> {
-//     fn read(&self, addr: u16, absolute: u16) -> u8 {
-//         self.as_ref().read(addr, absolute)
-//     }
-//
-//     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-//         self.as_mut().write(addr, value, absolute)
-//     }
-//
-//     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-//         self.as_ref().get_range(st, len)
-//     }
-// }
+
 
 pub trait MemoryBus {
     fn with_mbc<C: MBCController>(self, controller: &mut C) -> Self;
@@ -58,10 +98,16 @@ pub trait IOBus {
     fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
     fn io(&self, io: IO) -> IOReg;
     fn read(&self, addr: u16) -> u8;
-    fn write(&mut self, addr: u16, value: u8);
-    fn value(&self, addr: u16) -> u8;
-
     fn is_cgb(&self) -> bool;
+
+    fn read_with(&self, addr: u16, source: Source) -> u8;
+    fn write_with(&mut self, addr: u16, value: u8, source: Source);
+
+    fn write(&mut self, addr: u16, value: u8);
+
+    /// DMA memory access lock
+    fn lock(&mut self);
+    fn unlock(&mut self);
 }
 
 pub trait Device {

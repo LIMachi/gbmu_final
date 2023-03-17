@@ -1035,8 +1035,7 @@ impl From<u8> for CBOpcode {
             0xfc => CBOpcode::Set7H,
             0xfd => CBOpcode::Set7L,
             0xfe => CBOpcode::Set7IndHL,
-            0xff => CBOpcode::Set7A,
-            _ => unreachable!() // can't get anything else than 0..0xFF from an u8
+            0xff => CBOpcode::Set7A
         }
     }
 }

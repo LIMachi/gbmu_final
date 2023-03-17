@@ -1,5 +1,4 @@
 #![feature(drain_filter)]
-#![feature(let_else)]
 
 pub use egui;
 pub use winit;

@@ -77,9 +77,9 @@ impl tabs::Tab for Tabs {
 
 impl shared::Ui for Controller {
     fn init(&mut self, ctx: &mut Context) {
-        let ppu = self.ppu.as_ref().borrow();
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        for n in 0..if ppu.regs.cgb.read() != 0 { 728 } else { 384 } {
+        let count = if self.ppu.regs.cgb.read() != 0 { 728 } else { 384 };
+        for n in 0..count {
             let s = Textures::Tile(n);
             self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
         }
@@ -95,10 +95,9 @@ impl shared::Ui for Controller {
             self.init(ctx);
             self.init = true;
         }
-        let tiles: Vec<usize> = { self.ppu.as_ref().borrow_mut().tile_cache.drain().collect() };
-        let ppu = self.ppu.as_ref().borrow();
+        let tiles: Vec<usize> = { self.ppu.vram_mut().inner_mut().tile_cache.drain().collect() };
         for n in tiles {
-            let buf = PixelBuffer::<8, 8>::new(ppu.vram.inner().tile_data(n, 0)).image::<64, 64>();
+            let buf = PixelBuffer::<8, 8>::new(self.ppu.vram().inner().tile_data(n % 384, n / 384)).image::<64, 64>();
             ctx.tex_manager()
                 .write()
                 .set(self.storage.get(&Textures::Tile(n)).unwrap().id(), ImageDelta::full(buf, TextureOptions::NEAREST));
@@ -106,8 +105,8 @@ impl shared::Ui for Controller {
         CentralPanel::default()
             .show(ctx, |ui| {
                 ui.add(tabs::Tabs::new(&mut self.tab)
-                    .with_tab(Tabs::Oam, || oam::Oam(&self.storage, &ppu))
-                    .with_tab(Tabs::Tiledata, || bgmap::BgMap(&self.storage, &ppu, ctx))
+                    .with_tab(Tabs::Oam, || oam::Oam(&self.storage, &self.ppu))
+                    .with_tab(Tabs::Tiledata, || bgmap::BgMap(&self.storage, &self.ppu, ctx))
                     .with_tab(Tabs::Tilemap, || tilemap::Tilemap(&self.storage))
                 );
             });

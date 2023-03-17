@@ -1,8 +1,7 @@
 use serde::{Serialize, Deserialize};
-
+use super::mem::Mem;
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::mem::Mem;
 use crate::utils::Cell;
 
 #[derive(Debug, Copy, Clone)]
