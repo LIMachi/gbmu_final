@@ -49,7 +49,7 @@ impl WindowType {
                 .with_inner_size(PhysicalSize::new(1280, 720)),
             WindowType::Settings(_) => WindowBuilder::new()
                 .with_title("GBMU - settings")
-                .with_min_inner_size(PhysicalSize::<u32>::from((500, 500)))
+                .with_inner_size(PhysicalSize::<u32>::from((240, 500)))
                 .with_resizable(false),
         }.build(evt).unwrap()
     }

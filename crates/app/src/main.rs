@@ -1,4 +1,4 @@
-#![feature(let_else)]
+#![feature(hash_drain_filter)]
 
 use std::cell::RefCell;
 use std::rc::Rc;

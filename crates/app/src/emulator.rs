@@ -18,7 +18,7 @@ use crate::render::{Event, Render};
 
 mod joy;
 
-pub use joy::Keybindings;
+pub use joy::*;
 use crate::settings::{Settings, Mode};
 
 pub struct Emu {
