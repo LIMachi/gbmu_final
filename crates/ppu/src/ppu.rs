@@ -15,6 +15,8 @@ mod fifo;
 mod registers;
 mod states;
 
+pub(crate) type PpuState = Box<dyn State>;
+
 use states::*;
 use pixel::Pixel;
 use shared::utils::Cell;
@@ -55,7 +57,6 @@ pub(crate) struct Ppu {
     pub(crate) dots: usize,
     pub(crate) oam: Rc<RefCell<Lock<Oam>>>,
     pub(crate) vram: Rc<RefCell<Lock<Vram>>>,
-    pub(crate) state: Box<dyn State>,
     pub(crate) regs: Registers,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
@@ -78,7 +79,6 @@ impl Ppu {
             vram: Vram::new().locked().cell(),
             regs: Registers::default(),
             cram: cram::CRAM::default(),
-            state: Box::new(VState::new()),
             sprites,
             lcd,
             lcdc: LCDC(0),
@@ -93,9 +93,9 @@ impl Ppu {
     pub(crate) fn oam_mut(&self) -> RefMut<Lock<Oam>> { self.oam.as_ref().borrow_mut() }
     pub(crate) fn vram_mut(&self) -> RefMut<Lock<Vram>> { self.vram.as_ref().borrow_mut() }
 
-    fn set_state(&mut self, state: Box<dyn State>) {
-        let mode = state.mode();
-        self.state = state;
+    fn set_state(&mut self, state: &mut Box<dyn State>, next: Box<dyn State>) {
+        let mode = next.mode();
+        *state = next;
         self.regs.stat.reset(0);
         self.regs.stat.reset(1);
         if (mode as u8 & 0x1) != 0 { self.regs.stat.set(0); }
@@ -119,30 +119,29 @@ impl Ppu {
         };
     }
 
-    pub(crate) fn tick(&mut self) {
+    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>) {
         self.cram.tick();
         let lcdc = LCDC(self.regs.lcdc.read());
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
             self.regs.ly.direct_write(0);
-            self.set_state(Box::new(HState::last()));
+            self.set_state(state, Box::new(HState::last()));
             self.lcd.disable();
         }
         self.lcdc = lcdc;
         self.dots += 1;
         if self.lcdc.enabled() {
             if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
-            let mut state = std::mem::replace(&mut self.state, OamState::new().boxed());
             if let Some(next) = state.tick(self) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     self.dots = 0;
                     self.lcd.enable();
                 }
-                self.set_state(next);
-            } else { self.state = state; };
+                self.set_state(state, next);
+            }
         } else if self.dots == 65664 {
-            self.set_state(VState::immediate().boxed());
+            self.set_state(state, VState::immediate().boxed());
         }
     }
 
@@ -153,6 +152,8 @@ impl Ppu {
     pub fn set(&mut self, lx: usize, ly: usize, pixel: Pixel) {
         self.lcd.set(lx, ly, self.cram.color(pixel));
     }
+
+    pub fn default_state() -> PpuState { VState::new().boxed() }
 }
 
 impl Device for Ppu {
