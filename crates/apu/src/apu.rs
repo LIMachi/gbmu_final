@@ -4,7 +4,7 @@ use super::Input;
 mod dsg;
 
 use shared::io::{IO, IOReg};
-use dsg::{Channel, Event, SoundChannel};
+use dsg::{Channel, Event};
 use shared::utils::FEdge;
 
 pub struct Apu {
@@ -88,7 +88,6 @@ impl Apu {
         for channel in self.channels.iter_mut() {
             channel.clock();
         }
-        self.dsg.clock();
         if self.fedge.tick(self.div.bit(if self.ds.bit(7) != 0 { 5 } else { 4 }) != 0) {
             match self.div_apu {
                 0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length)),

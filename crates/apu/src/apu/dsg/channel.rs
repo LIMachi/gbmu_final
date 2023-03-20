@@ -52,12 +52,34 @@ impl SoundChannel for () {
     fn length(&self) -> u8 { 0 }
 }
 
+pub struct Capacitor {
+    factor: f32,
+    value: f32
+}
+
+impl Capacitor {
+    pub fn tick(&mut self, input: Option<f32>) -> f32 {
+        if let Some(v) = input {
+            self.value = v;
+            v
+        } else {
+            self.value *= self.factor;
+            self.value
+        }
+    }
+
+    pub fn new(factor: f32) -> Self {
+        Self { factor, value: 0. }
+    }
+}
+
 // handles DAC output/switches/volume/length
 pub(crate) struct Channel {
     pub enabled: bool,
     length_timer: u8,
     nr1: IOReg,
     nr4: IOReg,
+    dac: Capacitor,
     inner: Box<dyn SoundChannel + 'static>
 }
 
@@ -68,6 +90,7 @@ impl Channel {
             enabled: false,
             inner: Box::new(channel),
             nr1: IOReg::unset(),
+            dac: Capacitor::new(0.99),
             nr4: IOReg::unset(),
         }
     }
@@ -102,20 +125,18 @@ impl Channel {
         let mask = self.inner.length();
         self.length_timer = (mask - (self.nr1.value() & mask)) + 1;
     }
-}
 
-impl SoundChannel for Channel {
-    fn output(&self) -> u8 { self.inner.output() }
-
-    fn channel(&self) -> Channels {
-        self.inner.channel()
+    pub fn output(&mut self) -> f32 {
+        let out = if self.enabled { self.inner.output() } else { 0 };
+        self.dac.tick(if self.dac_enabled() { Some(out as f32 / 7.5) } else { None })
     }
 
-    fn dac_enabled(&self) -> bool {
+    pub fn channel(&self) -> Channels { self.inner.channel() }
+    pub fn dac_enabled(&self) -> bool {
         self.inner.dac_enabled()
     }
 
-    fn clock(&mut self) {
+    pub fn clock(&mut self) {
         if self.nr4.dirty() {
             self.nr4.reset_dirty();
             if self.nr4.bit(7) != 0 { self.trigger(); }
@@ -128,14 +149,12 @@ impl SoundChannel for Channel {
         if self.enabled { self.inner.clock(); }
     }
 
-    fn trigger(&mut self) -> bool {
+    pub fn trigger(&mut self) -> bool {
         self.enable();
         if self.inner.trigger() { self.disable(); }
         self.reload_length();
         false
     }
-
-    fn length(&self) -> u8 { 0 }
 }
 
 impl Device for Channel {
