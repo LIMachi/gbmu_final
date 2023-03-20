@@ -1,4 +1,5 @@
 #![feature(drain_filter)]
+#![feature(if_let_guard)]
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
@@ -11,7 +12,9 @@ mod render;
 
 use disassembly::Disassembly;
 use shared::egui::{TextureHandle, TextureId};
+use shared::input::Section;
 use shared::mem::{IOBus};
+use shared::winit::event::VirtualKeyCode;
 
 pub trait Emulator: ReadAccess + Schedule { }
 pub trait Bus: cpu::Bus + IOBus { }
@@ -37,6 +40,7 @@ pub trait ReadAccess {
     fn cpu_register(&self, reg: Reg) -> Value;
     fn get_range(&self, st: u16, len: u16) -> Vec<u8>;
     fn bus(&self) -> Ref<dyn BusWrapper>;
+    fn binding(&self, key: VirtualKeyCode) -> Option<Section>;
 }
 
 #[derive(Copy, Clone, Hash, PartialOrd, PartialEq, Eq)]
@@ -79,6 +83,10 @@ impl<E: Emulator> Ninja<E> {
     pub fn play(&mut self) {
         self.emu.play();
         self.disassembly.follow();
+    }
+
+    pub fn reset(&self) {
+        self.emu.reset();
     }
 
     pub fn step(&mut self) {

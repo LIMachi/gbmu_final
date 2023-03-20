@@ -26,8 +26,8 @@ pub trait Mem {
         self.write(addr, value, absolute)
     }
 
-    fn lock(&mut self, access: Source) { }
-    fn unlock(&mut self, access: Source) { }
+    fn lock(&mut self, _access: Source) { }
+    fn unlock(&mut self, _access: Source) { }
 }
 
 impl Mem for Rc<RefCell<dyn Mem>> {

@@ -1,4 +1,5 @@
 #![feature(drain_filter)]
+#![feature(hash_drain_filter)]
 
 pub use egui;
 pub use winit;
@@ -13,6 +14,9 @@ mod value;
 pub mod rom;
 pub mod breakpoints;
 pub use serde;
+
+pub mod input;
+
 
 #[derive(Copy, Debug, Eq, PartialEq, Hash, Clone)]
 pub enum Handle {

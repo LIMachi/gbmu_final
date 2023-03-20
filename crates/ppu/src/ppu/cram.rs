@@ -73,7 +73,7 @@ impl CRAM {
     // TODO lock access
     pub fn tick(&mut self) {
         if self.bcpd.dirty() {
-            println!("{:#06X}-> {:04X}", self.bcps.value(), self.bcpd.value());
+            //println!("{:#06X}-> {:04X}", self.bcps.value(), self.bcpd.value());
             self.bcpd.reset_dirty();
             let inc = self.bcps.bit(7) != 0;
             let addr = self.bcps.value() & 0x3F;

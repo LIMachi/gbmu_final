@@ -1,21 +1,19 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::rc::Rc;
 use serde::{Deserialize, Serialize};
-use winit::event::{Event, VirtualKeyCode, WindowEvent};
+use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use shared::{egui, Events};
 use shared::egui::{Align, Button, CentralPanel, Context, Response, Ui, Vec2};
-use crate::Keybindings;
-use crate::emulator::Section;
+use shared::input::{Keybindings, Section};
 
 pub struct Settings {
-    bindings: Rc<RefCell<Keybindings>>,
+    bindings: Keybindings,
     cgb: Rc<RefCell<Mode>>,
     key: Option<Section>
 }
 
 impl Settings {
-    pub fn new(bindings: Rc<RefCell<Keybindings>>, cgb: Rc<RefCell<Mode>>) -> Self {
+    pub fn new(bindings: Keybindings, cgb: Rc<RefCell<Mode>>) -> Self {
         Self {
             bindings,
             cgb,
@@ -55,7 +53,7 @@ struct Keybind<'a> {
 impl<'a> Keybind<'a> {
     pub fn new(key: Section, settings: &'a mut Settings) -> Self {
         Self {
-            bind: settings.bindings.as_ref().borrow_mut().get(key).1,
+            bind: settings.bindings.has(key),
             key,
             value: &mut settings.key
         }
@@ -132,10 +130,10 @@ impl shared::Ui for Settings {
     fn handle(&mut self, event: &Event<Events>) {
       match event {
           Event::WindowEvent { event: WindowEvent::KeyboardInput {
-              input, ..
+              input: KeyboardInput { virtual_keycode: Some(input), .. }, ..
           }, .. } => {
               if let Some(key) = self.key.take() {
-                  self.bindings.as_ref().borrow_mut().set(key,input.virtual_keycode.unwrap());
+                  self.bindings.set(key,*input);
               }
           }
           _ => {}

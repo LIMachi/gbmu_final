@@ -2,7 +2,7 @@ use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use std::panic::AssertUnwindSafe;
 use log::error;
-use winit::event::WindowEvent;
+use winit::event::{VirtualKeyCode, WindowEvent};
 use dbg::BusWrapper;
 use mem::{mbc, Wram};
 use shared::breakpoints::Breakpoints;
@@ -19,6 +19,7 @@ use crate::render::{Event, Render};
 mod joy;
 
 pub use joy::*;
+use shared::input::{Keybindings, Section};
 use crate::settings::{Settings, Mode};
 
 pub struct Emu {
@@ -75,7 +76,7 @@ impl Default for Emu {
 pub struct Emulator {
     proxy: Proxy,
     audio: apu::Controller,
-    bindings: Rc<RefCell<Keybindings>>,
+    bindings: Keybindings,
     breakpoints: Breakpoints,
     emu: Rc<RefCell<Emu>>,
     cgb: Rc<RefCell<Mode>>,
@@ -83,7 +84,7 @@ pub struct Emulator {
 
 impl Emulator {
 
-    pub fn new(proxy: Proxy, bindings: Rc<RefCell<Keybindings>>, conf: &AppConfig) -> Self {
+    pub fn new(proxy: Proxy, bindings: Keybindings, conf: &AppConfig) -> Self {
         Self {
             proxy,
             bindings,
@@ -180,6 +181,10 @@ impl dbg::ReadAccess for Emulator {
     fn bus(&self) -> Ref<dyn BusWrapper> {
         self.emu.as_ref().borrow()
     }
+
+    fn binding(&self, key: VirtualKeyCode) -> Option<Section> {
+        self.bindings.get(key)
+    }
 }
 
 impl dbg::Schedule for Emulator {
@@ -209,7 +214,7 @@ impl Emu {
 
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(audio: &apu::Controller, bindings: Rc<RefCell<Keybindings>>, rom: Rom, cgb: bool, running: bool) -> Self {
+    pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool) -> Self {
         let compat = cgb && !rom.header.kind.requires_gbc();
         let lcd = lcd::Lcd::new();
         let mut apu = audio.apu();

@@ -5,9 +5,10 @@ use shared::{egui::{self, Ui, CentralPanel, Color32, Layout, Align, FontFamily, 
 use shared::breakpoints::{Breakpoint};
 use shared::cpu::{Reg, Value, Flags, Opcode};
 use shared::egui::{Margin, ScrollArea, SidePanel, Vec2};
+use shared::input::{Section, Shortcut};
 use shared::io::IO;
 use shared::utils::image::ImageLoader;
-use shared::winit::event::WindowEvent;
+use shared::winit::event::{KeyboardInput, WindowEvent};
 use crate::{Bus, Context, Texture};
 
 
@@ -343,6 +344,18 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
         match event {
             Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
             Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&self.emu),
+            Event::WindowEvent { event: WindowEvent::KeyboardInput {
+                input: KeyboardInput { virtual_keycode: Some(input), ..  }, .. }, ..
+            } => {
+                if let Some(Section::Dbg(key)) = self.emu.binding(*input) {
+                    match key {
+                        Shortcut::Step => self.step(),
+                        Shortcut::Run => self.play(),
+                        Shortcut::Pause => self.pause(),
+                        Shortcut::Reset => self.reset()
+                    }
+                }
+            }
             _ => {}
         }
     }

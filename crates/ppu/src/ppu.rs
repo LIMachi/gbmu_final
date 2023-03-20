@@ -1,11 +1,9 @@
-use std::borrow::BorrowMut;
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use shared::io::LCDC;
-use shared::mem::{Device, IOBus, Mem, *};
-use shared::utils::image::Image;
+use shared::mem::{Device, IOBus, *};
 use crate::ppu::registers::Registers;
 
 mod fetcher;
@@ -18,9 +16,6 @@ mod states;
 use states::*;
 use pixel::Pixel;
 use shared::utils::Cell;
-
-const TILEDATA_WIDTH: usize = 16 * 16;
-const TILEDATA_HEIGHT: usize = 24 * 16;
 
 pub(crate) struct REdge {
     inner: bool
@@ -63,13 +58,11 @@ pub(crate) struct Ppu {
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
-    pub(crate) lcdc: LCDC,
-    pub(crate) tiledata: Vec<Image<TILEDATA_WIDTH, TILEDATA_HEIGHT>>
+    pub(crate) lcdc: LCDC
 }
 
 impl Ppu {
     pub fn new(lcd: Lcd) -> Self {
-        use shared::mem::Locked;
         let sprites = Vec::with_capacity(10);
         Self {
             sc: Scroll::default(),
@@ -83,7 +76,6 @@ impl Ppu {
             lcd,
             lcdc: LCDC(0),
             win: Default::default(),
-            tiledata: vec![],
             stat: REdge::new()
         }
     }

@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use lcd::Lcd;
 use shared::mem::{Device, IOBus, Mem, PPU};
-use shared::utils::Cell;
 
 mod render;
 mod ppu;

@@ -18,15 +18,15 @@ use apu::SoundConfig;
 use dbg::{Debugger, Schedule};
 use render::{windows::Windows, WindowType};
 use shared::{Events, Handle};
+use shared::input::Keybindings;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::app::{AppConfig, DbgConfig, RomConfig};
-use crate::emulator::Keybindings;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
     sound: SoundConfig,
-    bindings: Rc<RefCell<Keybindings>>,
+    bindings: Keybindings,
     roms: Rc<RefCell<RomConfig>>,
     emu: emulator::Emulator,
     dbg: Debugger<emulator::Emulator>,
@@ -40,7 +40,7 @@ impl App {
             .build();
         let proxy = e.create_proxy();
         let conf = AppConfig::load();
-        let bindings = conf.keys.clone().cell();
+        let bindings = conf.keys.clone();
         let emu = emulator::Emulator::new(proxy.clone(), bindings.clone(), &conf);
         let roms = conf.roms.cell();
         let dbg = Debugger::new(emu.clone());
@@ -109,7 +109,7 @@ impl App {
                         debug: DbgConfig {
                             breaks: self.emu.breakpoints().take()
                         },
-                        keys: self.bindings.as_ref().take(),
+                        keys: self.bindings.clone(),
                         mode: self.emu.mode()
                     };
                     if let Err(e) = serde_any::ser::to_file_pretty("gbmu.ron", &conf) {

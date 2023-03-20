@@ -11,7 +11,7 @@ use crate::render::Proxy;
 use shared::serde::{Serialize, Deserialize};
 use shared::{Events, Handle};
 use shared::breakpoints::Breakpoint;
-use crate::emulator::Keybindings;
+use shared::input::Keybindings;
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
