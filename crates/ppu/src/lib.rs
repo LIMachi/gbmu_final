@@ -23,7 +23,8 @@ pub struct Controller {
     tab: render::Tabs,
     init: bool,
     storage: HashMap<render::Textures, shared::egui::TextureHandle>,
-    ppu: ppu::Ppu
+    ppu: ppu::Ppu,
+    state: ppu::PpuState,
 }
 
 impl Controller {
@@ -32,12 +33,13 @@ impl Controller {
             tab: render::Tabs::Oam,
             init: false,
             storage: HashMap::with_capacity(256),
-            ppu: ppu::Ppu::new(lcd)
+            ppu: ppu::Ppu::new(lcd),
+            state: ppu::Ppu::default_state()
         }
     }
 
     pub fn tick(&mut self) {
-        self.ppu.tick();
+        self.ppu.tick(&mut self.state);
     }
 }
 

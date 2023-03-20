@@ -215,7 +215,7 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool) -> Self {
-        let compat = cgb && !rom.header.kind.requires_gbc();
+        let compat = rom.header.kind.cgb_mode(cgb);
         let lcd = lcd::Lcd::new();
         let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
@@ -242,7 +242,7 @@ impl Emu {
         IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
         cpu.skip_boot();
         log::info!("cartridge: {} | device: {} DMG compatibility mode: {}",
-            rom.header.title, if cgb { "CGB" } else { "DMG" }, if compat { "enabled" } else { "disabled" }
+            rom.header.title, if cgb { "CGB" } else { "DMG" }, if !compat { "enabled" } else { "disabled" }
         );
         Self {
             speed: Default::default(),

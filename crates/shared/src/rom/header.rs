@@ -4,18 +4,24 @@ use log::warn;
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Console {
     GBC,
-    Other
+    DMG,
+    All,
+    Other(u8)
 }
 
 impl Console {
-    pub fn requires_gbc(&self) -> bool { self == &Console::GBC }
+    pub fn cgb_mode(&self, on_gbc: bool) -> bool {
+        on_gbc && matches!(self, Console::GBC | Console::All)
+    }
 }
 
 impl From<u8> for Console {
     fn from(value: u8) -> Self {
         match value {
-            0x80 => Console::GBC,
-            _ => Console::Other
+            0x0 => Console::DMG,
+            0x80 => Console::All,
+            0xC0 => Console::GBC,
+            n => Console::Other(n)
         }
     }
 }
