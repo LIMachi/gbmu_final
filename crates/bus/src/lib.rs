@@ -1,4 +1,6 @@
-use std::cell::RefCell;
+#![feature(trait_upcasting)]
+
+use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 use mem::Hram;
 use shared::{cpu::MemStatus, mem::*};
@@ -16,6 +18,7 @@ impl Mem for Empty {}
 type LockedMem = Lock<Rc<RefCell<dyn Mem>>>;
 
 pub struct Bus {
+    mbc: Rc<RefCell<dyn MBCController>>,
     rom: LockedMem,
     srom: LockedMem,
     sram: LockedMem,
@@ -33,6 +36,7 @@ pub struct Bus {
 impl Bus {
     pub fn new(cgb: bool, compat: bool) -> Self {
         Self {
+            mbc: mem::mbc::Controller::unplugged().cell(),
             cgb,
             io: io::IORegs::init(compat),
             rom: Empty { }.locked_cell(),
@@ -44,8 +48,13 @@ impl Bus {
             hram: Hram::new().locked_cell(),
             un_1: Empty { }.locked_cell(),
             ie: IOReg::with_access(IO::IE.access()),
-            status: MemStatus::ReqRead(0x100)
+            status: MemStatus::ReqRead(0x0)
         }
+    }
+
+    pub fn skip_boot(mut self) -> Self {
+        self.status = MemStatus::ReqRead(0x100);
+        self
     }
 
     fn read(&self, addr: u16) -> u8 {
@@ -74,6 +83,7 @@ impl Bus {
             ECHO..=ECHO_END => self.ram.write(addr - ECHO, value, addr),
             OAM..=OAM_END => self.oam.write(addr - OAM, value, addr),
             UN_1..=UN_1_END => self.un_1.write(addr - UN_1, value, addr),
+            BOOT => self.rom.write(BOOT, value, BOOT),
             IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
@@ -82,11 +92,12 @@ impl Bus {
 }
 
 impl MemoryBus for Bus {
-    fn with_mbc<C: MBCController>(mut self, controller: &mut C) -> Self {
-        self.rom = controller.rom().locked();
-        self.srom = controller.srom().locked();
-        self.sram = controller.sram().locked();
+    fn with_mbc<C: MBCController + 'static>(mut self, mut controller: C) -> Self {
         controller.configure(&mut self);
+        self.mbc = controller.cell();
+        self.rom = Lock::new(self.mbc.clone());
+        self.srom = Lock::new(self.mbc.clone());
+        self.sram = Lock::new(self.mbc.clone());
         self
     }
 
@@ -170,6 +181,10 @@ impl IOBus for Bus {
         self.sram.unlock(Source::Dma);
         self.vram.unlock(Source::Ppu);
         self.oam.unlock(Source::Dma);
+    }
+
+    fn mbc(&self) -> Ref<dyn MBCController> {
+        self.mbc.as_ref().borrow()
     }
 }
 

@@ -44,7 +44,7 @@ impl DSG {
         // TODO add volume knob
         let k = 0.5;
         let vol = self.volume.value();
-        let [l, r] = [(vol & 0x70) >> 4 + 1, (vol & 0x7) + 1];
+        let [l, r] = [1 + (vol & 0x70) >> 4, (vol & 0x7) + 1];
         let [vl, vr] = [l as f32 / 8., r as f32 / 8.];
         let [l, r] = self.output; // 0.
         let [cl, cr] = self.capacitor; // -1.

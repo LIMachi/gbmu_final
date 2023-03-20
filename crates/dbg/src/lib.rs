@@ -13,7 +13,7 @@ mod render;
 use disassembly::Disassembly;
 use shared::egui::{TextureHandle, TextureId};
 use shared::input::Section;
-use shared::mem::{IOBus};
+use shared::mem::{IOBus, MBCController};
 use shared::winit::event::VirtualKeyCode;
 
 pub trait Emulator: ReadAccess + Schedule { }
@@ -21,7 +21,7 @@ pub trait Bus: cpu::Bus + IOBus { }
 
 pub trait BusWrapper {
     fn bus(&self) -> Box<&dyn Bus>;
-    fn mbc(&self) -> &mem::mbc::Controller;
+    fn mbc(&self) -> Ref<dyn MBCController>;
 }
 
 impl<E: ReadAccess + Schedule> Emulator for E { }

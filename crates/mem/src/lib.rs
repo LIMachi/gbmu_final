@@ -7,6 +7,8 @@ mod hram;
 mod vram;
 mod wram;
 
+mod boot;
+
 pub mod mbc;
 
 pub use hram::Hram;

@@ -103,3 +103,6 @@ impl MemoryController for Mbc5 {
         self.ram_bank
     }
 }
+
+impl Device for Mbc5 { }
+impl super::Mbc for Mbc5 { }

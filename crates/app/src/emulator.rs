@@ -10,7 +10,7 @@ use shared::rom::Rom;
 use shared::{io::IO, Events, Ui, egui::Context};
 use shared::cpu::Bus;
 use shared::winit::window::Window;
-use shared::mem::{IOBus, MemoryBus};
+use shared::mem::{IOBus, MBCController, MemoryBus};
 use shared::utils::Cell;
 
 use crate::{AppConfig, Proxy};
@@ -30,7 +30,6 @@ pub struct Emu {
     pub bus: bus::Bus,
     pub cpu: cpu::Cpu,
     pub ppu: ppu::Controller,
-    pub mbc: mbc::Controller,
     pub dma: ppu::Dma,
     pub hdma: ppu::Hdma,
     pub timer: bus::Timer,
@@ -41,7 +40,7 @@ pub struct Emu {
 impl Default for Emu {
     fn default() -> Self {
         let lcd = lcd::Lcd::new();
-        let mut mbc = mbc::Controller::unplugged();
+        let mbc = mbc::Controller::unplugged();
         let mut ppu = ppu::Controller::new(lcd.clone());
 
         let joy = joy::Joypad::new(Default::default());
@@ -51,7 +50,7 @@ impl Default for Emu {
         let cpu = cpu::Cpu::new();
         let apu = apu::Apu::default();
         let bus = bus::Bus::new(false, false)
-            .with_mbc(&mut mbc)
+            .with_mbc(mbc)
             .with_wram(Wram::new(false))
             .with_ppu(&mut ppu);
         Self {
@@ -61,7 +60,6 @@ impl Default for Emu {
             lcd,
             joy,
             ppu,
-            mbc,
             cpu,
             dma,
             hdma,
@@ -215,18 +213,24 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool) -> Self {
+        let skip_boot = false;
         let compat = rom.header.kind.cgb_mode(cgb);
-        let lcd = lcd::Lcd::new();
-        let mut apu = audio.apu();
         let mut joy = joy::Joypad::new(bindings);
-        let mut mbc = mem::mbc::Controller::new(&rom);
+        let mut timer = bus::Timer::default();
         let mut dma = ppu::Dma::default();
         let mut hdma = ppu::Hdma::default();
+        let mut apu = audio.apu();
+
+        let lcd = lcd::Lcd::new();
         let mut ppu = ppu::Controller::new(lcd.clone());
-        let mut timer = bus::Timer::default();
-        let mut cpu = cpu::Cpu::new();
-        let mut bus = bus::Bus::new(cgb, compat)
-            .with_mbc(&mut mbc)
+
+        let mbc = mem::mbc::Controller::new(&rom);
+        let cpu = cpu::Cpu::new();
+        let bus = bus::Bus::new(cgb, compat);
+        let mbc = if skip_boot { mbc.skip_boot() } else { mbc };
+        let mut cpu = if skip_boot { cpu.skip_boot() } else { cpu };
+        let mut bus = if skip_boot { bus.skip_boot() } else { bus }
+            .with_mbc(mbc)
             .with_wram(Wram::new(cgb))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
@@ -236,11 +240,12 @@ impl Emu {
             .configure(&mut joy)
             .configure(&mut apu);
         timer.offset();
-        IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
-        IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
-        IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
-        IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
-        cpu.skip_boot();
+        if skip_boot {
+            IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
+            IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
+            IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
+            IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
+        }
         log::info!("cartridge: {} | device: {} DMG compatibility mode: {}",
             rom.header.title, if cgb { "CGB" } else { "DMG" }, if !compat { "enabled" } else { "disabled" }
         );
@@ -251,7 +256,6 @@ impl Emu {
             bus,
             cpu,
             ppu,
-            mbc,
             dma,
             hdma,
             timer,
@@ -290,5 +294,5 @@ impl Emu {
 
 impl BusWrapper for Emu {
     fn bus(&self) -> Box<&dyn dbg::Bus> { Box::new(&self.bus) }
-    fn mbc(&self) -> &mem::mbc::Controller { &self.mbc }
+    fn mbc(&self) -> Ref<dyn MBCController> { self.bus.mbc() }
 }

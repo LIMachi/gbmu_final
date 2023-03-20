@@ -130,3 +130,7 @@ impl MemoryController for Mbc3 {
         self.ram_bank
     }
 }
+
+impl Device for Mbc3 { }
+impl super::Mbc for Mbc3 { }
+

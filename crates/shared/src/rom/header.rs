@@ -18,7 +18,7 @@ impl Console {
 impl From<u8> for Console {
     fn from(value: u8) -> Self {
         match value {
-            0x0 => Console::DMG,
+            n if n & 0x80 == 0 => Console::DMG,
             0x80 => Console::All,
             0xC0 => Console::GBC,
             n => Console::Other(n)

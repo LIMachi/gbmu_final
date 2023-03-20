@@ -1,6 +1,6 @@
 use shared::cpu::{Reg, Value};
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Registers {
     a: u8,
     f: u8,

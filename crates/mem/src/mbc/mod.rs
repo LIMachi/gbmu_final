@@ -1,7 +1,6 @@
-use std::{rc::Rc, cell::RefCell};
 use std::path::PathBuf;
 use shared::{mem::*, rom::{Rom, Mbc as Mbcs}};
-use shared::utils::Cell;
+use crate::boot::Boot;
 
 pub mod mbc0;
 pub mod mbc1;
@@ -17,12 +16,15 @@ pub trait MemoryController {
     fn ram_bank(&self) -> usize { 0 }
 }
 
-trait Mbc: MemoryController + Mem {
+pub(crate) trait Mbc: MemoryController + Mem + Device {
+    fn is_boot(&self) -> bool { false }
+    fn unmap(&mut self) -> Box<dyn Mbc> { unreachable!() }
 }
 
-impl<M: MemoryController + Mem> Mbc for M { }
-
 pub struct Unplugged { }
+impl Device for Unplugged { }
+impl Mem for Unplugged { }
+impl Mbc for Unplugged { }
 
 impl MemoryController for Unplugged {
     fn new(_rom: &Rom, _ram: Vec<u8>) -> Self where Self: Sized {
@@ -31,12 +33,11 @@ impl MemoryController for Unplugged {
     fn ram_dump(&self) -> Vec<u8> { vec![] }
 }
 
-impl Mem for Unplugged { }
 
-#[derive(Clone)]
 pub struct Controller {
     sav: Option<PathBuf>,
-    inner: Rc<RefCell<dyn Mbc>>
+    inner: Box<dyn Mbc>,
+    boot: bool,
 }
 
 impl Controller {
@@ -51,35 +52,41 @@ impl Controller {
             } else { vec![0xAF; rom.header.ram_size.size()] };
             (Some(sav), ram)
         } else { (None, vec![0xAF; rom.header.ram_size.size()]) };
-        let inner: Rc<RefCell<dyn Mbc>> = match rom.header.cartridge.mbc() {
-            Mbcs::MBC0 => mbc0::Mbc0::new(rom, ram).cell(),
-            Mbcs::MBC1 => mbc1::Mbc1::new(rom, ram).cell(),
+        let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
+            Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram)),
+            Mbcs::MBC1 => Box::new(Boot::<mbc1::Mbc1>::new(rom, ram)),
             Mbcs::MBC2 => unimplemented!(),
-            Mbcs::MBC3 => mbc3::Mbc3::new(rom, ram).cell(),
-            Mbcs::MBC5 => mbc5::Mbc5::new(rom, ram).cell(),
+            Mbcs::MBC3 => Box::new(Boot::<mbc3::Mbc3>::new(rom, ram)),
+            Mbcs::MBC5 => Box::new(Boot::<mbc5::Mbc5>::new(rom, ram)),
             Mbcs::Unknown => unimplemented!()
         };
 
         Self {
             sav,
-            inner
+            inner,
+            boot: true
         }
     }
 
-    pub fn unplugged() -> Self {
-        Self { sav: None, inner: Unplugged { }.cell() }
+    pub fn skip_boot(mut self) -> Self {
+        if self.boot {
+            self.boot = false;
+            self.inner = self.inner.unmap();
+        }
+        self
     }
 
-    pub fn rom_bank(&self) -> usize { self.inner.borrow().rom_bank() }
-    pub fn ram_bank(&self) -> usize { self.inner.borrow().ram_bank() }
+    pub fn unplugged() -> Self {
+        Self { sav: None, boot: false, inner: Box::new(Unplugged { }) }
+    }
 }
 
 impl Drop for Controller {
     fn drop(&mut self) {
-        let ram = self.inner.as_ref().borrow_mut().ram_dump();
+        let ram = self.inner.ram_dump();
         if ram.is_empty() { return }
-        log::info!("dumping ram to save file");
         if let Some(sav) = &self.sav {
+            log::info!("dumping ram to save file {:?}", sav);
             use std::io::Write;
             std::fs::File::create(&sav).ok()
                 .map(|mut f| f.write_all(&ram).expect("failed to write savefile"));
@@ -88,9 +95,39 @@ impl Drop for Controller {
 }
 
 impl MBCController for Controller {
-    fn rom(&self) -> Rc<RefCell<dyn Mem>> { self.inner.clone() }
-    fn srom(&self) -> Rc<RefCell<dyn Mem>> { self.inner.clone() }
-    fn sram(&self) -> Rc<RefCell<dyn Mem>> { self.inner.clone() }
+    fn rom_bank(&self) -> usize { self.inner.rom_bank() }
+    fn ram_bank(&self) -> usize { self.inner.ram_bank() }
 }
 
-impl Device for Controller { }
+impl Mem for Controller {
+    fn read(&self, addr: u16, absolute: u16) -> u8 {
+        self.inner.read(addr, absolute)
+    }
+
+    fn value(&self, addr: u16, absolute: u16) -> u8 {
+        self.inner.value(addr, absolute)
+    }
+
+    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        if !self.boot || absolute != 0xFF50 {
+            self.inner.write(addr, value, absolute);
+        } else {
+            log::info!("unmapping boot");
+            self.inner = self.inner.unmap();
+            self.boot = false;
+        }
+    }
+
+    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+        self.inner.get_range(st, len)
+    }
+
+    fn lock(&mut self, access: Source) { self.inner.lock(access) }
+    fn unlock(&mut self, access: Source) { self.inner.unlock(access) }
+}
+
+impl Device for Controller {
+    fn configure(&mut self, bus: &dyn IOBus) {
+        self.inner.configure(bus);
+    }
+}

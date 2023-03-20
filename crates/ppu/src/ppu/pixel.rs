@@ -39,13 +39,13 @@ impl Pixel {
     }
 
     /// sprite priority mix
+    // TODO fix object priority in DMG + OPRI
     pub fn mix(&mut self, rhs: Pixel) {
         *self = match (self.color, rhs.color, self.index, rhs.index) {
             (_, _, None, Some(_)) => rhs,
             (_, _, Some(_), None ) => *self,
             (_, 0, ..) => *self,
             (0, ..) => rhs,
-            (_, _, Some(x1), Some(x2) ) if x1 < x2 => *self,
             (_, _, Some(x1), Some(x2) ) if x1 > x2 => rhs,
             _ => *self,
         }

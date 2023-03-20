@@ -50,8 +50,9 @@ impl Cpu {
         }
     }
 
-    pub fn skip_boot(&mut self) {
-        self.regs = if self.cgb.read() != 0 { Registers::GBC } else { Registers::GB }
+    pub fn skip_boot(mut self) -> Self {
+        self.regs = if self.cgb.read() != 0 { Registers::GBC } else { Registers::GB };
+        self
     }
 
     pub fn registers(&self) -> &Registers { &self.regs }

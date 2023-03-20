@@ -87,9 +87,10 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
     fn unlock(&mut self, access: Source) { self.as_ref().borrow_mut().unlock(access); }
 }
 
+impl Mem for () { }
 
 pub trait MemoryBus {
-    fn with_mbc<C: MBCController>(self, controller: &mut C) -> Self;
+    fn with_mbc<C: MBCController + 'static>(self, controller: C) -> Self;
     fn with_ppu<P: PPU>(self, ppu: &mut P) -> Self;
     fn with_wram<R: Device + Mem + 'static>(self, ram: R) -> Self;
 }
@@ -108,6 +109,8 @@ pub trait IOBus {
     /// DMA memory access lock
     fn lock(&mut self);
     fn unlock(&mut self);
+
+    fn mbc(&self) -> std::cell::Ref<dyn MBCController>;
 }
 
 pub trait Device {
@@ -122,10 +125,9 @@ pub trait PPU: Device {
     fn oam(&self) -> Rc<RefCell<dyn Mem>>;
 }
 
-pub trait MBCController: Device {
-    fn rom(&self) -> Rc<RefCell<dyn Mem>>;
-    fn srom(&self) -> Rc<RefCell<dyn Mem>>;
-    fn sram(&self) -> Rc<RefCell<dyn Mem>>;
+pub trait MBCController: Device + Mem {
+    fn rom_bank(&self) -> usize;
+    fn ram_bank(&self) -> usize;
 }
 
 pub const ROM: u16 = 0x0;
@@ -146,6 +148,7 @@ pub const OAM: u16 = 0xFE00;
 pub const OAM_END: u16 = 0xFE9F;
 pub const UN_1: u16 = 0xFEA0;
 pub const UN_1_END: u16 = 0xFEFF;
+pub const BOOT: u16 = 0xFF50;
 pub const IO: u16 = 0xFF00;
 pub const IO_END: u16 = 0xFF7F;
 pub const HRAM: u16 = 0xFF80;

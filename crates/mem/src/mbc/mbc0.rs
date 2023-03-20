@@ -1,4 +1,5 @@
 use shared::{mem::*, rom::Rom};
+use crate::mbc::Mbc;
 
 pub struct Mbc0 {
     rom: Vec<u8>,
@@ -37,3 +38,6 @@ impl super::MemoryController for Mbc0 {
         vec![]
     }
 }
+
+impl Device for Mbc0 { }
+impl Mbc for Mbc0 { }
