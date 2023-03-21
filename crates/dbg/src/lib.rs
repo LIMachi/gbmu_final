@@ -2,7 +2,7 @@
 #![feature(if_let_guard)]
 
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use shared::{egui::Context, Ui, cpu::{self, Reg, Value}, breakpoints::{Breakpoint, Breakpoints}, Event};
 
@@ -59,6 +59,7 @@ struct Ninja<E: Emulator> {
     disassembly: Disassembly<E>,
     viewer: memory::Viewer,
     textures: HashMap<Texture, TextureHandle>,
+    keys: HashSet<VirtualKeyCode>,
     breakpoints: Breakpoints
 }
 
@@ -69,6 +70,7 @@ impl<E: Emulator> Ninja<E> {
             render_data: Default::default(),
             disassembly: Disassembly::new(),
             breakpoints: emu.breakpoints(),
+            keys: Default::default(),
             viewer: memory::Viewer::new(emu.breakpoints()),
             emu,
         }
