@@ -97,7 +97,8 @@ impl Cpu {
                         state.bus.direct_read(pc + 1),
                         state.bus.direct_read(pc + 2),
                         state.bus.direct_read(pc + 3)];
-                    file.write_all(format!("A:{:02X} F:{:02X} SP:{:04X} PC:{:04X} INS:{:?}\n", a, f, sp, pc, self.prev).as_bytes());
+                    file.write_all(format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
+                                           a, f, b, c, d, e, h, l, sp, pc, pc0, pc1, pc2, pc3).as_bytes());
                 }
             }
             let opcode = state.read();
