@@ -49,7 +49,7 @@ impl Fetcher {
 
     pub fn set_mode(&mut self, mode: Mode) -> bool {
         let mut changed = false;
-        if mode == Mode::Window && self.mode == Mode::Bg {
+        if mode == Mode::Window && self.mode != Mode::Window {
             self.state = State::Tile;
             changed = true;
         }
@@ -57,6 +57,7 @@ impl Fetcher {
             self.tile = tile as u16;
             self.state = State::DataLow;
             self.attrs = Attributes(flags);
+            if let Mode::Sprite(..) = self.mode { } else { self.prev = self.mode };
         }
         self.mode = mode;
         changed

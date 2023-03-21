@@ -33,7 +33,9 @@ impl Mem for IORegs {
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        self.range.get_mut(addr as usize).map(|x| x.write(0, value, absolute)).expect(format!("write outside of IOReg range {addr:#06X}").as_str());
+        self.range.get_mut(addr as usize)
+            .map(|x| x.write(0, value, absolute)).
+            expect(format!("write outside of IOReg range {addr:#06X}").as_str());
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
