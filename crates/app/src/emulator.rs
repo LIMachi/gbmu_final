@@ -213,7 +213,7 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool) -> Self {
-        let skip_boot = false;
+        let skip_boot = true; //TODO mettre a false
         let compat = rom.header.kind.cgb_mode(cgb);
         let mut joy = joy::Joypad::new(bindings);
         let mut timer = bus::Timer::default();

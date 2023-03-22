@@ -9,7 +9,7 @@ use shared::input::{Section, Shortcut};
 use shared::io::IO;
 use shared::utils::convert::Converter;
 use shared::utils::image::ImageLoader;
-use shared::winit::event::{KeyboardInput, WindowEvent};
+use shared::winit::event::{ElementState, KeyboardInput, WindowEvent};
 use crate::{Bus, Context, Texture};
 
 
@@ -319,8 +319,15 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
             Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
             Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&self.emu),
             Event::WindowEvent { event: WindowEvent::KeyboardInput {
-                input: KeyboardInput { virtual_keycode: Some(input), ..  }, .. }, ..
+                input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Released, ..  }, .. }, ..
             } => {
+                self.keys.remove(input);
+            },
+            Event::WindowEvent { event: WindowEvent::KeyboardInput {
+                input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Pressed, ..  }, .. }, ..
+            } => {
+                if self.keys.contains(input) { return }
+                self.keys.insert(*input);
                 if let Some(Section::Dbg(key)) = self.emu.binding(*input) {
                     match key {
                         Shortcut::Step => self.step(),
