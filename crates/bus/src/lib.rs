@@ -3,7 +3,7 @@
 use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 use mem::Hram;
-use shared::{cpu::MemStatus, mem::*};
+use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::io::{IO, IOReg};
 use shared::utils::Cell;
 
@@ -30,6 +30,7 @@ pub struct Bus {
     io: io::IORegs,
     ie: IOReg,
     status: MemStatus,
+    last: Option<Op>,
     cgb: bool,
 }
 
@@ -38,6 +39,7 @@ impl Bus {
         Self {
             mbc: mem::mbc::Controller::unplugged().cell(),
             cgb,
+            last: None,
             io: io::IORegs::init(compat),
             rom: Empty { }.locked_cell(),
             srom: Empty { }.locked_cell(),
@@ -88,6 +90,10 @@ impl Bus {
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
         }
+    }
+
+    pub fn last(&mut self) -> Option<Op> {
+        self.last.take()
     }
 }
 
@@ -198,8 +204,13 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn tick(&mut self) {
+        self.last = None;
         self.status = match self.status {
-            MemStatus::ReqRead(addr) => MemStatus::Read(self.read(addr)),
+            MemStatus::ReqRead(addr) => {
+                let v = self.read(addr);
+                self.last = Some(Op::Read(addr, v));
+                MemStatus::Read(v)
+            },
             MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
             st => st
         };
@@ -225,10 +236,10 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn write(&mut self, addr: u16, value: u8) {
+        self.last = Some(Op::Write(addr, value));
         self.write(addr, value);
     }
 
-    #[cfg(feature = "doctor")]
     fn direct_read(&self, offset: u16) -> u8 {
         self.read(offset)
     }

@@ -156,8 +156,10 @@ impl Menu {
             }
         }
         if !names.is_empty() {
-            self.textures.insert(Texture::Cover(rom_path.clone()),ctx.load_image(rom_path, &names[0]));
-            rom.cover = Some(rom_path.clone());
+            if let Some(tex) = ctx.load_image(rom_path, &names[0]) {
+                self.textures.insert(Texture::Cover(rom_path.clone()), tex);
+                rom.cover = Some(rom_path.clone());
+            }
         }
     }
 }

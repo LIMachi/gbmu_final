@@ -21,7 +21,7 @@ pub fn decode(opcode: Opcode) -> &'static [&'static [Op]] {
         Opcode::DecB         => &[&[inc::pc, read::b, dec::dec, write::b]],
         Opcode::LdBd8        => &[&[inc::pc], &[read::mem, inc::pc, write::b]],
         Opcode::Rlca         => &[&[inc::pc, bits::rlc::<{ regs::A }, true>]],
-        Opcode::LdInda16SP   => &[&[inc::pc], &[read::mem, inc::pc], &[read::mem, mem::merge, inc::pc], &[mem::req_write], &[read::sp, write::mem]],
+        Opcode::LdInda16SP   => &[&[inc::pc], &[read::mem, inc::pc], &[read::mem, mem::merge, inc::pc, mem::req_write], &[read::sp, write::low], &[write::mem]],
         Opcode::AddHLBC      => &[&[inc::pc], &[read::bc, alu::add_hl]],
         Opcode::LdAIndBC     => &[&[inc::pc], &[read::bc, mem::req_read], &[read::mem, write::a]],
         Opcode::DecBC        => &[&[inc::pc], &[read::bc, dec::dec16, write::bc]],

@@ -21,6 +21,7 @@ impl Timer {
         self.div.direct_write(0xAC);
     }
 
+    //TODO add double speed register, add 2 to inner timer if in double speed mode
     pub fn tick(&mut self) {
         if self.div.dirty() {
             self.div.reset_dirty();

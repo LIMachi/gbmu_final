@@ -4,6 +4,7 @@ use std::rc::Rc;
 pub mod image;
 pub mod clock;
 pub mod rtc;
+pub mod convert;
 
 pub trait Cell {
     fn cell(self) -> Rc<RefCell<Self>>;

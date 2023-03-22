@@ -1,10 +1,9 @@
 use std::ops::Range;
-use shared::breakpoints::{Breakpoint, Breakpoints};
+use shared::breakpoints::{Breakpoint, Breakpoints, Value};
 
 use shared::egui;
-use shared::egui::{Color32, Label, ScrollArea, Sense, TextStyle, Vec2};
+use shared::egui::{Color32, Label, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
 use shared::egui::RichText;
-use shared::io::Access;
 use shared::mem::*;
 use crate::Bus;
 use super::render::DARK_BLACK;
@@ -47,6 +46,8 @@ pub struct Viewer {
     current: usize,
     hover: Option<u16>,
     breakpoints: Breakpoints,
+    input: String,
+    value: Value
 }
 
 impl Viewer {
@@ -64,7 +65,9 @@ impl Viewer {
             ],
             current: 0,
             hover: None,
-            breakpoints: Breakpoints::default()
+            breakpoints: Breakpoints::default(),
+            input: String::new(),
+            value: Value::Any
         }
     }
 
@@ -77,6 +80,44 @@ impl Viewer {
 }
 
 const COLUMNS: u16 = 16;
+
+struct ContextMenu<'a> {
+    value: &'a mut Value,
+    input: &'a mut String,
+    breaks: &'a mut Breakpoints,
+    addr: u16
+}
+
+impl<'a> Widget for ContextMenu<'a> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        ui.horizontal(|ui| {
+            ui.label("Break on ");
+            ui.radio_value(self.value, Value::Any, Value::Any.sym());
+            ui.radio_value(self.value, Value::Eq(0), Value::Eq(0).sym());
+            ui.radio_value(self.value, Value::Not(0), Value::Not(0).sym());
+            ui.radio_value(self.value, Value::And(0), Value::And(0).sym());
+        });
+        if self.value.param() {
+            ui.horizontal(|ui| {
+                ui.label("Value: ");
+                if ui.text_edit_singleline(self.input).changed() {
+                    self.value.parse(self.input);
+                }
+            });
+        }
+        use shared::breakpoints::Access;
+        let rr = ui.button("Read");
+        let rw = ui.button("Write");
+        let rrw = ui.button("R/W");
+        let access = if rr.clicked() { Access::read(self.addr, *self.value) }
+        else if rw.clicked() { Access::write(self.addr, *self.value) }
+        else if rrw.clicked() { Access::rw(self.addr, *self.value) }
+        else { return rr | rw | rrw };
+        ui.close_menu();
+        self.breaks.schedule(Breakpoint::access(access));
+        rr | rw | rrw
+    }
+}
 
 impl Viewer {
     fn current(&self) -> &'static str {
@@ -149,10 +190,12 @@ impl Viewer {
                                             let ret = ui.add(label);
                                             if ret.hovered() { hover = Some(addr) }
                                             ret.context_menu(|ui| {
-                                                ui.label("Break on:");
-                                                if ui.button("Read").clicked() { self.breakpoints.schedule(Breakpoint::access(addr, Access::R)); }
-                                                if ui.button("Write").clicked() { self.breakpoints.schedule(Breakpoint::access(addr, Access::W)); }
-                                                if ui.button("R/W").clicked() { self.breakpoints.schedule(Breakpoint::access(addr, Access::RW)); }
+                                                ui.add(ContextMenu {
+                                                    value: &mut self.value,
+                                                    input: &mut self.input,
+                                                    breaks: &mut self.breakpoints,
+                                                    addr
+                                                });
                                             });
                                         }
                                     });

@@ -269,16 +269,18 @@ impl Emu {
         if !self.running { return false; }
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
             self.joy.tick();
-            self.dma.tick(&mut self.bus);
             let tick = self.hdma.tick(&mut self.bus);
-            if !tick && (clock == 0 /*|| clock == 2 && self.cpu.double_speed()*/) {
-                self.bus.tick(); // TODO maybe move bus tick in cpu. easier to handle double speed (cause it affects the bus)
-                self.cpu.cycle(&mut self.bus);
+            if clock == 0 /*|| (clock == 2 && self.cpu.double_speed())*/ {
+                self.dma.tick(&mut self.bus);
+                if !tick {
+                    self.bus.tick();
+                    self.cpu.cycle(&mut self.bus);
+                }
             }
             self.timer.tick();
             self.ppu.tick();
             self.apu.tick();
-            self.running &= bp.tick(&self.cpu, self.bus.status());
+            self.running &= bp.tick(&self.cpu, self.bus.last());
             self.cpu.reset_finished();
         })) {
             Ok(_) => {},

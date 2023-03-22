@@ -74,12 +74,15 @@ impl Cpu {
     pub fn cycle(&mut self, bus: &mut dyn Bus) {
         let prefixed = self.prefixed;
         self.prefixed = false;
-        self.check_interrupts();
+        if !prefixed { self.check_interrupts(); }
         if self.mode == Mode::Halt {
             return ;
         }
         let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime, &mut self.mode));
         if self.instructions.is_empty() {
+            let opcode = state.read();
+            let Ok(opcode) = Opcode::try_from((opcode, prefixed)) else { unreachable!(); };
+
             #[cfg(feature = "log_opcode")]
             {
                 use std::io::Write;
@@ -97,12 +100,15 @@ impl Cpu {
                         state.bus.direct_read(pc + 1),
                         state.bus.direct_read(pc + 2),
                         state.bus.direct_read(pc + 3)];
-                    file.write_all(format!("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n",
-                                           a, f, b, c, d, e, h, l, sp, pc, pc0, pc1, pc2, pc3).as_bytes());
+                    let buff = format!("\
+                    A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X}\
+                    SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X} INS: {:?} NEXT: {:?}\n",
+                                       a, f, b, c, d, e, h, l, sp, pc, pc0, pc1, pc2, pc3, self.prev, opcode);
+                    log::info!("{buff}");
+                    file.write_all(buff.as_bytes());
                 }
             }
-            let opcode = state.read();
-            let Ok(opcode) = Opcode::try_from((opcode, prefixed)) else { unreachable!(); };
+
             self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
             self.prev = opcode;
             self.at = state.register(Reg::PC).u16();

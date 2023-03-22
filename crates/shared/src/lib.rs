@@ -1,3 +1,4 @@
+#![feature(if_let_guard)]
 #![feature(drain_filter)]
 #![feature(hash_drain_filter)]
 
@@ -63,9 +64,8 @@ pub mod cpu {
         fn get_range(&self, start: u16, len: u16) -> Vec<u8>;
         fn write(&mut self, addr: u16, value: u8);
 
-        /// DONT USE
-        /// this exists only for debugging purposes.
-        #[cfg(feature = "doctor")]
+        /// Bypasses read cycle
+        /// CPU doesn't use this
         fn direct_read(&self, offset: u16) -> u8;
     }
 
@@ -78,6 +78,13 @@ pub mod cpu {
         ReqWrite(u16),
         Idle
     }
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    pub enum Op {
+        Read(u16, u8),
+        Write(u16, u8)
+    }
+
 }
 
 pub trait Ui {

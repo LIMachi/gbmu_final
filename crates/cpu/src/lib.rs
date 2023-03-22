@@ -9,6 +9,7 @@ use registers::*;
 use shared::cpu::{Value, Opcode, CBOpcode, Reg, MemStatus, Bus, regs};
 pub use cpu::Cpu;
 use crate::cpu::Mode;
+use crate::ops::alu::add;
 
 trait RWStatus {
     fn read(&mut self) -> u8;
@@ -19,33 +20,29 @@ trait RWStatus {
 
 impl RWStatus for MemStatus {
     fn read(&mut self) -> u8 {
-        let v = match self {
-            MemStatus::Read(v) => *v,
+        match std::mem::replace(self, MemStatus::Ready) {
+            MemStatus::Read(v) => v,
             _ => panic!("unexpected mem read")
-        };
-        *self = MemStatus::Ready;
-        v
+        }
     }
 
     fn write(&mut self) -> u16 {
-        let addr = match self {
-            MemStatus::Write(addr) => { *addr },
+        match std::mem::replace(self, MemStatus::Ready) {
+            MemStatus::Write(addr) => addr,
             _ => panic!("unexpected mem write")
-        };
-        *self = MemStatus::Ready;
-        addr
+        }
     }
 
     fn req_read(&mut self, addr: u16) {
-        *self = match self {
-            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => { MemStatus::ReqRead(addr) },
+        match std::mem::replace(self, MemStatus::ReqRead(addr)) {
+            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => {},
             s => panic!("invalid state {s:?}")
         }
     }
 
     fn req_write(&mut self, addr: u16) {
-        *self = match self {
-            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => { MemStatus::ReqWrite(addr) },
+        match std::mem::replace(self, MemStatus::ReqWrite(addr)) {
+            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => {},
             s => panic!("invalid state {s:?}")
         }
     }
@@ -133,16 +130,14 @@ impl<'a> State<'a> {
         *self.halt = Mode::Halt;
     }
 
-    pub fn write(&mut self, value: Value) {
+    pub fn write(&mut self, value: u8) {
+        self.bus.write(self.mem.write(), value);
+    }
+
+    pub fn write_low(&mut self, value: u8) {
         let addr = self.mem.write();
-        match value {
-            Value::U8(v) => self.bus.write(addr,v),
-            Value::U16(v) => {
-                let [low, high] = v.to_le_bytes();
-                self.bus.write(addr, low);
-                self.bus.write(addr + 1, high);
-            }
-        }
+        self.req_write(addr + 1);
+        self.bus.write(addr, value);
     }
 
     pub fn clear(&mut self) {

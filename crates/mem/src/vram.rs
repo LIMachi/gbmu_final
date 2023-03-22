@@ -80,8 +80,8 @@ impl Mem for Vram {
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         let bank = if self.mem.cgb() { (self.bank.read() & 0x1) as u16 } else { 0 };
+        if addr < 0x1800 { self.tile_cache.insert(addr as usize / 16 + bank as usize * 384); }
         let addr = addr + bank * BANK_SIZE;
-        if absolute < 0x9800 { self.tile_cache.insert(addr as usize / 16 + bank as usize * 384); }
         self.mem.write(addr, value, absolute);
     }
 

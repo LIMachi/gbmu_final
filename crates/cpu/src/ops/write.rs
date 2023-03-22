@@ -48,12 +48,6 @@ pub fn l(state: &mut State) -> Flow {
     CONTINUE
 }
 
-/*pub fn af(state: &mut State) -> Flow {
-    let value = state.pop();
-    state.set_register(Reg::AF, value);
-    CONTINUE
-}*/
-
 pub fn bc(state: &mut State) -> Flow {
     let value = state.pop();
     state.set_register(Reg::BC, value);
@@ -89,6 +83,16 @@ pub fn pc(state: &mut State) -> Flow {
 
 pub fn mem(state: &mut State) -> Flow {
     let v = state.try_pop().expect(format!("failed to pop mem (pc {:#06X})", state.regs.pc()).as_str());
+    let Value::U8(v) = v else { panic!("failed to pop mem (pc: {:#06X}", state.regs.pc()); };
     state.write(v);
+    CONTINUE
+}
+
+pub fn low(state: &mut State) -> Flow {
+    let v = state.try_pop().expect(format!("failed to pop mem (pc {:#06X})", state.regs.pc()).as_str());
+    let Value::U16(v) = v else { panic!("Expected u16 on stack (pc: {:#06X}", state.regs.pc()); };
+    let [low, high] = v.to_le_bytes();
+    state.write_low(low);
+    state.push(high);
     CONTINUE
 }

@@ -41,7 +41,7 @@ impl Op {
     // }
 
     pub fn is_jmp(&self) -> bool {
-        self.instruction.contains("JR") || self.instruction.contains("JP")
+        self.instruction.contains("JR") || self.instruction.contains("JP") || self.instruction.contains("RET")
     }
 }
 

@@ -1,9 +1,12 @@
 use std::cell::{RefCell, RefMut};
+use std::fmt::Formatter;
+use std::io::Read;
 use std::rc::Rc;
 use super::{Cpu, registers, value};
 use serde::{Serialize, Deserialize};
-use crate::cpu::{self, MemStatus, Opcode};
+use crate::cpu::{Bus, Op, Opcode};
 use crate::utils::Cell;
+use crate::utils::convert::Converter;
 
 #[derive(Clone, Default)]
 pub struct Breakpoints {
@@ -20,30 +23,116 @@ impl Breakpoints {
     }
 }
 
-pub use super::io::Access;
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Value {
+    Any,
+    Eq(u8),
+    And(u8),
+    Not(u8)
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        use Value::*;
+        match (self, other) {
+            (Any, Any) => true,
+            (Eq(_), Eq(_)) => true,
+            (And(_), And(_)) => true,
+            (Not(_), Not(_)) => true,
+            _ => false
+        }
+    }
+}
+
+impl Default for Value {
+    fn default() -> Self { Self::Any }
+}
+
+impl PartialEq<u8> for Value {
+    fn eq(&self, other: &u8) -> bool {
+        match (self, *other) {
+            (Value::Any, _) => true,
+            (Value::Eq(u), v) if u == &v => true,
+            (Value::And(u), v) if u & v == *u => true,
+            (Value::Not(u), v) if u != &v => true,
+            _ => false
+        }
+    }
+}
+
+impl Value {
+    pub fn param(&self) -> bool { self != &Value::Any }
+    pub fn sym(&self) -> &str {
+        match self {
+            Value::Any => "*",
+            Value::Eq(_) => "==",
+            Value::Not(_) => "!=",
+            Value::And(_) => "&",
+        }
+    }
+
+    pub fn parse(&mut self, input: &mut String) {
+        match self {
+            Value::Eq(v) | Value::And(v) | Value::Not(v) => *v = u8::convert(&input),
+            _ => {}
+        }
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Any => f.write_fmt(format_args!("= *")),
+            Value::Not(v) => f.write_fmt(format_args!("!= {v:#02x}")),
+            Value::Eq(v) => f.write_fmt(format_args!("== {v:#02x}")),
+            Value::And(v) => f.write_fmt(format_args!("& {v:#02x}")),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Access {
+    addr: u16,
+    kind: super::io::Access,
+    value: Value
+}
+
+impl Access {
+    fn new(addr: u16, kind: super::io::Access, value: Value) -> Self {
+        Self { addr, kind, value }
+    }
+
+    pub fn read(addr: u16, value: Value) -> Self { Access::new(addr, super::io::Access::R, value) }
+    pub fn write(addr: u16, value: Value) -> Self { Access::new(addr, super::io::Access::W, value) }
+    pub fn rw(addr: u16, value: Value) -> Self { Access::new(addr, super::io::Access::RW, value) }
+
+    pub fn matches(&self, op: Op) -> bool {
+        use super::io::Access as Kind;
+        match (self.kind, op) {
+            (Kind::R, Op::Read(addr, v)) |
+            (Kind::RW | Kind::W, Op::Write(addr, v))
+            if addr == self.addr => self.value == v,
+            _ => false
+        }
+    }
+
+    pub fn format(&self) -> String {
+        format!("{:#06X}{:?} {}", self.addr, self.kind, self.value)
+    }
+}
 
 //TODO add Read(u16) / Write(u16)
-#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Debug)]
 pub enum Break {
-    Access(Access, u16),
+    Access(Access),
     Cycles(usize),
     Instructions(usize),
     Instruction(Opcode),
     Register(registers::Reg, value::Value)
 }
 
-impl PartialEq<MemStatus> for Break {
-    fn eq(&self, other: &MemStatus) -> bool {
-        match (self, other) {
-            (Break::Access(Access::R | Access::RW, addr), MemStatus::ReqRead(n)) => addr == n,
-            (Break::Access(Access::W | Access::RW, addr), MemStatus::ReqWrite(n)) => addr == n,
-            _ => false
-        }
-    }
-}
-
 impl Break {
-    pub fn tick(&mut self, runner: &impl Cpu, status: &MemStatus) -> bool {
+    pub fn tick(&mut self, runner: &impl Cpu, last: Option<Op>) -> bool {
         match self {
             Break::Cycles(n) if *n == 0 => true,
             Break::Cycles(n) => { *n = *n - 1; false },
@@ -51,7 +140,7 @@ impl Break {
             Break::Instructions(n) if runner.done() && *n == 0 => true,
             Break::Instructions(n) if runner.done() => { *n = *n - 1; *n == 0 },
             Break::Register(r, v) if runner.done() && runner.register(*r) == *v => true,
-            acc @Break::Access( .. ) if acc == status => true,
+            Break::Access(access) if let Some(last) = last => access.matches(last),
             _ => false
         }
     }
@@ -61,7 +150,7 @@ impl Break {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Breakpoint {
     kind: Break,
     once: bool,
@@ -75,8 +164,8 @@ impl Breakpoint {
 }
 
 impl Breakpoint {
-    pub fn tick(&mut self, runner: &impl Cpu, status: &MemStatus) -> (bool, bool) {
-        (self.once, self.kind.tick(runner, status) && self.enabled)
+    pub fn tick(&mut self, runner: &impl Cpu, last: Option<Op>) -> (bool, bool) {
+        (self.once, self.kind.tick(runner, last) && self.enabled)
     }
 
     pub fn pause() -> Self { Self::cycles(0) }
@@ -96,7 +185,7 @@ impl Breakpoint {
         Self::new(Break::address(addr), false)
     }
 
-    pub fn access(addr: u16, access: Access) -> Self { Self::new(Break::Access(access, addr), false) }
+    pub fn access(access: Access) -> Self { Self::new(Break::Access(access), false) }
 
     pub fn register(reg: registers::Reg, value: value::Value) -> Self {
         Self::new(Break::Register(reg, value), false)
@@ -119,17 +208,17 @@ impl Breakpoint {
             Break::Instructions(_) => unreachable!(),
             Break::Register(reg, value) => format!("{reg:?} == {value:#06x}"),
             Break::Instruction(op) => crate::opcodes::dbg::dbg_opcodes(op).1.to_string(),
-            Break::Access(access, addr) => format!("{addr:#06X}:{}", access.format()),
+            Break::Access(access) => access.format(),
         }
     }
 }
 
 impl Breakpoints {
-    pub fn tick(&self, cpu: &impl Cpu, status: cpu::MemStatus) -> bool {
+    pub fn tick(&self, cpu: &impl Cpu, last: Option<Op>) -> bool {
         let mut breakpoints = self.breakpoints.as_ref().borrow_mut();
         let mut stop = false;
         breakpoints.drain_filter(|bp| {
-            let (once, res) = bp.tick(cpu, &status);
+            let (once, res) = bp.tick(cpu, last);
             stop |= res;
             once && res
         });

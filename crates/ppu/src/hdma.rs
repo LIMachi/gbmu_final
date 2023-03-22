@@ -95,7 +95,7 @@ impl Hdma {
                 tick = true;
                 tr.len -= 1;
                 let v = bus.read_with(tr.src, Source::Hdma);
-                log::info!("cp {:#06X}({:#02X}) to {:#06X}", tr.src, v, tr.dst);
+                log::debug!("cp {:#06X}({:#02X}) to {:#06X}", tr.src, v, tr.dst);
                 bus.write_with(tr.dst, v, Source::Hdma);
                 tr.src += 1;
                 tr.dst += 1;

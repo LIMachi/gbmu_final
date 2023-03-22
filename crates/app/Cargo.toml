@@ -31,8 +31,8 @@ version = "1.0.152"
 features = ["derive"]
 
 [features]
-debug = ["cpu/log_opcode", "bus/doctor", "shared/doctor", "apu/debug"]
-doctor = ["bus/doctor", "cpu/doctor", "shared/doctor"]
+debug = ["cpu/log_opcode", "apu/debug"]
+doctor = ["cpu/doctor"]
 file_log = []
 
 [dependencies.shared]

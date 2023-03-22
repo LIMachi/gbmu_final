@@ -78,7 +78,7 @@ impl tabs::Tab for Tabs {
 impl shared::Ui for Controller {
     fn init(&mut self, ctx: &mut Context) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        let count = if self.ppu.regs.cgb.read() != 0 { 728 } else { 384 };
+        let count = if self.ppu.regs.cgb.read() != 0 { 768 } else { 384 };
         for n in 0..count {
             let s = Textures::Tile(n);
             self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
@@ -100,7 +100,7 @@ impl shared::Ui for Controller {
             let buf = PixelBuffer::<8, 8>::new(self.ppu.vram().inner().tile_data(n % 384, n / 384)).image::<64, 64>();
             ctx.tex_manager()
                 .write()
-                .set(self.storage.get(&Textures::Tile(n)).unwrap().id(), ImageDelta::full(buf, TextureOptions::NEAREST));
+                .set(self.storage.get(&Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id(), ImageDelta::full(buf, TextureOptions::NEAREST));
         }
         CentralPanel::default()
             .show(ctx, |ui| {

@@ -7,6 +7,7 @@ use shared::cpu::{Reg, Value, Flags, Opcode};
 use shared::egui::{Margin, ScrollArea, SidePanel, Vec2};
 use shared::input::{Section, Shortcut};
 use shared::io::IO;
+use shared::utils::convert::Converter;
 use shared::utils::image::ImageLoader;
 use shared::winit::event::{KeyboardInput, WindowEvent};
 use crate::{Bus, Context, Texture};
@@ -39,33 +40,6 @@ pub struct Data {
     count: usize
 }
 
-trait Converter {
-    fn convert(str: &str) -> Self;
-}
-
-impl Converter for u8 {
-    fn convert(raw: &str) -> Self {
-        let _a = 2;
-
-        let str = raw.trim_start_matches("0x").trim_start_matches("0X");
-        if str != raw {
-            u8::from_str_radix(str, 16).unwrap_or(0)
-        } else {
-            u8::from_str(str).or_else(|_| u8::from_str_radix(str, 16)).unwrap_or(0)
-        }
-    }
-}
-
-impl Converter for u16 {
-    fn convert(raw: &str) -> Self {
-        let str = raw.trim_start_matches("0x").trim_start_matches("0X");
-        if str != raw {
-            u16::from_str_radix(str, 16).unwrap_or(0)
-        } else {
-            u16::from_str(str).or_else(|_| u16::from_str_radix(str, 16)).unwrap_or(0)
-        }
-    }
-}
 impl Data {
     fn breakpoint(&self) -> Breakpoint {
         match self.reg {

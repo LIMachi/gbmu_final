@@ -6,14 +6,14 @@ use egui_extras::image::{FitTo, load_svg_bytes_with_size};
 pub type Image<const W: usize, const H: usize> = [[[u32; 3]; W]; H];
 
 pub trait ImageLoader {
-    fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&self, name: S, path: P) -> TextureHandle;
+    fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&self, name: S, path: P) -> Option<TextureHandle>;
     fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle;
 }
 
 impl ImageLoader for Context {
-    fn load_image<S: Into<String>, P: AsRef<Path>>(&self, name: S, path: P) -> TextureHandle {
-        let img = load_image_from_path(path.as_ref()).unwrap();
-        self.load_texture(name, img, TextureOptions::LINEAR)
+    fn load_image<S: Into<String>, P: AsRef<Path>>(&self, name: S, path: P) -> Option<TextureHandle> {
+        load_image_from_path(path.as_ref()).ok()
+            .map(|img| self.load_texture(name, img, TextureOptions::LINEAR))
     }
 
     fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle {
@@ -23,7 +23,7 @@ impl ImageLoader for Context {
 }
 
 pub fn load_image_from_path(path: &Path) -> Result<egui::ColorImage, image::ImageError> {
-    let image = image::io::Reader::open(path)?.decode()?;
+    let image = image::io::Reader::open(path)?.with_guessed_format()?.decode()?;
     let size = [image.width() as _, image.height() as _];
     let image_buffer = image.to_rgba8();
     let pixels = image_buffer.as_flat_samples();
