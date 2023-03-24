@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use shared::{mem::*, rom::{Rom, Mbc as Mbcs}};
+use shared::egui::Key::P;
 use crate::boot::Boot;
 
 pub mod mbc0;
@@ -19,6 +20,7 @@ pub trait MemoryController {
 pub(crate) trait Mbc: MemoryController + Mem + Device {
     fn is_boot(&self) -> bool { false }
     fn unmap(&mut self) -> Box<dyn Mbc> { unreachable!() }
+    fn tick(&mut self) { }
 }
 
 pub struct Unplugged { }
@@ -97,6 +99,7 @@ impl Drop for Controller {
 impl MBCController for Controller {
     fn rom_bank(&self) -> usize { self.inner.rom_bank() }
     fn ram_bank(&self) -> usize { self.inner.ram_bank() }
+    fn tick(&mut self) { self.inner.tick(); }
 }
 
 impl Mem for Controller {

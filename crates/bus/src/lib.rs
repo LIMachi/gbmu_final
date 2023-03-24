@@ -18,6 +18,7 @@ impl Mem for Empty {}
 type LockedMem = Lock<Rc<RefCell<dyn Mem>>>;
 
 pub struct Bus {
+    clock: u8,
     mbc: Rc<RefCell<dyn MBCController>>,
     rom: LockedMem,
     srom: LockedMem,
@@ -37,6 +38,7 @@ pub struct Bus {
 impl Bus {
     pub fn new(cgb: bool, compat: bool) -> Self {
         Self {
+            clock: 0,
             mbc: mem::mbc::Controller::unplugged().cell(),
             cgb,
             last: None,
@@ -204,6 +206,10 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn tick(&mut self) {
+        if self.clock == 127 {
+            self.mbc.as_ref().borrow_mut().tick();
+            self.clock = 0;
+        } else { self.clock += 1; }
         self.last = None;
         self.status = match self.status {
             MemStatus::ReqRead(addr) => {

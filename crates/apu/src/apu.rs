@@ -82,29 +82,34 @@ impl Apu {
         self.dsg.set_charge_factor(self.charge_factor());
     }
 
+    fn power(&mut self) {
+        self.sound.reset_dirty();
+        let on = self.on;
+        self.on = self.sound.bit(7) != 0;
+        if self.on != on {
+            if self.on {
+                log::info!("APU on");
+                for channel in self.channels.iter_mut() {
+                    channel.power_on();
+                }
+                self.dsg.power_on();
+            } else {
+                log::info!("APU off");
+                for channel in self.channels.iter_mut() {
+                    channel.power_off();
+                }
+                self.dsg.power_off();
+            }
+        }
+    }
+
     pub fn tick(&mut self) {
         self.sample += 1.;
         if self.sample >= self.tick {
             self.input.write_sample(self.dsg.tick(&mut self.channels));
             self.sample -= self.tick;
         }
-        if self.sound.dirty() {
-            let on = self.on;
-            self.on = self.sound.bit(7) != 0;
-            if self.on != on {
-                if self.on {
-                    for channel in self.channels.iter_mut() {
-                        channel.power_on();
-                    }
-                    self.dsg.power_on();
-                } else {
-                    for channel in self.channels.iter_mut() {
-                        channel.power_off();
-                    }
-                    self.dsg.power_off();
-                }
-            }
-        }
+        if self.sound.dirty() { self.power(); }
         if !self.on { return; }
         for channel in self.channels.iter_mut() {
             channel.clock();

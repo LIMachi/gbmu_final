@@ -13,6 +13,7 @@ impl Mode {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Transfer {
     mode: Mode,
     len: usize,
@@ -89,7 +90,7 @@ impl Hdma {
             }
         }
         let mut tick = false;
-        self.transfer = if let Some(mut tr) = self.transfer.take() {
+        self.transfer = self.transfer.and_then(|mut tr| {
             let mut blocks = self.control.value();
             if tr.should_tick(self.stat.value() & 0x3, (self.control.value() as usize) & 0x7F) {
                 tick = true;
@@ -107,7 +108,7 @@ impl Hdma {
             } else {
                 Some(tr)
             }
-        } else { None };
+        });
         tick
     }
 }

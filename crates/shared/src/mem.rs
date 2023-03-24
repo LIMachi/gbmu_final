@@ -128,6 +128,7 @@ pub trait PPU: Device {
 pub trait MBCController: Device + Mem {
     fn rom_bank(&self) -> usize;
     fn ram_bank(&self) -> usize;
+    fn tick(&mut self);
 }
 
 pub const ROM: u16 = 0x0;

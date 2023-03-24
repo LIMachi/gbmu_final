@@ -270,14 +270,14 @@ impl Emu {
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
             self.joy.tick();
             let tick = self.hdma.tick(&mut self.bus);
+            self.bus.tick();
             if clock == 0 /*|| (clock == 2 && self.cpu.double_speed())*/ {
+                self.timer.tick();
                 self.dma.tick(&mut self.bus);
                 if !tick {
-                    self.bus.tick();
                     self.cpu.cycle(&mut self.bus);
                 }
             }
-            self.timer.tick();
             self.ppu.tick();
             self.apu.tick();
             self.running &= bp.tick(&self.cpu, self.bus.last());

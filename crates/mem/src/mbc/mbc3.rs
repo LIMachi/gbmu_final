@@ -2,7 +2,7 @@ use shared::mem::*;
 use shared::rom::Rom;
 use crate::mbc::MemoryController;
 
-use shared::utils::rtc::{Rtc, RtcSave};
+use shared::utils::rtc::Rtc;
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE : usize = 0x2000;
@@ -103,9 +103,7 @@ impl Mem for Mbc3 {
 impl MemoryController for Mbc3 {
     fn new(rom: &Rom, mut ram: Vec<u8>) -> Self {
         let raw = ram.split_off(rom.header.ram_size.size());
-        let rtc = RtcSave::deserialize(raw)
-            .map(|x| x.load())
-            .unwrap_or_default();
+        let rtc = Rtc::deserialize(raw).unwrap_or_default();
         Self {
             rom: rom.raw(),
             ram,
@@ -121,7 +119,7 @@ impl MemoryController for Mbc3 {
 
     fn ram_dump(&self) -> Vec<u8> {
         let mut dump = self.ram.clone();
-        dump.append(&mut RtcSave::save(&self.rtc).serialize());
+        dump.append(&mut self.rtc.serialize());
         dump
     }
 
@@ -132,5 +130,9 @@ impl MemoryController for Mbc3 {
 }
 
 impl Device for Mbc3 { }
-impl super::Mbc for Mbc3 { }
+impl super::Mbc for Mbc3 {
+    fn tick(&mut self) {
+        self.rtc.tick();
+    }
+}
 

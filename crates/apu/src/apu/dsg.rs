@@ -45,7 +45,7 @@ impl DSG {
 
     pub fn hpf(&mut self) -> [f32; 2] {
         // TODO add volume knob
-        let k = 0.5;
+        let k = 0.1;
         let vol = self.volume.value();
         let [l, r] = [1 + (vol & 0x70) >> 4, (vol & 0x7) + 1];
         let [vl, vr] = [l as f32 / 8., r as f32 / 8.];

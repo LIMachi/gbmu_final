@@ -114,8 +114,7 @@ fn io_table(ui: &mut Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str, extra
                             body.row(16., |mut row| {
                                 row.col(|ui| { ui.label(format!("{:04X}:{}", *io as u16, io.name())); });
                                 row.col(|ui| {
-                                    // let v = bus.read(*io as u16);
-                                    let v = bus.io(*io).value();
+                                    let v = bus.direct_read(*io as u16);
                                     let tr = ui.label(format!("{:#04X}", v));
                                     if let Some(tooltip) = io.tooltip(v) {
                                         tr.on_hover_text(tooltip);

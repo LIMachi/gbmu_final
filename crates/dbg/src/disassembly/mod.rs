@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Range;
 use egui_extras::{Column, TableBuilder};
+use log::log;
 use shared::breakpoints::{Breakpoint, Breakpoints};
 use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
@@ -22,11 +23,12 @@ impl Op {
     }
 
     pub fn parse(pc: u16, range: &[u8]) -> Self {
-        let opcode = range[0];
-        let op = match (opcode, false).try_into() {
-            Ok(Opcode::PrefixCB) => { (range[1], true).try_into().unwrap() },
-            Ok(opcode) => opcode,
-            Err(_e) => Opcode::Nop
+        let op = range.get(0).and_then(|x| (*x, false).try_into().ok());
+        let op = match (op, range.get(1)) {
+            (Some(Opcode::PrefixCB), Some(v)) => (*v, true).try_into().unwrap(),
+            (Some(Opcode::PrefixCB), None) => { log::warn!("corrupted range ! (lone CB prefix)"); Opcode::PrefixCB },
+            (Some(op), _) => op,
+            (None, _) => { log::warn!("no op in range !"); Opcode::Nop }
         };
         let (sz, info) = dbg::dbg_opcodes(op);
         Self::new(pc, sz, info.to_string(), if range.len() < sz {

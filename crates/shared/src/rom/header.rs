@@ -29,7 +29,8 @@ impl From<u8> for Console {
 #[derive(Debug, Clone)]
 pub enum Gameboy {
     DMG,
-    Super
+    Super,
+    Other
 }
 
 impl From<u8> for Gameboy {
@@ -37,7 +38,10 @@ impl From<u8> for Gameboy {
         match value {
             0x00 => Gameboy::DMG,
             0x03 => Gameboy::Super,
-            _ => panic!("Not a valid instruction set!")
+            set => {
+                log::warn!("Not a valid instruction set {set:#04x}!");
+                Gameboy::Other
+            }
         }
     }
 }
