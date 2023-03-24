@@ -27,7 +27,7 @@ impl Dma {
         }
         if self.p != 160 {
             let v = bus.read_with(self.st + self.p as u16, Source::Dma);
-            log::debug!("copy {:#06X} {:#04X} {:#06X}", self.st + self.p as u16, v, OAM + self.p as u16);
+            // log::debug!("copy {:#06X} {:#04X} {:#06X}", self.st + self.p as u16, v, OAM + self.p as u16);
             bus.write_with(OAM + self.p as u16, v, Source::Dma);
             self.p += 1;
             if self.p == 160 {

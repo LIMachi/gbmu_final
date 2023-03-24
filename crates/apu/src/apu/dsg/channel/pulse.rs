@@ -1,4 +1,4 @@
-use shared::io::{IO, IOReg};
+use shared::io::{AccessMode, IO, IOReg};
 use shared::mem::{Device, IOBus};
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
@@ -100,29 +100,6 @@ impl Channel {
         }
     }
 
-    /*
-    pub fn test(frequency: u16) -> Self {
-        let mut channel = Self {
-            triggered: false,
-            cycle: 0,
-            freq_timer: 0,
-            envelope: Envelope::default(),
-            has_sweep: false,
-            sweep: Sweep::default(),
-            registers: Registers {
-                sweep: IOReg::rw(),
-                length: IOReg::rw().with_value(0x80),
-                volume: IOReg::rw().with_value(0x10),
-                wave1: IOReg::rw().with_value(frequency as u8),
-                wave2: IOReg::rw().with_value((frequency >> 8) as u8)
-            }
-        };
-        channel.update_envelope();
-        channel.update_sweep();
-        channel.trigger();
-        channel
-    }*/
-
     fn frequency(&self) -> u16 {
         self.registers.wave1.value() as u16 | ((self.registers.wave2.value() as u16 & 0x7) << 8)
     }
@@ -181,6 +158,14 @@ impl SoundChannel for Channel {
     }
 
     fn length(&self) -> u8 { 0x3F }
+
+    fn power_on(&mut self) {
+        self.registers.sweep.set_access(IO::NR10.access());
+    }
+
+    fn power_off(&mut self) {
+        self.registers.sweep.set_access(AccessMode::rdonly()).direct_write(0);
+    }
 }
 
 impl Device for Channel {

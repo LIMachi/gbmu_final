@@ -1,6 +1,7 @@
 mod channel;
+
 pub(crate) use channel::{Event, Channel};
-use shared::io::{IO, IOReg};
+use shared::io::{AccessMode, IO, IOReg};
 
 #[repr(u8)]
 enum Panning {
@@ -21,7 +22,8 @@ pub(crate) struct DSG {
     output: [f32; 2],
     capacitor: [f32; 2],
     tick: usize,
-    charge_factor: f32
+    charge_factor: f32,
+    cgb_mode: bool
 }
 
 impl DSG {
@@ -29,10 +31,11 @@ impl DSG {
         Self {
             ctrl: Default::default(),
             volume: Default::default(),
+            cgb_mode: Default::default(),
             output: [0.; 2],
             capacitor: [0.; 2],
             tick: 0,
-            charge_factor
+            charge_factor,
         }
     }
 
@@ -55,7 +58,7 @@ impl DSG {
 
     fn panned(&self, side: Panning, channel: &mut Channel) -> f32 {
         if self.ctrl.value() & (1 << (side as u8 + channel.channel() as u8)) != 0 {
-            channel.output()
+            channel.output(self.cgb_mode)
         } else { 0. }
     }
 
@@ -70,11 +73,22 @@ impl DSG {
         self.tick += 1;
         if any_dac { self.hpf() } else { [0.; 2] }
     }
+
+    pub fn power_on(&mut self) {
+        self.ctrl.set_access(IO::NR51.access());
+        self.volume.set_access(IO::NR50.access());
+    }
+
+    pub fn power_off(&mut self) {
+        self.ctrl.set_access(AccessMode::rdonly()).direct_write(0);
+        self.volume.set_access(AccessMode::rdonly()).direct_write(0);
+    }
 }
 
 impl shared::mem::Device for DSG {
     fn configure(&mut self, bus: &dyn shared::mem::IOBus) {
         self.ctrl = bus.io(IO::NR51);
         self.volume = bus.io(IO::NR50);
+        self.cgb_mode = bus.is_cgb();
     }
 }

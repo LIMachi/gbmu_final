@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use super::mem::Mem;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt::format;
 use crate::utils::Cell;
 
 #[derive(Debug, Copy, Clone)]
@@ -212,6 +213,46 @@ impl IO {
             IO::IE => "IE",
         }
     }
+
+    pub fn tooltip(&self, reg: u8) -> Option<String> {
+        let panning = ["Off", "Right", "Left", "Both"];
+        match self {
+            IO::PCM12 => Some(format!("Only active in CGB, output of channels 1 & 2 (digital)\nChannel 1: {}\nChannel 2: {}", reg & 0xF, (reg >> 4) & 0xF)),
+            IO::PCM34 => Some(format!("Only active in CGB, output of channels 3 & 4 (digital)\nChannel 3: {}\nChannel 4: {}", reg & 0xF, (reg >> 4) & 0xF)),
+            IO::NR52 => Some(format!("APU active: {}\nActive channels:\n- pulse1 {}\n- pulse2 {}\n- wave {}\n- noise {}", reg & 0x80 != 0, reg & 1 != 0, reg & 2 != 0, reg & 4 != 0, reg & 8 != 0)),
+            IO::NR51 => Some(format!("Channel panning:\n- pulse1 {}\n- pulse2 {}\n- wave {}\n- noise {}", panning[((reg & 0x1) | ((reg & 0x10) >> 3)) as usize], panning[((reg & 0x2) | ((reg & 0x20) >> 3)) as usize >> 1], panning[((reg & 0x4) | ((reg & 0x40) >> 3)) as usize >> 2], panning[((reg & 0x8) | ((reg & 0x80) >> 3)) as usize >> 3])),
+            IO::NR50 => Some(format!("Master volume:\n- left {} %\n- right {} %\n VIN mix: {}", ((0x70 & reg) >> 4) as f32 / 7. * 100., (0x7 & reg) as f32 / 7. * 100., panning[((reg & 0x80) >> 6 | (reg & 0x8) >> 3) as usize])),
+            IO::NR10 => Some(
+                if reg & 0x70 != 0 {
+                    format!("Channel 1 Sweep\nPace {} Hz\n{}\nSlope (divider): {}", ((reg & 0x70) >> 4) * 128, if reg & 0x8 != 0 { "Subtraction" } else { "Addition" }, 1 << (reg & 0x7))
+                } else {
+                    format!("Channel 1 Sweep\nDisabled (bits 4-6 disabled)")
+                }
+            ),
+            IO::NR11 => Some(format!("Channel 1 Duty & Length\nWave duty {} %\nLength: {} Hz", 12.5 * (1 + ((reg & 0xC0) >> 6)) as f32, 256 * (reg as usize & 0x3F))),
+            IO::NR12 => Some(format!("Channel 1 Volume & Envelope\nVolume {} %\n{}\nPace {} Hz", ((reg & 0xF0) >> 4) as f32 / 15. * 100., if reg & 0x8 != 0 { "Increase" } else { "Decrease" }, (reg & 0x7) as usize * 64)),
+            IO::NR13 => Some(format!("Channel 1 Wavelength (low): {reg:#04X}")),
+            IO::NR14 => Some(format!("Channel 1 Wavelength (high) & Control\nWave high: {:#04X}\nStop on NR11 timer finish {}\nTrigger {}", reg & 0x7, reg & 0x40 != 0, reg & 0x80 != 0)),
+            IO::NR21 => Some(format!("Channel 2 Duty & Length\nWave duty {} %\nLength: {} Hz", 12.5 * (1 + ((reg & 0xC0) >> 6)) as f32, 256 * (reg as usize & 0x3F))),
+            IO::NR22 => Some(format!("Channel 2 Volume & Envelope\nVolume {} %\n{}\nPace {} Hz", ((reg & 0xF0) >> 4) as f32 / 15. * 100., if reg & 0x8 != 0 { "Increase" } else { "Decrease" }, (reg & 0x7) as usize * 64)),
+            IO::NR23 => Some(format!("Channel 2 Wavelength (low): {reg:#04X}")),
+            IO::NR24 => Some(format!("Channel 2 Wavelength (high) & Control\nWave high: {:#04X}\nStop on NR21 timer finish {}\nTrigger {}", reg & 0x7, reg & 0x40 != 0, reg & 0x80 != 0)),
+            IO::NR30 => Some(format!("Channel 3 DAC Setting: {}", if reg & 0x80 != 0 { "On" } else { "Off" })),
+            IO::NR31 => Some(format!("Channel 3 Length: {} Hz", 256 * (reg as usize))),
+            IO::NR32 => Some(format!("Channel 3 Volume: {}", if reg & 0x60 == 0 { "Mute".to_string() } else { format!("{} %", 100 >> (((reg & 0x60) >> 5) - 1)) })),
+            IO::NR33 => Some(format!("Channel 3 Wavelength (low): {reg:#04X}")),
+            IO::NR34 => Some(format!("Channel 3 Wavelength (high) & Control\nWave high: {:#04X}\nStop on NR31 timer finish {}\nTrigger {}", reg & 0x7, reg & 0x40 != 0, reg & 0x80 != 0)),
+            IO::NR41 => Some(format!("Channel 4 Length: {} Hz", 256 * (reg & 0x3F) as usize)),
+            IO::NR42 => Some(format!("Channel 4 Volume & Envelope\nVolume {} %\n{}\nPace {} Hz", ((reg & 0xF0) >> 4) as f32 / 15. * 100., if reg & 0x8 != 0 { "Increase" } else { "Decrease" }, (reg & 0x7) as usize * 64)),
+            IO::NR43 => Some(format!("Channel 4 Frequency & LSFR width\nFrequency: {} Hz\nLSFR width (bits): {}", 262144. / (if reg & 7 == 0 { 0.5 } else { (reg & 7) as f32 }) * 2f32.powf((reg >> 4) as f32), 15 >> ((reg & 0x8) >> 3))),
+            IO::NR44 => Some(format!("Channel 4 Control\nStop on NR41 timer finish {}\nTrigger {}", reg & 0x40 != 0, reg & 0x80 != 0)),
+            IO::JOYP => Some(format!("Joypad Query/Status\nQuery {}\nRight / A {}\nLeft / B {}\nUp / Select {}\nDown / Start {}", ["None", "Direction", "Action", "All"][(reg & 0x30) as usize >> 4], reg & 0x1 == 0, reg & 0x2 == 0, reg & 0x4 == 0, reg & 0x8 == 0)),
+            IO::IE => Some(format!("Enable interrupts:\nVBlank (@0x0040): {}\nLCD Stat (@0x0048): {}\nTimer (@0x0050): {}\nSerial (@0x0058): {}\nJoypad (@0x0060): {}", reg & 0x1 != 0, reg & 0x2 != 0, reg & 0x4 != 0, reg & 0x8 != 0, reg & 0x10 != 0)),
+            IO::IF => Some(format!("Interrupt flag:\nVBlank (@0x0040): {}\nLCD Stat (@0x0048): {}\nTimer (@0x0050): {}\nSerial (@0x0058): {}\nJoypad (@0x0060): {}", reg & 0x1 != 0, reg & 0x2 != 0, reg & 0x4 != 0, reg & 0x8 != 0, reg & 0x10 != 0)),
+            IO::SB => Some(format!("Serial byte: holds a byte that will (or is being) replaced by another coming from a connected gameboy (bit by bit every cycle)")),
+            _ => None
+        }
+    }
 }
 
 impl TryFrom<u16> for IO {
@@ -331,7 +372,7 @@ impl IO {
             IO::NR44     => Custom([W, W, W, U, U, U, RW, W]),
             IO::NR50     => Generic(RW),
             IO::NR51     => Generic(RW),
-            IO::NR52     => Custom([U, U, U, U, RW, RW, U, U]),
+            IO::NR52     => Custom([R, R, R, R, U, U, U, RW]),
             IO::WaveRam0 => Generic(RW),
             IO::WaveRam1 => Generic(RW),
             IO::WaveRam2 => Generic(RW),
@@ -536,11 +577,11 @@ impl IOReg {
 
     pub fn value(&self) -> u8 { self.0.borrow().v }
 
-    pub fn direct_write(&mut self, value: u8) {
+    pub fn direct_write(&self, value: u8) {
         self.0.as_ref().borrow_mut().direct_write(value);
     }
 
-    pub fn set(&mut self, bit: u8) {
+    pub fn set(&self, bit: u8) {
         self.direct_write(self.value() | (1 << bit));
     }
 
@@ -548,13 +589,13 @@ impl IOReg {
         (self.read() >> bit) & 0x1
     }
 
-    pub fn reset(&mut self, bit: u8) {
+    pub fn reset(&self, bit: u8) {
         self.direct_write(self.value() & !(1 << bit));
     }
 
     pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }
 
-    pub fn reset_dirty(&mut self) { self.0.as_ref().borrow_mut().reset_dirty(); }
+    pub fn reset_dirty(&self) { self.0.as_ref().borrow_mut().reset_dirty(); }
     pub fn dirty(&self) -> bool { self.0.as_ref().borrow().dirty }
 
     pub fn set_read_mask(&self, rmask: u8) {
@@ -563,5 +604,12 @@ impl IOReg {
 
     pub fn set_write_mask(&self, wmask: u8) {
         self.0.borrow_mut().wmask = wmask;
+    }
+
+    pub fn set_access(&self, mode: AccessMode) -> &Self {
+        let mut t = self.0.borrow_mut();
+        t.wmask = mode.wmask();
+        t.rmask = mode.rmask();
+        self
     }
 }

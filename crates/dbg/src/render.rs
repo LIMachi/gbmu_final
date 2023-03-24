@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::str::FromStr;
 use egui_extras::Column;
 use super::{Emulator, Ninja};
@@ -112,7 +113,14 @@ fn io_table(ui: &mut Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str, extra
                         for io in ios {
                             body.row(16., |mut row| {
                                 row.col(|ui| { ui.label(format!("{:04X}:{}", *io as u16, io.name())); });
-                                row.col(|ui| { ui.label(format!("{:#04X}", bus.read(*io as u16))); });
+                                row.col(|ui| {
+                                    // let v = bus.read(*io as u16);
+                                    let v = bus.io(*io).value();
+                                    let tr = ui.label(format!("{:#04X}", v));
+                                    if let Some(tooltip) = io.tooltip(v) {
+                                        tr.on_hover_text(tooltip);
+                                    }
+                                });
                             })
                         }
                     });
@@ -283,8 +291,9 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                 body.row(240., |mut row| {
                                     const CPU: &[IO] = &[IO::JOYP, IO::DIV, IO::TAC, IO::TIMA, IO::TMA, IO::IF, IO::IE, IO::SB, IO::SC];
                                     const MEM: &[IO] = &[IO::KEY1, IO::DMA, IO::VBK, IO::SVBK, IO::HDMA1, IO::HDMA2, IO::HDMA3, IO::HDMA4, IO::HDMA5];
-                                    const AUDIO: &[IO] = &[IO::NR50, IO::NR51, IO::NR52, IO::NR10, IO::NR11, IO::NR12, IO::NR13, IO::NR14, IO::NR21, IO::NR22, IO::NR23, IO::NR24,
-                                                                                         IO::NR30, IO::NR31, IO::NR32, IO::NR33, IO::NR34, IO::NR41, IO::NR42, IO::NR43, IO::NR44,
+                                    const AUDIO: &[IO] = &[IO::PCM12, IO::PCM34,
+                                                           IO::NR50, IO::NR51, IO::NR52, IO::NR10, IO::NR11, IO::NR12, IO::NR13, IO::NR14, IO::NR21, IO::NR22, IO::NR23, IO::NR24,
+                                                           IO::NR30, IO::NR31, IO::NR32, IO::NR33, IO::NR34, IO::NR41, IO::NR42, IO::NR43, IO::NR44,
                                                            IO::WaveRam0, IO::WaveRam1, IO::WaveRam2, IO::WaveRam3, IO::WaveRam4, IO::WaveRam5, IO::WaveRam6, IO::WaveRam7,
                                                            IO::WaveRam8, IO::WaveRam9, IO::WaveRamA, IO::WaveRamB, IO::WaveRamC, IO::WaveRamD, IO::WaveRamE, IO::WaveRamF];
                                     const VIDEO: &[IO] = &[IO::LCDC, IO::STAT, IO::SCX, IO::SCY, IO::LY, IO::LYC, IO::DMA, IO::WX, IO::WY, IO::BGP, IO::OBP0, IO::OBP1, IO::BCPS, IO::BCPD, IO::OPRI, IO::OCPS];

@@ -18,7 +18,8 @@ pub struct Apu {
     sound: IOReg,
     div: IOReg,
     ds: IOReg,
-    channels: Vec<Channel>
+    channels: Vec<Channel>,
+    on: bool,
 }
 
 impl Default for Apu {
@@ -35,7 +36,8 @@ impl Default for Apu {
             channels: vec![],
             sound: Default::default(),
             div: Default::default(),
-            ds: Default::default()
+            ds: Default::default(),
+            on: false
         }
     }
 }
@@ -68,6 +70,7 @@ impl Apu {
             channels,
             div: IOReg::unset(),
             ds: IOReg::rdonly(),
+            on: false
         }
     }
 
@@ -85,6 +88,24 @@ impl Apu {
             self.input.write_sample(self.dsg.tick(&mut self.channels));
             self.sample -= self.tick;
         }
+        if self.sound.dirty() {
+            let on = self.on;
+            self.on = self.sound.bit(7) != 0;
+            if self.on != on {
+                if self.on {
+                    for channel in self.channels.iter_mut() {
+                        channel.power_on();
+                    }
+                    self.dsg.power_on();
+                } else {
+                    for channel in self.channels.iter_mut() {
+                        channel.power_off();
+                    }
+                    self.dsg.power_off();
+                }
+            }
+        }
+        if !self.on { return; }
         for channel in self.channels.iter_mut() {
             channel.clock();
         }

@@ -1,4 +1,4 @@
-use shared::io::{IO, IOReg};
+use shared::io::{AccessMode, IO, IOReg};
 use shared::mem::{Device, IOBus};
 use super::{SoundChannel, Channels};
 
@@ -99,6 +99,20 @@ impl SoundChannel for Channel {
         for w in self.registers.pattern.iter() {
             w.set_read_mask(0xFF);
             w.set_write_mask(0xFF);
+        }
+    }
+
+    fn power_on(&mut self) {
+        self.registers.dac_enable.set_access(IO::NR30.access());
+        for wave in &self.registers.pattern {
+            wave.set_access(IO::WaveRam0.access());
+        }
+    }
+
+    fn power_off(&mut self) {
+        self.registers.dac_enable.set_access(AccessMode::rdonly()).direct_write(0);
+        for wave in &self.registers.pattern {
+            wave.set_access(AccessMode::rdonly()).direct_write(0);
         }
     }
 }

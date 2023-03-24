@@ -71,7 +71,10 @@ impl SoundChannel for Channel {
         if !self.triggered { return }
         if self.freq_timer == 0 {
             self.freq_timer = self.frequency();
-            if self.freq_timer == 0 { return; }
+            if self.freq_timer == 0 {
+                self.triggered = false;
+                return;
+            }
             let mut r = self.buffer & 1;
             self.buffer >>= 1;
             r ^= self.buffer & 1;
