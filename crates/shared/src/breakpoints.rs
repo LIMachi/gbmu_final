@@ -1,10 +1,9 @@
 use std::cell::{RefCell, RefMut};
 use std::fmt::Formatter;
-use std::io::Read;
 use std::rc::Rc;
 use super::{Cpu, registers, value};
 use serde::{Serialize, Deserialize};
-use crate::cpu::{Bus, Op, Opcode};
+use crate::cpu::{Op, Opcode};
 use crate::utils::Cell;
 use crate::utils::convert::Converter;
 
