@@ -4,7 +4,7 @@ use super::Mbc;
 
 pub struct Mbc2 { }
 impl super::MemoryController for Mbc2 {
-    fn new(rom: &Rom, ram: Vec<u8>) -> Self where Self: Sized {
+    fn new(_rom: &Rom, _ram: Vec<u8>) -> Self where Self: Sized {
         Self { }
     }
 
