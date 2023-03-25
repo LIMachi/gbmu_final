@@ -1,4 +1,3 @@
-use std::time::Instant;
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus};
 use shared::utils::FEdge;
@@ -31,13 +30,13 @@ impl Timer {
         self.timer = v;
         let mut d = self.div.value();
         if c {
-            let (d, o) = d.overflowing_add( 1);
+            d = d.wrapping_add(1);
             self.div.direct_write(d);
         }
         let tac = self.tac.value();
         let tac_enable = tac & 4 != 0;
         let edge = tac_enable && (match tac & 0x3 {
-            0 => self.div.value() >> 1,
+            0 => d >> 1,
             1 => self.timer >> 3,
             2 => self.timer >> 5,
             3 => self.timer >> 7,

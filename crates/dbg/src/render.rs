@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::str::FromStr;
 use egui_extras::Column;
 use super::{Emulator, Ninja};

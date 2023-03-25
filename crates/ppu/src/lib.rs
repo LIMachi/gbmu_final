@@ -1,6 +1,7 @@
 #![feature(slice_flatten)]
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
+#![feature(if_let_guard)]
 
 extern crate core;
 

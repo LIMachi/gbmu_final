@@ -2,7 +2,6 @@ use serde::{Serialize, Deserialize};
 use super::mem::Mem;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::fmt::format;
 use crate::utils::Cell;
 
 #[derive(Debug, Copy, Clone)]
@@ -572,7 +571,7 @@ impl IOReg {
     pub fn rw() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::rw())))) }
     pub fn custom(bits: [Access; 8]) -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::Custom(bits))))) }
     pub fn with_access(mode: AccessMode) -> Self { IOReg(HReg::new(mode).cell()) }
-    pub fn with_value(mut self, value: u8) -> Self { self.direct_write(value); self }
+    pub fn with_value(self, value: u8) -> Self { self.direct_write(value); self }
     pub fn unset() -> Self { IOReg(HReg::new(AccessMode::Generic(Access::U)).cell()) }
 
     pub fn value(&self) -> u8 { self.0.borrow().v }

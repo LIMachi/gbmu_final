@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use shared::{mem::*, rom::{Rom, Mbc as Mbcs}};
-use shared::egui::Key::P;
 use crate::boot::Boot;
 
 pub mod mbc0;

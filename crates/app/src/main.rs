@@ -107,7 +107,9 @@ impl App {
                         sound: self.sound.clone(),
                         roms: self.roms.as_ref().take(),
                         debug: DbgConfig {
-                            breaks: self.emu.breakpoints().take()
+                            breaks: self.emu.breakpoints().take().into_iter()
+                                .filter(|x| !x.temp())
+                                .collect()
                         },
                         keys: self.bindings.clone(),
                         mode: self.emu.mode()

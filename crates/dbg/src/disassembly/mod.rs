@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Range;
 use egui_extras::{Column, TableBuilder};
-use log::log;
 use shared::breakpoints::{Breakpoint, Breakpoints};
 use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
