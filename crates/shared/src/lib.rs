@@ -17,6 +17,7 @@ pub mod breakpoints;
 pub use serde;
 
 pub mod input;
+pub mod audio_settings;
 
 
 #[derive(Copy, Debug, Eq, PartialEq, Hash, Clone)]

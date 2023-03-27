@@ -10,6 +10,7 @@ use crate::render::Proxy;
 
 use shared::serde::{Serialize, Deserialize};
 use shared::{Events, Handle};
+use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoint;
 use shared::input::Keybindings;
 
@@ -49,7 +50,9 @@ pub struct AppConfig {
     #[serde(default)]
     pub keys: Keybindings,
     #[serde(default)]
-    pub sound: apu::SoundConfig,
+    pub sound_device: apu::SoundConfig,
+    #[serde(default)]
+    pub audio_settings: AudioSettings,
     #[serde(default)]
     pub mode: super::settings::Mode,
 }

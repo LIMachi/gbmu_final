@@ -18,6 +18,7 @@ use apu::SoundConfig;
 use dbg::{Debugger, Schedule};
 use render::{windows::Windows, WindowType};
 use shared::{Events, Handle};
+use shared::audio_settings::AudioSettings;
 use shared::input::Keybindings;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
@@ -25,7 +26,8 @@ use crate::app::{AppConfig, DbgConfig, RomConfig};
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
-    sound: SoundConfig,
+    sound_device: SoundConfig,
+    audio_settings: AudioSettings,
     bindings: Keybindings,
     roms: Rc<RefCell<RomConfig>>,
     emu: emulator::Emulator,
@@ -45,7 +47,8 @@ impl App {
         let roms = conf.roms.cell();
         let dbg = Debugger::new(emu.clone());
         Self {
-            sound: conf.sound,
+            sound_device: conf.sound_device,
+            audio_settings: conf.audio_settings,
             roms,
             bindings,
             event_loop: Some(e),
@@ -104,7 +107,8 @@ impl App {
                 },
                 Event::UserEvent(Events::Close) => {
                     let conf = AppConfig {
-                        sound: self.sound.clone(),
+                        sound_device: self.sound_device.clone(),
+                        audio_settings: self.audio_settings.clone(),
                         roms: self.roms.as_ref().take(),
                         debug: DbgConfig {
                             breaks: self.emu.breakpoints().take().into_iter()

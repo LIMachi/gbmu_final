@@ -22,9 +22,9 @@ impl Default for Input {
 }
 
 impl Input {
-    pub fn write_sample(&mut self, samples: [f32; 2]) {
-        self.0.as_ref().borrow_mut().push(samples[0]).ok();
-        self.0.as_ref().borrow_mut().push(samples[1]).ok();
+    pub fn write_sample(&mut self, samples: [f32; 2], volume: f32) {
+        self.0.as_ref().borrow_mut().push(samples[0] * volume).ok();
+        self.0.as_ref().borrow_mut().push(samples[1] * volume).ok();
     }
 
     pub fn replace(&mut self, with: Producer<f32>) {
@@ -84,6 +84,10 @@ pub(crate) fn default_device() -> String {
 impl Audio {
     pub fn devices() -> impl Iterator<Item = Device> {
         cpal::default_host().output_devices().unwrap()
+    }
+
+    pub fn device(&self) -> String {
+        self.dev_name.clone()
     }
 
     pub fn sample_rate(&self) -> u32 { self.sample_rate.0 }

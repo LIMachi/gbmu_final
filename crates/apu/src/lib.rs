@@ -13,6 +13,7 @@ mod driver;
 
 pub use apu::Apu;
 use driver::{Audio, Input};
+use shared::audio_settings::AudioSettings;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SoundConfig {
@@ -39,6 +40,10 @@ impl Controller {
         Audio::devices().filter_map(|x| x.name().ok())
     }
 
+    pub fn device(&self) -> String {
+        self.driver.as_ref().borrow().device()
+    }
+
     pub fn switch<S: Into<String>>(&mut self, name: S) {
         self.driver.as_ref().borrow_mut()
             .switch(name)
@@ -52,7 +57,7 @@ impl Controller {
         Self { input, driver: audio.cell() }
     }
 
-    pub fn apu(&self) -> Apu {
-        Apu::new(self.driver.as_ref().borrow().sample_rate(), self.input.clone())
+    pub fn apu(&self, settings: AudioSettings) -> Apu {
+        Apu::new(self.driver.as_ref().borrow().sample_rate(), self.input.clone(), settings)
     }
 }

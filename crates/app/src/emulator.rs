@@ -19,6 +19,7 @@ use crate::render::{Event, Render};
 mod joy;
 
 pub use joy::*;
+use shared::audio_settings::AudioSettings;
 use shared::input::{Keybindings, Section};
 use crate::settings::{Settings, Mode};
 
@@ -74,6 +75,7 @@ impl Default for Emu {
 pub struct Emulator {
     proxy: Proxy,
     audio: apu::Controller,
+    audio_settings: AudioSettings,
     bindings: Keybindings,
     breakpoints: Breakpoints,
     emu: Rc<RefCell<Emu>>,
@@ -87,14 +89,15 @@ impl Emulator {
             proxy,
             bindings,
             emu: Emu::default().cell(),
-            audio: apu::Controller::new(&conf.sound),
+            audio_settings: conf.audio_settings.clone(),
+            audio: apu::Controller::new(&conf.sound_device),
             breakpoints: Breakpoints::new(conf.debug.breaks.clone()),
-            cgb: conf.mode.cell()
+            cgb: conf.mode.cell(),
         }
     }
 
     pub fn settings(&self) -> Settings {
-        Settings::new(self.bindings.clone(), self.cgb.clone())
+        Settings::new(self.bindings.clone(), self.cgb.clone(), self.audio_settings.clone(), self.audio.clone())
     }
 
     pub fn mode(&self) -> Mode {
@@ -119,7 +122,7 @@ impl Emulator {
     }
 
     fn insert(&self, rom: Rom, running: bool) {
-        let emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(), running);
+        let emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(), running, self.audio_settings.clone());
         self.emu.replace(emu);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -212,14 +215,14 @@ impl Emu {
 
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool) -> Self {
+    pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool, audio_settings: AudioSettings) -> Self {
         let skip_boot = true; //TODO mettre a false
         let compat = rom.header.kind.cgb_mode(cgb);
         let mut joy = joy::Joypad::new(bindings);
         let mut timer = bus::Timer::default();
         let mut dma = ppu::Dma::default();
         let mut hdma = ppu::Hdma::default();
-        let mut apu = audio.apu();
+        let mut apu = audio.apu(audio_settings);
 
         let lcd = lcd::Lcd::new();
         let mut ppu = ppu::Controller::new(lcd.clone());

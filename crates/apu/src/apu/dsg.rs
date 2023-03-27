@@ -1,5 +1,7 @@
 mod channel;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 pub(crate) use channel::{Event, Channel};
 use shared::io::{AccessMode, IO, IOReg};
 
@@ -62,13 +64,17 @@ impl DSG {
         } else { 0. }
     }
 
-    pub fn tick(&mut self, channels: &mut [Channel]) -> [f32; 2] {
+    pub fn tick(&mut self, channels: &mut [Channel], state: &[Rc<RefCell<bool>>; 4]) -> [f32; 2] {
         self.output = [0.; 2];
         let mut any_dac = false;
+        let mut i = 0;
         channels.iter_mut()
             .for_each(|c| {
-            any_dac |= c.dac_enabled();
-            *self += c;
+                if *state[i].as_ref().borrow() {
+                    any_dac |= c.dac_enabled();
+                    *self += c;
+                }
+                i += 1;
         });
         self.tick += 1;
         if any_dac { self.hpf() } else { [0.; 2] }

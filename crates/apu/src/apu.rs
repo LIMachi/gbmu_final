@@ -5,6 +5,7 @@ mod dsg;
 
 use shared::io::{IO, IOReg};
 use dsg::{Channel, Event};
+use shared::audio_settings::AudioSettings;
 use shared::utils::FEdge;
 
 pub struct Apu {
@@ -20,6 +21,7 @@ pub struct Apu {
     ds: IOReg,
     channels: Vec<Channel>,
     on: bool,
+    settings: AudioSettings
 }
 
 impl Default for Apu {
@@ -37,7 +39,8 @@ impl Default for Apu {
             sound: Default::default(),
             div: Default::default(),
             ds: Default::default(),
-            on: false
+            on: false,
+            settings: Default::default(),
         }
     }
 }
@@ -48,7 +51,7 @@ impl Apu {
         0.999958f32.powf(4194304./ self.sample_rate as f32)
     }
 
-    pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
+    pub(crate) fn new(sample_rate: u32, input: Input, settings: AudioSettings) -> Self {
         #[cfg(feature = "debug")]
         let channels = vec![];
         #[cfg(not(feature = "debug"))]
@@ -70,7 +73,8 @@ impl Apu {
             channels,
             div: IOReg::unset(),
             ds: IOReg::rdonly(),
-            on: false
+            on: false,
+            settings
         }
     }
 
@@ -106,7 +110,7 @@ impl Apu {
     pub fn tick(&mut self) {
         self.sample += 1.;
         if self.sample >= self.tick {
-            self.input.write_sample(self.dsg.tick(&mut self.channels));
+            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels), *self.settings.volume.as_ref().borrow());
             self.sample -= self.tick;
         }
         if self.sound.dirty() { self.power(); }
