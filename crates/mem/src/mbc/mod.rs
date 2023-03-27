@@ -56,7 +56,7 @@ impl Controller {
         let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
             Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram)),
             Mbcs::MBC1 => Box::new(Boot::<mbc1::Mbc1>::new(rom, ram)),
-            Mbcs::MBC2 => unimplemented!(),
+            Mbcs::MBC2 => Box::new(Boot::<mbc2::Mbc2>::new(rom, ram)),
             Mbcs::MBC3 => Box::new(Boot::<mbc3::Mbc3>::new(rom, ram)),
             Mbcs::MBC5 => Box::new(Boot::<mbc5::Mbc5>::new(rom, ram)),
             Mbcs::Unknown => unimplemented!()

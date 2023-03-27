@@ -63,7 +63,7 @@ impl Capabilities {
     }
 
     pub fn save(&self) -> bool {
-        (self.0 & (capability::RAM | capability::BATT)) != 0
+        (self.0 & capability::BATT) != 0 //TODO gros cat pas sur ....
     }
 
     pub fn switch(&self) -> bool {
