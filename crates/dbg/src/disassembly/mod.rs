@@ -232,13 +232,13 @@ impl<E: Emulator> Disassembly<E> {
 
     pub fn render(&mut self, emu: &E, ui: &mut Ui, breakpoints: &Breakpoints) {
         let pc = emu.cpu_register(Reg::PC).u16();
+        self.ranges.iter_mut().for_each(|x| { x.update(emu); });
         let cursor = match self.cursor {
             Cursor::Follow => self.row(pc),
             Cursor::Fixed(row) => row,
         };
         ui.set_height(300.);
         let row = self.row(pc);
-        self.ranges.iter_mut().for_each(|x| { x.update(emu); });
         let mut table = TableBuilder::new(ui)
             .columns(Column::remainder(), 3)
             .striped(true)
