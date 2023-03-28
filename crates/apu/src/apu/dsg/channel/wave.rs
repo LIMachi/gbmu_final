@@ -83,7 +83,7 @@ impl SoundChannel for Channel {
     fn trigger(&mut self) -> bool {
         self.cycle = 1;
         self.freq_timer = 2 * (0x7FF - self.frequency()) | (self.freq_timer & 0x3);
-        true //FIXME: handle special cases/obscure behaviors
+        false //FIXME: handle special cases/obscure behaviors
     }
 
     fn length(&self) -> u8 { 0xFF }

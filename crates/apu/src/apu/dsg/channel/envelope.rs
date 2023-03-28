@@ -14,7 +14,6 @@ impl Envelope {
         self.base = self.value;
         self.period = data & 0x7;
         self.increase = data & 0x8 != 0;
-        if self.period == 0 { self.period = 8; }
     }
 
     pub fn clock(&mut self) {
