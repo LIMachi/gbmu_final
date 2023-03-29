@@ -17,7 +17,8 @@ members = [
     "crates/dbg",
     "crates/shared",
     "crates/ppu",
-    "crates/mem"
+    "crates/mem",
+    "crates/serial"
 ]
 
 [patch.crates-io]

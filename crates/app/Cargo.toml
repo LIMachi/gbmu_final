@@ -51,3 +51,5 @@ path = "../dbg"
 path = "../ppu"
 [dependencies.apu]
 path = "../apu"
+[dependencies.serial]
+path = "../serial"

@@ -18,7 +18,6 @@ use crate::render::{Event, Render};
 
 mod joy;
 
-pub use joy::*;
 use shared::audio_settings::AudioSettings;
 use shared::input::{Keybindings, Section};
 use crate::settings::{Settings, Mode};
@@ -35,6 +34,7 @@ pub struct Emu {
     pub hdma: ppu::Hdma,
     pub timer: bus::Timer,
     pub apu: apu::Apu,
+    pub serial: serial::Port,
     running: bool
 }
 
@@ -45,6 +45,7 @@ impl Default for Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
 
         let joy = joy::Joypad::new(Default::default());
+        let serial = serial::Port::new();
         let dma = ppu::Dma::default();
         let hdma = ppu::Hdma::default();
         let timer = bus::Timer::default();
@@ -66,6 +67,7 @@ impl Default for Emu {
             hdma,
             bus,
             timer,
+            serial,
             running: false
         }
     }
@@ -97,7 +99,7 @@ impl Emulator {
     }
 
     pub fn settings(&self) -> Settings {
-        Settings::new(self.bindings.clone(), self.cgb.clone(), self.audio_settings.clone(), self.audio.clone())
+        Settings::new(self.bindings.clone(), self.cgb.clone(), self.audio_settings.clone(), self.audio.clone(), self.proxy.clone())
     }
 
     pub fn mode(&self) -> Mode {
@@ -150,6 +152,9 @@ impl Render for Emulator {
                 if let WindowEvent::KeyboardInput { input, .. } = event {
                     self.emu.as_ref().borrow_mut().joy.handle(*input);
                 }
+            },
+            Event::UserEvent(Events::Connect(addr, port)) => {
+                self.emu.as_ref().borrow_mut().serial.connect(*addr, *port);
             },
             _ => {}
         }
@@ -223,6 +228,7 @@ impl Emu {
         let mut dma = ppu::Dma::default();
         let mut hdma = ppu::Hdma::default();
         let mut apu = audio.apu(audio_settings);
+        let mut serial = serial::Port::new();
 
         let lcd = lcd::Lcd::new();
         let mut ppu = ppu::Controller::new(lcd.clone());
@@ -241,7 +247,8 @@ impl Emu {
             .configure(&mut timer)
             .configure(&mut cpu)
             .configure(&mut joy)
-            .configure(&mut apu);
+            .configure(&mut apu)
+            .configure(&mut serial);
         timer.offset();
         if skip_boot {
             IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
@@ -262,6 +269,7 @@ impl Emu {
             dma,
             hdma,
             timer,
+            serial,
             rom: Some(rom),
             running,
             apu
@@ -273,6 +281,7 @@ impl Emu {
         match std::panic::catch_unwind(AssertUnwindSafe(|| {
             self.joy.tick();
             let tick = self.hdma.tick(&mut self.bus);
+            self.serial.tick();
             self.bus.tick();
             if clock == 0 /*|| (clock == 2 && self.cpu.double_speed())*/ {
                 self.timer.tick();

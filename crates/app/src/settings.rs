@@ -1,13 +1,15 @@
 use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use apu::Controller;
 use shared::{egui, Events};
 use shared::audio_settings::AudioSettings;
-use shared::egui::{Align, Button, CentralPanel, Context, Response, TextBuffer, Ui, Vec2};
+use shared::egui::{Align, Button, CentralPanel, Context, Response, TextBuffer, TextEdit, Ui, Vec2};
 use shared::input::{Keybindings, Section};
+use crate::render::Proxy;
 
 pub struct Settings {
     bindings: Keybindings,
@@ -15,18 +17,24 @@ pub struct Settings {
     audio: AudioSettings,
     audio_device: Controller,
     devices: Vec<String>,
-    key: Option<Section>
+    key: Option<Section>,
+    host: String,
+    port: String,
+    proxy: Proxy
 }
 
 impl Settings {
-    pub fn new(bindings: Keybindings, cgb: Rc<RefCell<Mode>>, audio: AudioSettings, audio_device: Controller) -> Self {
+    pub fn new(bindings: Keybindings, cgb: Rc<RefCell<Mode>>, audio: AudioSettings, audio_device: Controller, proxy: Proxy) -> Self {
         Self {
             bindings,
             cgb,
             audio,
             audio_device,
             devices: Controller::devices().collect(),
-            key:None
+            key:None,
+            host: "127.0.0.1".to_string(),
+            port: "27542".to_string(),
+            proxy
         }
     }
 }
@@ -165,6 +173,34 @@ impl shared::Ui for Settings {
                 });
                 if device != self.audio_device.device() {
                     self.audio_device.switch(device);
+                }
+                ui.separator();
+                ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
+                    ui.label("SERIAL");
+                });
+                ui.horizontal(|ui| {
+                    let host = TextEdit::singleline(&mut self.host).desired_width(120.);
+                    ui.label("Host: ");
+                    ui.add(host);
+                });
+                ui.horizontal(|ui| {
+                    let port = TextEdit::singleline(&mut self.port).desired_width(48.);
+                    ui.label(" Port: ");
+                    ui.add(port);
+                });
+                if ui.button("Connect").clicked() {
+                    match (self.host.parse(), self.port.parse()) {
+                        (Ok(addr), Ok(port)) => {
+                            let addr: Ipv4Addr = addr;
+                            let port: u16 = port;
+                            let event = Events::Connect(addr, port);
+                            log::info!("serial connection request to {event:?}");
+                            self.proxy.send_event(event).expect("failed to send event through proxy");
+                        },
+                        (a, p) => {
+                            log::warn!("failed to parse: {a:?}, {p:?}");
+                        }
+                    }
                 }
             });
     }
