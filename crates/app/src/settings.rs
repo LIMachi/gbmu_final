@@ -1,13 +1,12 @@
-use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::Ipv4Addr;
 use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use apu::Controller;
 use shared::{egui, Events};
 use shared::audio_settings::AudioSettings;
-use shared::egui::{Align, Button, CentralPanel, Context, Response, TextBuffer, TextEdit, Ui, Vec2};
+use shared::egui::{Align, Button, CentralPanel, Context, Response, TextEdit, Ui, Vec2};
 use shared::input::{Keybindings, Section};
 use crate::render::Proxy;
 

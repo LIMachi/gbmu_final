@@ -28,7 +28,7 @@ impl Channel {
     }
 
     fn frequency(&self) -> u16 {
-        self.registers.wave1.read() as u16 | ((self.registers.wave2.read() as u16 & 0x7) << 8)
+        self.registers.wave1.value() as u16 | ((self.registers.wave2.value() as u16 & 0x7) << 8)
     }
 }
 

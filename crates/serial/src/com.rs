@@ -22,7 +22,7 @@ impl Client {
             loop {
                 match self.inner.read_exact(&mut buf) {
                     Ok(()) => match self.data.send(buf[0]) {
-                        Err(e) => { log::warn!("client: failed to send down recv data"); break },
+                        Err(_) => { log::warn!("client: failed to send down recv data"); break },
                         _ => {}
                     },
                     Err(e) => {
@@ -51,7 +51,7 @@ pub struct Serial {
 impl Serial {
     pub fn build() -> Self {
         let connected = Arc::new(Mutex::new(false));
-        let mut srv = TcpListener::bind(
+        let srv = TcpListener::bind(
             &(27542..27552).map(|port| SocketAddr::from(([0, 0, 0, 0], port)))
                 .collect::<Vec<SocketAddr>>()[..]).expect("failed to find available port");
         srv.set_nonblocking(true).expect("failed to set nonblocking");
@@ -63,7 +63,7 @@ impl Serial {
         let (tx_c, rx_c) = channel();
         let clone = connected.clone();
         std::thread::spawn(move || {
-            let mut connected = clone;
+            let connected = clone;
             let mut rx = None;
             let mut client = None;
             loop {

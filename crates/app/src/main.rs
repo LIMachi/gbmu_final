@@ -164,7 +164,9 @@ fn main() {
                 st.pause();
             }
             if st.elapsed().as_secs() != 0 {
-                log::debug!("cycles: {}", cycles as f64 / st.elapsed().as_secs_f64());
+                let t = cycles as f64 / st.elapsed().as_secs_f64();
+                let p = (t / 4194304.) * 100.;
+                log::debug!("cycles: {:.0} ({:0.2} %)", t, p);
                 st.stop();
                 st.start();
                 cycles = 0;

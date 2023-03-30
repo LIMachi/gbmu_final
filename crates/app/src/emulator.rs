@@ -283,7 +283,7 @@ impl Emu {
             let tick = self.hdma.tick(&mut self.bus);
             self.serial.tick();
             self.bus.tick();
-            if clock == 0 /*|| (clock == 2 && self.cpu.double_speed())*/ {
+            if clock == 0 || (clock == 2 && self.cpu.double_speed()) {
                 self.timer.tick();
                 self.dma.tick(&mut self.bus);
                 if !tick {
@@ -291,7 +291,7 @@ impl Emu {
                 }
             }
             self.ppu.tick();
-            self.apu.tick();
+            self.apu.tick(self.cpu.double_speed());
             self.running &= bp.tick(&self.cpu, self.bus.last());
             self.cpu.reset_finished();
         })) {

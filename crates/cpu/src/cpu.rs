@@ -22,7 +22,8 @@ pub struct Cpu {
     ime: bool,
     cgb: IOReg,
     int_flags: IOReg,
-    ie: IOReg
+    ie: IOReg,
+    ds: IOReg
 }
 
 impl shared::Cpu for Cpu {
@@ -47,7 +48,12 @@ impl Cpu {
             int_flags: IOReg::unset(),
             ie: IOReg::unset(),
             at: 0,
+            ds: IOReg::unset()
         }
+    }
+
+    pub fn double_speed(&self) -> bool {
+        self.cgb.value() != 0 && self.ds.bit(7) != 0
     }
 
     pub fn skip_boot(mut self) -> Self {
@@ -134,5 +140,6 @@ impl Device for Cpu {
         self.cgb = bus.io(IO::CGB);
         self.ie = bus.io(IO::IE);
         self.int_flags = bus.io(IO::IF);
+        self.ds = bus.io(IO::KEY1);
     }
 }

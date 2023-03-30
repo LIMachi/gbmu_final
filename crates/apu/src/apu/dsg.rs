@@ -23,7 +23,6 @@ pub(crate) struct DSG {
     volume: IOReg,
     output: [f32; 2],
     capacitor: [f32; 2],
-    tick: usize,
     charge_factor: f32,
     cgb_mode: bool
 }
@@ -36,7 +35,6 @@ impl DSG {
             cgb_mode: Default::default(),
             output: [0.; 2],
             capacitor: [0.; 2],
-            tick: 0,
             charge_factor,
         }
     }
@@ -46,8 +44,6 @@ impl DSG {
     }
 
     pub fn hpf(&mut self) -> [f32; 2] {
-        // TODO add volume knob
-        let k = 0.1;
         let vol = self.volume.value();
         let [l, r] = [1 + (vol & 0x70) >> 4, (vol & 0x7) + 1];
         let [vl, vr] = [l as f32 / 8., r as f32 / 8.];
@@ -55,7 +51,7 @@ impl DSG {
         let [cl, cr] = self.capacitor; // -1.
         let [ol, or] = [l - cl, r - cr]; // 1
         self.capacitor = [l - ol * self.charge_factor, r - or * self.charge_factor]; // 0 - 1 * 0.998 -> -0.998
-        [ol * vl * k, or * vr * k]
+        [ol * vl, or * vr]
     }
 
     fn panned(&self, side: Panning, channel: &mut Channel) -> f32 {
@@ -76,7 +72,6 @@ impl DSG {
                 }
                 i += 1;
         });
-        self.tick += 1;
         if any_dac { self.hpf() } else { [0.; 2] }
     }
 

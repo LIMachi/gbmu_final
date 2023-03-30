@@ -1,4 +1,3 @@
-use std::ops::AddAssign;
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus, Source};
 
@@ -36,7 +35,6 @@ pub struct Hdma {
     count: u8,
     src: u16,
     dst: u16,
-    ctrl: u8,
 }
 
 impl Default for Hdma {
@@ -52,7 +50,6 @@ impl Default for Hdma {
             state: State::Wait,
             statv: 0,
             mode: None,
-            ctrl: 0xFF,
             count: 0,
             src: 0,
             dst: 0
@@ -93,7 +90,7 @@ impl Hdma {
                     self.state = if mode == Mode::HBlank { State::WaitHblank } else { State::Transfer };
                     log::info!("HDMA ({mode:?}): [{src:#04X}-{:#04X}] -> [{dst:#04X}-{:#04X}] ({})", src + len as u16, dst + len as u16, len);
                 },
-                Some(mode) if self.control.bit(7) == 0 => {
+                Some(_) if self.control.bit(7) == 0 => {
                     log::info!("HDMA paused");
                     self.control.set(7);
                     self.count = 0;

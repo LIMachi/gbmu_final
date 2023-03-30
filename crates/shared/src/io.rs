@@ -429,6 +429,7 @@ impl IO {
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Access { W, R, RW, U }
+#[derive(Debug)]
 pub enum AccessMode { Generic(Access), Custom([Access; 8]) }
 
 impl Access {
@@ -452,7 +453,7 @@ impl AccessMode {
             AccessMode::Generic(acc) => acc.read_mask(),
             AccessMode::Custom(bits) => {
                 let mut mask = 0;
-                for b in 0..7 {
+                for b in 0..8 {
                     mask |= match bits[b] {
                         Access::R | Access::RW => 1,
                         Access::W | Access::U => 0
@@ -468,7 +469,7 @@ impl AccessMode {
             AccessMode::Generic(acc) => acc.write_mask(),
             AccessMode::Custom(bits) => {
                 let mut mask = 0;
-                for b in 0..7 {
+                for b in 0..8 {
                     mask |= match bits[b] {
                         Access::W | Access::RW => 1,
                         Access::R | Access::U => 0

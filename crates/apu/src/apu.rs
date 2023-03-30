@@ -8,6 +8,8 @@ use dsg::{Channel, Event};
 use shared::audio_settings::AudioSettings;
 use shared::utils::FEdge;
 
+pub const TICK_RATE: f64 = 4_194_304.;
+
 pub struct Apu {
     fedge: FEdge,
     div_apu: u8,
@@ -18,7 +20,6 @@ pub struct Apu {
     dsg: dsg::DSG,
     sound: IOReg,
     div: IOReg,
-    ds: IOReg,
     channels: Vec<Channel>,
     on: bool,
     settings: AudioSettings
@@ -32,13 +33,12 @@ impl Default for Apu {
             div_apu: 0,
             sample: 0.,
             sample_rate,
-            tick: 4_194_304. / sample_rate as f64,
+            tick: TICK_RATE / sample_rate as f64,
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
             channels: vec![],
             sound: Default::default(),
             div: Default::default(),
-            ds: Default::default(),
             on: false,
             settings: Default::default(),
         }
@@ -48,7 +48,7 @@ impl Default for Apu {
 impl Apu {
     fn charge_factor(&self) -> f32 {
         // TODO match on hypothetical cgb bus (0.998943 for cgb)
-        0.999958f32.powf(4194304./ self.sample_rate as f32)
+        0.999958f32.powf(TICK_RATE as f32 / self.sample_rate as f32)
     }
 
     pub(crate) fn new(sample_rate: u32, input: Input, settings: AudioSettings) -> Self {
@@ -66,13 +66,12 @@ impl Apu {
             div_apu: 0,
             sample: 0.,
             sample_rate,
-            tick: 4_194_304. / sample_rate as f64,
+            tick: TICK_RATE / sample_rate as f64,
             input,
             sound: IOReg::unset(),
             dsg: dsg::DSG::new(1.),
             channels,
             div: IOReg::unset(),
-            ds: IOReg::rdonly(),
             on: false,
             settings
         }
@@ -81,7 +80,7 @@ impl Apu {
     // TODO call this on Events::AudioDevice
     pub fn update_sample_rate(&mut self, sample_rate: u32) {
         self.sample = 0.;
-        self.tick = 4_194_304. / sample_rate as f64;
+        self.tick = TICK_RATE / sample_rate as f64;
         self.sample_rate = sample_rate;
         self.dsg.set_charge_factor(self.charge_factor());
     }
@@ -107,7 +106,7 @@ impl Apu {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, double_speed: bool) {
         self.sample += 1.;
         if self.sample >= self.tick {
             self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels), *self.settings.volume.as_ref().borrow());
@@ -118,7 +117,7 @@ impl Apu {
         for channel in self.channels.iter_mut() {
             channel.clock();
         }
-        if self.fedge.tick(self.div.bit(if self.ds.bit(7) != 0 { 5 } else { 4 }) != 0) {
+        if self.fedge.tick(self.div.bit(if double_speed { 5 } else { 4 }) != 0) {
             match self.div_apu {
                 0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length)),
                 2 | 6 => self.channels.iter_mut().for_each(|x| {
@@ -143,6 +142,5 @@ impl shared::mem::Device for Apu {
         self.dsg.configure(bus);
         self.dsg.set_charge_factor(self.charge_factor());
         self.div = bus.io(IO::DIV);
-        self.ds = bus.io(IO::KEY1);
     }
 }

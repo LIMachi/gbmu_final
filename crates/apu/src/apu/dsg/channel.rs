@@ -176,7 +176,6 @@ impl Channel {
             let n = (self.inner.channel() as u8) & 1;
             let t = self.pcm.value() & (0xF0 >> (4 * n));
             let p = t | ((out & 0xF) << (4 * n));
-            // println!("{n} {t} {p}");
             self.pcm.direct_write(p);
         }
         self.dac.tick(if self.dac_enabled() { Some(1. - out as f32 / 7.5) } else { None })
