@@ -1,5 +1,5 @@
 use mem::oam::Sprite;
-use shared::io::LCDC;
+use shared::io::{CGB_MODE, LCDC};
 use shared::mem::Source;
 use crate::ppu::pixel::Attributes;
 use super::{Pixel, Ppu, fifo::*};
@@ -84,7 +84,7 @@ impl Fetcher {
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
         self.tile = ppu.vram().get(Source::Ppu, |vram| vram.read_bank(addr, 0)) as u16;
-        if ppu.regs.cgb.read() != 0 {
+        if ppu.regs.key0.value() & CGB_MODE != 0 {
             self.attrs = Attributes(ppu.vram().get(Source::Ppu, |v| v.read_bank(addr, 1)));
         }
         State::DataLow
@@ -150,7 +150,7 @@ impl Fetcher {
                 self.set_mode(self.prev);
                 bg.enable();
             } else if bg.push(colors.into_iter().map(|x|
-                Pixel::bg(if ppu.regs.cgb.read() == 0 && !ppu.lcdc.priority() { 0 } else { x }, self.attrs)
+                Pixel::bg(if ppu.regs.key0.value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { x }, self.attrs)
             ).collect()) {
                 self.x += 1;
             } else {

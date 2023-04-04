@@ -39,6 +39,7 @@ impl Client {
     }
 }
 
+
 pub struct Serial {
     stop: Sender<Event>,
     events: Receiver<Event>,

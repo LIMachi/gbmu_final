@@ -2,7 +2,7 @@
 
 use std::cell::{Ref, RefCell};
 use std::rc::Rc;
-use mem::Hram;
+use mem::{Hram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::io::{IO, IOReg};
 use shared::utils::Cell;
@@ -31,18 +31,16 @@ pub struct Bus {
     io: io::IORegs,
     ie: IOReg,
     status: MemStatus,
-    last: Option<Op>,
-    cgb: bool,
+    last: Option<Op>
 }
 
 impl Bus {
-    pub fn new(cgb: bool, compat: bool) -> Self {
+    pub fn new(cgb: bool) -> Self {
         Self {
             clock: 0,
             mbc: mem::mbc::Controller::unplugged().cell(),
-            cgb,
             last: None,
-            io: io::IORegs::init(compat),
+            io: io::IORegs::init(cgb),
             rom: Empty { }.locked_cell(),
             srom: Empty { }.locked_cell(),
             sram: Empty { }.locked_cell(),
@@ -53,11 +51,12 @@ impl Bus {
             un_1: Empty { }.locked_cell(),
             ie: IOReg::with_access(IO::IE.access()),
             status: MemStatus::ReqRead(0x0)
-        }
+        }.with_wram(Wram::new(cgb))
     }
 
-    pub fn skip_boot(mut self) -> Self {
+    pub fn skip_boot(mut self, console: u8) -> Self {
         self.status = MemStatus::ReqRead(0x100);
+        self.io.skip_boot(console);
         self
     }
 
@@ -87,7 +86,6 @@ impl Bus {
             ECHO..=ECHO_END => self.ram.write(addr - ECHO, value, addr),
             OAM..=OAM_END => self.oam.write(addr - OAM, value, addr),
             UN_1..=UN_1_END => self.un_1.write(addr - UN_1, value, addr),
-            BOOT => self.rom.write(BOOT, value, BOOT),
             IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
@@ -135,7 +133,7 @@ impl IOBus for Bus {
         self.read(addr)
     }
 
-    fn is_cgb(&self) -> bool { self.cgb }
+    fn is_cgb(&self) -> bool { self.io.io(IO::CGB).value() != 0 }
 
     fn read_with(&self, addr: u16, source: Source) -> u8 {
         match addr {
@@ -167,10 +165,6 @@ impl IOBus for Bus {
             HRAM..=HRAM_END => self.hram.write_with(addr - HRAM, value, addr, source),
             END => { self.ie.write_with(0, value, addr, source) }
         }
-    }
-
-    fn write(&mut self, addr: u16, value: u8) {
-        self.write(addr, value);
     }
 
     fn lock(&mut self) {
@@ -244,6 +238,16 @@ impl shared::cpu::Bus for Bus {
     fn write(&mut self, addr: u16, value: u8) {
         self.last = Some(Op::Write(addr, value));
         self.write(addr, value);
+        match addr {
+            0xFF50 if self.io.writable(IO::POST) => {
+                self.mbc.as_ref().borrow_mut().post();
+                self.io.post();
+            },
+            0xFF4C if self.io.writable(IO::KEY0) => {
+                self.io.compat_mode();
+            }
+            _ => {}
+        }
     }
 
     fn direct_read(&self, offset: u16) -> u8 {

@@ -13,6 +13,7 @@ use crate::render::Proxy;
 pub struct Settings {
     bindings: Keybindings,
     cgb: Rc<RefCell<Mode>>,
+    bios: Rc<RefCell<bool>>,
     audio: AudioSettings,
     audio_device: Controller,
     devices: Vec<String>,
@@ -23,10 +24,11 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new(bindings: Keybindings, cgb: Rc<RefCell<Mode>>, audio: AudioSettings, audio_device: Controller, proxy: Proxy) -> Self {
+    pub fn new(bindings: Keybindings, cgb: Rc<RefCell<Mode>>, bios: Rc<RefCell<bool>>, audio: AudioSettings, audio_device: Controller, proxy: Proxy) -> Self {
         Self {
             bindings,
             cgb,
+            bios,
             audio,
             audio_device,
             devices: Controller::devices().collect(),
@@ -127,6 +129,7 @@ impl shared::Ui for Settings {
         CentralPanel::default()
             .show(ctx, |ui: &mut Ui| {
                 let mut model = *self.cgb.as_ref().borrow();
+                let mut bios = *self.bios.as_ref().borrow();
                 let mut global_volume = *self.audio.volume.as_ref().borrow();
                 let mut chan1 = *self.audio.channels[0].as_ref().borrow();
                 let mut chan2 = *self.audio.channels[1].as_ref().borrow();
@@ -149,6 +152,8 @@ impl shared::Ui for Settings {
                 ui.radio_value(&mut model, Mode::Dmg, format!("{:?}", Mode::Dmg));
                 ui.radio_value(&mut model, Mode::Cgb, format!("{:?}", Mode::Cgb));
                 self.cgb.replace(model);
+                ui.checkbox(&mut bios, "enable boot rom");
+                self.bios.replace(bios);
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("SOUNDS");

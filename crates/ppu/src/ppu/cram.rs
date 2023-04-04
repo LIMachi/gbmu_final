@@ -1,4 +1,4 @@
-use shared::io::{IO, IOReg};
+use shared::io::{CGB_MODE, IO, IOReg};
 use shared::mem::{Device, IOBus};
 
 pub struct CRAM {
@@ -11,7 +11,7 @@ pub struct CRAM {
     ocpd: IOReg,
     bgdata: [u8; 64],
     objdata: [u8; 64],
-    pub cgb: IOReg,
+    pub key0: IOReg,
 }
 
 impl Default for CRAM {
@@ -26,7 +26,7 @@ impl Default for CRAM {
             ocpd: Default::default(),
             bgdata: [0xFF; 64],
             objdata: [0; 64],
-            cgb: Default::default()
+            key0: Default::default()
         }
     }
 }
@@ -48,7 +48,7 @@ impl CRAM {
     pub fn color(&self, pixel: super::Pixel) -> [u8; 3] {
         const DMG_COLORS: [[u8; 3]; 4] = [[0xBF; 3], [0x7F; 3], [0x3F; 3], [0; 3]];
 
-        match (pixel.color, pixel.attrs, pixel.sprite, self.cgb.read() != 0) {
+        match (pixel.color, pixel.attrs, pixel.sprite, self.key0.value() & CGB_MODE != 0) {
             (c, a, true, false) => {
                 let palette = if a.obp1() { &self.obp1 } else { &self.obp0 }.read() >> (2 * c);
                 DMG_COLORS[(palette & 3) as usize]
@@ -73,7 +73,6 @@ impl CRAM {
     // TODO lock access
     pub fn tick(&mut self) {
         if self.bcpd.dirty() {
-            //println!("{:#06X}-> {:04X}", self.bcps.value(), self.bcpd.value());
             self.bcpd.reset_dirty();
             let inc = self.bcps.bit(7) != 0;
             let addr = self.bcps.value() & 0x3F;
@@ -99,6 +98,6 @@ impl Device for CRAM {
         self.bcpd = bus.io(IO::BCPD);
         self.ocps = bus.io(IO::OCPS);
         self.ocpd = bus.io(IO::OCPD);
-        self.cgb = bus.io(IO::CGB);
+        self.key0 = bus.io(IO::KEY0);
     }
 }

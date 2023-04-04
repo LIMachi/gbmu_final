@@ -12,10 +12,10 @@ impl Clock {
             round: cycle_len
         }
     }
-    pub fn tick(&mut self) -> bool {
+    pub fn tick(&mut self) -> u8 {
         self.inner += 1;
         self.inner %= self.round;
-        self.inner == 0
+        self.inner
     }
 
     pub fn value(&self) -> u8 { self.inner }

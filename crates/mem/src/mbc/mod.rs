@@ -34,11 +34,9 @@ impl MemoryController for Unplugged {
     fn ram_dump(&self) -> Vec<u8> { vec![] }
 }
 
-
 pub struct Controller {
     sav: Option<PathBuf>,
-    inner: Box<dyn Mbc>,
-    boot: bool,
+    inner: Box<dyn Mbc>
 }
 
 impl Controller {
@@ -64,21 +62,17 @@ impl Controller {
 
         Self {
             sav,
-            inner,
-            boot: true
+            inner
         }
     }
 
     pub fn skip_boot(mut self) -> Self {
-        if self.boot {
-            self.boot = false;
-            self.inner = self.inner.unmap();
-        }
+        self.post();
         self
     }
 
     pub fn unplugged() -> Self {
-        Self { sav: None, boot: false, inner: Box::new(Unplugged { }) }
+        Self { sav: None, inner: Box::new(Unplugged { }) }
     }
 }
 
@@ -99,6 +93,8 @@ impl MBCController for Controller {
     fn rom_bank(&self) -> usize { self.inner.rom_bank() }
     fn ram_bank(&self) -> usize { self.inner.ram_bank() }
     fn tick(&mut self) { self.inner.tick(); }
+
+    fn post(&mut self) { self.inner = self.inner.unmap(); }
 }
 
 impl Mem for Controller {
@@ -111,13 +107,7 @@ impl Mem for Controller {
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        if !self.boot || absolute != 0xFF50 {
-            self.inner.write(addr, value, absolute);
-        } else {
-            log::info!("unmapping boot");
-            self.inner = self.inner.unmap();
-            self.boot = false;
-        }
+        self.inner.write(addr, value, absolute);
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {

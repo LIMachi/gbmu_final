@@ -1,13 +1,11 @@
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
-use std::panic::AssertUnwindSafe;
-use log::error;
 use winit::event::{VirtualKeyCode, WindowEvent};
 use dbg::BusWrapper;
-use mem::{mbc, Wram};
+use mem::mbc;
 use shared::breakpoints::Breakpoints;
 use shared::rom::Rom;
-use shared::{io::IO, Events, Ui, egui::Context};
+use shared::{Events, Ui, egui::Context};
 use shared::cpu::Bus;
 use shared::winit::window::Window;
 use shared::mem::{IOBus, MBCController, MemoryBus};
@@ -51,9 +49,8 @@ impl Default for Emu {
         let timer = bus::Timer::default();
         let cpu = cpu::Cpu::new();
         let apu = apu::Apu::default();
-        let bus = bus::Bus::new(false, false)
+        let bus = bus::Bus::new(false)
             .with_mbc(mbc)
-            .with_wram(Wram::new(false))
             .with_ppu(&mut ppu);
         Self {
             apu,
@@ -82,6 +79,7 @@ pub struct Emulator {
     breakpoints: Breakpoints,
     emu: Rc<RefCell<Emu>>,
     cgb: Rc<RefCell<Mode>>,
+    bios: Rc<RefCell<bool>>,
 }
 
 impl Emulator {
@@ -95,23 +93,30 @@ impl Emulator {
             audio: apu::Controller::new(&conf.sound_device),
             breakpoints: Breakpoints::new(conf.debug.breaks.clone()),
             cgb: conf.mode.cell(),
+            bios: conf.bios.cell(),
         }
     }
 
     pub fn settings(&self) -> Settings {
-        Settings::new(self.bindings.clone(), self.cgb.clone(), self.audio_settings.clone(), self.audio.clone(), self.proxy.clone())
+        Settings::new(self.bindings.clone(), self.cgb.clone(), self.bios.clone(), self.audio_settings.clone(), self.audio.clone(), self.proxy.clone())
     }
 
     pub fn mode(&self) -> Mode {
         *self.cgb.as_ref().borrow()
     }
 
-    pub fn cycle(&mut self, clock: u8) -> bool { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints) }
+    pub fn enabled_boot(&self) -> bool {
+        *self.bios.as_ref().borrow()
+    }
+
+    pub fn cycle(&mut self, clock: u8) { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints); }
 
     pub fn is_running(&self) -> bool { self.emu.as_ref().borrow().running }
 
     pub fn stop(&mut self) {
+        // TODO drop serial first ?
         self.emu.replace(Emu::default());
+
     }
 
     pub fn cycle_time(&self) -> f64 {
@@ -124,7 +129,7 @@ impl Emulator {
     }
 
     fn insert(&self, rom: Rom, running: bool) {
-        let emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(), running, self.audio_settings.clone());
+        let emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(),self.enabled_boot(), running, self.audio_settings.clone());
         self.emu.replace(emu);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -220,27 +225,24 @@ impl Emu {
 
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, running: bool, audio_settings: AudioSettings) -> Self {
-        let skip_boot = true; //TODO mettre a false
-        let compat = rom.header.kind.cgb_mode(cgb);
+    pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, bios: bool, running: bool, audio_settings: AudioSettings) -> Self {
+        let skip_boot = !bios;
         let mut joy = joy::Joypad::new(bindings);
         let mut timer = bus::Timer::default();
         let mut dma = ppu::Dma::default();
         let mut hdma = ppu::Hdma::default();
         let mut apu = audio.apu(audio_settings);
-        let mut serial = serial::Port::new();
+        let mut serial = serial::Port::new(); // TODO move Serial over to Emulator (allows for earlier connection). use RefCell and borrow for Emu lifetime
 
         let lcd = lcd::Lcd::new();
         let mut ppu = ppu::Controller::new(lcd.clone());
 
         let mbc = mem::mbc::Controller::new(&rom);
-        let cpu = cpu::Cpu::new();
-        let bus = bus::Bus::new(cgb, compat);
+        let mut cpu = cpu::Cpu::new();
+        let bus = bus::Bus::new(cgb);
         let mbc = if skip_boot { mbc.skip_boot() } else { mbc };
-        let mut cpu = if skip_boot { cpu.skip_boot() } else { cpu };
-        let mut bus = if skip_boot { bus.skip_boot() } else { bus }
+        let bus = if skip_boot { bus.skip_boot(rom.raw()[0x143]) } else { bus }
             .with_mbc(mbc)
-            .with_wram(Wram::new(cgb))
             .with_ppu(&mut ppu)
             .configure(&mut dma)
             .configure(&mut hdma)
@@ -249,16 +251,8 @@ impl Emu {
             .configure(&mut joy)
             .configure(&mut apu)
             .configure(&mut serial);
-        timer.offset();
-        if skip_boot {
-            IOBus::write(&mut bus, IO::BGP as u16, 0xFC); // should be set by BIOS
-            IOBus::write(&mut bus, IO::OBP0 as u16, 0xFF); // should be set by BIOS
-            IOBus::write(&mut bus, IO::OBP1 as u16, 0xFF); // should be set by BIOS
-            IOBus::write(&mut bus, IO::LCDC as u16, 0x91); // should be set by BIOS
-        }
-        log::info!("cartridge: {} | device: {} DMG compatibility mode: {}",
-            rom.header.title, if cgb { "CGB" } else { "DMG" }, if !compat { "enabled" } else { "disabled" }
-        );
+        log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
+        if skip_boot { cpu.skip_boot(cgb); timer.offset() };
         Self {
             speed: Default::default(),
             joy,
@@ -276,33 +270,21 @@ impl Emu {
         }
     }
 
-    pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) -> bool {
-        if !self.running { return false; }
-        match std::panic::catch_unwind(AssertUnwindSafe(|| {
-            self.joy.tick();
-            let tick = self.hdma.tick(&mut self.bus);
-            self.serial.tick();
-            self.bus.tick();
-            if clock == 0 || (clock == 2 && self.cpu.double_speed()) {
-                self.timer.tick();
-                self.dma.tick(&mut self.bus);
-                if !tick {
-                    self.cpu.cycle(&mut self.bus);
-                }
-            }
-            self.ppu.tick();
-            self.apu.tick(self.cpu.double_speed());
-            self.running &= bp.tick(&self.cpu, self.bus.last());
-            self.cpu.reset_finished();
-        })) {
-            Ok(_) => {},
-            Err(e) => {
-                error!("{e:?}");
-                self.running = false;
-                return false;
-            }
+    pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) {
+        if !self.running { return }
+        self.joy.tick();
+        let tick = self.hdma.tick(&mut self.bus);
+        self.serial.tick();
+        self.bus.tick();
+        if clock == 0 || (clock == 2 && self.cpu.double_speed()) {
+            self.timer.tick();
+            self.dma.tick(&mut self.bus);
+            if !tick { self.cpu.cycle(&mut self.bus); }
         }
-        true
+        self.ppu.tick();
+        self.apu.tick(self.cpu.double_speed());
+        self.running &= bp.tick(&self.cpu, self.bus.last());
+        self.cpu.reset_finished();
     }
 }
 

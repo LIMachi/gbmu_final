@@ -4,6 +4,9 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use crate::utils::Cell;
 
+pub const CGB_MODE: u8 = 0x80;
+pub const DMG_MODE: u8 = 0x04;
+
 #[derive(Debug, Copy, Clone)]
 pub struct LCDC(pub u8);
 
@@ -55,80 +58,159 @@ impl LCDC {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum IO {
-    CGB              = 0x0100,
+    ///0x100
+    CGB              = 0x100,
+    ///0xFF00
     JOYP             = 0xFF00,
+    ///0xFF01
     SB               = 0xFF01,
+    ///0xFF02
     SC               = 0xFF02,
+    ///0xFF04
     DIV              = 0xFF04,
+    ///0xFF05
     TIMA             = 0xFF05,
+    ///0xFF06
     TMA              = 0xFF06,
+    ///0xFF07
     TAC              = 0xFF07,
+    ///0xFF0F
     IF               = 0xFF0F,
+    ///0xFF10
     NR10             = 0xFF10,
+    ///0xFF11
     NR11             = 0xFF11,
+    ///0xFF12
     NR12             = 0xFF12,
+    ///0xFF13
     NR13             = 0xFF13,
+    ///0xFF14
     NR14             = 0xFF14,
+    ///0xFF16
     NR21             = 0xFF16,
+    ///0xFF17
     NR22             = 0xFF17,
+    ///0xFF18
     NR23             = 0xFF18,
+    ///0xFF19
     NR24             = 0xFF19,
+    ///0xFF1A
     NR30             = 0xFF1A,
+    ///0xFF1B
     NR31             = 0xFF1B,
+    ///0xFF1C
     NR32             = 0xFF1C,
+    ///0xFF1D
     NR33             = 0xFF1D,
+    ///0xFF1E
     NR34             = 0xFF1E,
+    ///0xFF20
     NR41             = 0xFF20,
+    ///0xFF21
     NR42             = 0xFF21,
+    ///0xFF22
     NR43             = 0xFF22,
+    ///0xFF23
     NR44             = 0xFF23,
+    ///0xFF24
     NR50             = 0xFF24,
+    ///0xFF25
     NR51             = 0xFF25,
+    ///0xFF26
     NR52             = 0xFF26,
+    ///0xFF30
     WaveRam0         = 0xFF30,
+    ///0xFF31
     WaveRam1         = 0xFF31,
+    ///0xFF32
     WaveRam2         = 0xFF32,
+    ///0xFF33
     WaveRam3         = 0xFF33,
+    ///0xFF34
     WaveRam4         = 0xFF34,
+    ///0xFF35
     WaveRam5         = 0xFF35,
+    ///0xFF36
     WaveRam6         = 0xFF36,
+    ///0xFF37
     WaveRam7         = 0xFF37,
+    ///0xFF38
     WaveRam8         = 0xFF38,
+    ///0xFF39
     WaveRam9         = 0xFF39,
+    ///0xFF3A
     WaveRamA         = 0xFF3A,
+    ///0xFF3B
     WaveRamB         = 0xFF3B,
+    ///0xFF3C
     WaveRamC         = 0xFF3C,
+    ///0xFF3D
     WaveRamD         = 0xFF3D,
+    ///0xFF3E
     WaveRamE         = 0xFF3E,
+    ///0xFF3F
     WaveRamF         = 0xFF3F,
+    ///0xFF40
     LCDC             = 0xFF40,
+    ///0xFF41
     STAT             = 0xFF41,
+    ///0xFF42
     SCY              = 0xFF42,
+    ///0xFF43
     SCX              = 0xFF43,
+    ///0xFF44
     LY               = 0xFF44,
+    ///0xFF45
     LYC              = 0xFF45,
+    ///0xFF46
     DMA              = 0xFF46,
+    ///0xFF47
     BGP              = 0xFF47,
+    ///0xFF48
     OBP0             = 0xFF48,
+    ///0xFF49
     OBP1             = 0xFF49,
+    ///0xFF4A
     WY               = 0xFF4A,
+    ///0xFF4B
     WX               = 0xFF4B,
+    ///0xFF4C
+    KEY0             = 0xFF4C,
+    ///0xFF4D
     KEY1             = 0xFF4D,
+    ///0xFF4F
     VBK              = 0xFF4F,
+    ///0xFF50
+    POST             = 0xFF50,
+    ///0xFF51
     HDMA1            = 0xFF51,
+    ///0xFF52
     HDMA2            = 0xFF52,
+    ///0xFF53
     HDMA3            = 0xFF53,
+    ///0xFF54
     HDMA4            = 0xFF54,
+    ///0xFF55
     HDMA5            = 0xFF55,
+    ///0xFF56
     RP               = 0xFF56,
+    ///0xFF68
     BCPS             = 0xFF68,
+    ///0xFF69
     BCPD             = 0xFF69,
+    ///0xFF6A
     OCPS             = 0xFF6A,
+    ///0xFF6B
     OCPD             = 0xFF6B,
+    ///0xFF6C
     OPRI             = 0xFF6C,
+    ///0xFF70
     SVBK             = 0xFF70,
+    ///0xFF76
     PCM12            = 0xFF76,
+    ///0xFF77
     PCM34            = 0xFF77,
+    ///0xFFFF
     IE               = 0xFFFF
 }
 
@@ -193,8 +275,10 @@ impl IO {
             IO::OBP1 => "OBP1",
             IO::WY => "WY",
             IO::WX => "WX",
+            IO::KEY0 => "KEY0",
             IO::KEY1 => "KEY1",
             IO::VBK => "VBK",
+            IO::POST => "POST",
             IO::HDMA1 => "HDMA1",
             IO::HDMA2 => "HDMA2",
             IO::HDMA3 => "HDMA3",
@@ -315,8 +399,10 @@ impl TryFrom<u16> for IO {
             0xFF49 => IO::OBP1,
             0xFF4A => IO::WY,
             0xFF4B => IO::WX,
+            0xFF4C => IO::KEY0,
             0xFF4D => IO::KEY1,
             0xFF4F => IO::VBK,
+            0xFF50 => IO::POST,
             0xFF51 => IO::HDMA1,
             0xFF52 => IO::HDMA2,
             0xFF53 => IO::HDMA3,
@@ -400,8 +486,10 @@ impl IO {
             IO::OBP1 => Generic(RW),
             IO::WY => Generic(RW),
             IO::WX => Generic(RW),
+            IO::KEY0 => Generic(RW),
             IO::KEY1 => Custom([RW, U, U, U, U, U, U, R]),
             IO::VBK => Generic(RW),
+            IO::POST => Generic(RW),
             IO::HDMA1 => Generic(W),
             IO::HDMA2 => Generic(W),
             IO::HDMA3 => Generic(W),
@@ -419,9 +507,10 @@ impl IO {
             IO::IE => Custom([RW, RW, RW, RW, RW, U, U, U])
         }
     }
-    pub fn default(&self) -> u8 {
+    pub fn default(&self, cgb: bool) -> u8 {
         match self {
             IO::JOYP => 0xFF,
+            IO::KEY0 if cgb => 0x80,
             _ => 0
         }
     }
@@ -429,7 +518,7 @@ impl IO {
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Access { W, R, RW, U }
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum AccessMode { Generic(Access), Custom([Access; 8]) }
 
 impl Access {
@@ -455,8 +544,8 @@ impl AccessMode {
                 let mut mask = 0;
                 for b in 0..8 {
                     mask |= match bits[b] {
-                        Access::R | Access::RW => 1,
-                        Access::W | Access::U => 0
+                        Access::R | Access::RW | Access::U => 1,
+                        Access::W => 0
                     } << b;
                 }
                 mask
@@ -514,7 +603,7 @@ impl HReg {
         HReg {
             v: 0,
             dirty: false,
-            rmask: access.rmask(),
+            rmask: !access.rmask(),
             wmask: access.wmask()
         }
     }
@@ -527,7 +616,7 @@ impl HReg {
 
 impl Mem for HReg {
     fn read(&self, _: u16, _absolute: u16) -> u8 {
-        self.v | !self.rmask
+        self.v | self.rmask
     }
 
     fn value(&self, _addr: u16, _absolute: u16) -> u8 {
@@ -586,7 +675,7 @@ impl IOReg {
     }
 
     pub fn bit(&self, bit: u8) -> u8 {
-        (self.read() >> bit) & 0x1
+        (self.value() >> bit) & 0x1
     }
 
     pub fn reset(&self, bit: u8) {
@@ -605,6 +694,8 @@ impl IOReg {
     pub fn set_write_mask(&self, wmask: u8) {
         self.0.borrow_mut().wmask = wmask;
     }
+
+    pub fn writable(&self) -> bool { self.0.borrow().wmask != 0 }
 
     pub fn set_access(&self, mode: AccessMode) -> &Self {
         let mut t = self.0.borrow_mut();

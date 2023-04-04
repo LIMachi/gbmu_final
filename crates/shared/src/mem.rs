@@ -104,8 +104,6 @@ pub trait IOBus {
     fn read_with(&self, addr: u16, source: Source) -> u8;
     fn write_with(&mut self, addr: u16, value: u8, source: Source);
 
-    fn write(&mut self, addr: u16, value: u8);
-
     /// DMA memory access lock
     fn lock(&mut self);
     fn unlock(&mut self);
@@ -129,6 +127,8 @@ pub trait MBCController: Device + Mem {
     fn rom_bank(&self) -> usize;
     fn ram_bank(&self) -> usize;
     fn tick(&mut self);
+
+    fn post(&mut self);
 }
 
 pub const ROM: u16 = 0x0;

@@ -21,6 +21,7 @@ pub struct Registers {
     pub opri: IOReg,
     pub interrupt: IOReg,
     pub cgb: IOReg,
+    pub key0: IOReg,
 }
 
 impl Device for Registers {
@@ -43,5 +44,6 @@ impl Device for Registers {
         self.opri = bus.io(IO::OPRI);
         self.interrupt = bus.io(IO::IF);
         self.cgb = bus.io(IO::CGB);
+        self.key0 = bus.io(IO::KEY0);
     }
 }

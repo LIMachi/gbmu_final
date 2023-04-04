@@ -1,29 +1,68 @@
-use shared::io::{IO, IOReg};
+use shared::io::{Access, AccessMode, DMG_MODE, IO, IOReg};
 use shared::mem::Mem;
 
+
 pub struct IORegs {
-    range: Vec<IOReg>,
-    gbc: IOReg
+    cgb: IOReg,
+    range: Vec<IOReg>
 }
 
 impl IORegs {
+    const DISABLED: AccessMode = AccessMode::Generic(Access::U);
+
     pub fn init(cgb: bool) -> Self {
         Self {
-            gbc: IOReg::rdonly().with_value(cgb as u8),
+            cgb: IOReg::rdonly().with_value(cgb as u8),
             range: (0..128).into_iter().map(|i| {
                 let (access, value) = IO::try_from(0xFF00 + i)
-                    .map(|x| (x.access(), x.default())).unwrap_or(Default::default());
+                    .map(|x| (x.access(), x.default(cgb))).unwrap_or(Default::default());
                 IOReg::with_access(access)
                     .with_value(value)
             }).collect()
         }
     }
 
-    pub fn io(&self, io: IO) -> IOReg {
-        match io {
-            IO::CGB => self.gbc.clone(),
-            io => self.range[io as u16 as usize - shared::mem::IO as usize].clone()
+    fn set(&mut self, io: IO, value: u8) {
+        let addr = io as u16 - shared::mem::IO;
+        self.range[addr as usize].direct_write(value);
+    }
+
+    pub fn compat_mode(&mut self) {
+        if self.io(IO::KEY0).value() == DMG_MODE {
+            log::info!("DMG compatibility mode: enabled");
+            self.io(IO::HDMA5).set_access(IORegs::DISABLED);
+            self.io(IO::KEY1).set_access(IORegs::DISABLED);
+            self.io(IO::OCPD).set_access(IORegs::DISABLED);
+            self.io(IO::BCPD).set_access(IORegs::DISABLED);
+            self.io(IO::SVBK).set_access(IORegs::DISABLED);
+            self.io(IO::VBK).set_access(IORegs::DISABLED);
+            self.io(IO::OPRI).set_access(IORegs::DISABLED);
         }
+    }
+
+    pub fn post(&mut self) {
+        log::info!("compat mode: {:#04X}", self.io(IO::KEY0).value());
+        self.io(IO::POST).set_access(IORegs::DISABLED);
+        self.io(IO::KEY0).set_access(IORegs::DISABLED);
+    }
+
+    pub fn skip_boot(&mut self, console: u8) {
+        self.set(IO::KEY0, console);
+        self.set(IO::BGP, 0xFC);
+        self.set(IO::OBP0, 0xFF);
+        self.set(IO::OBP1, 0xFF);
+        self.set(IO::LCDC, 0x91);
+        self.compat_mode();
+        self.post();
+    }
+
+    pub fn io(&self, io: IO) -> IOReg {
+        if io == IO::CGB { return self.cgb.clone() }
+        self.range[io as u16 as usize - shared::mem::IO as usize].clone()
+    }
+
+    pub fn writable(&self, io: IO) -> bool {
+        self.range[io as u16 as usize - shared::mem::IO as usize].writable()
     }
 }
 

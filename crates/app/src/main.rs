@@ -116,7 +116,8 @@ impl App {
                                 .collect()
                         },
                         keys: self.bindings.clone(),
-                        mode: self.emu.mode()
+                        mode: self.emu.mode(),
+                        bios: self.emu.enabled_boot(),
                     };
                     if let Err(e) = serde_any::ser::to_file_pretty("gbmu.ron", &conf) {
                         log::warn!("error while saving config {e:?}");
@@ -153,11 +154,7 @@ fn main() {
                 let cy = app.emu.cycle_time();
                 while acc >= cy {
                     cycles += 1;
-                    clock.tick();
-                    if !app.emu.cycle(clock.value()) {
-                        st.pause();
-                        break ;
-                    }
+                    app.emu.cycle(clock.tick());
                     acc -= cy;
                 }
             } else {

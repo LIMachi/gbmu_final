@@ -20,7 +20,6 @@ pub struct Cpu {
     prefixed: bool,
     finished: bool,
     ime: bool,
-    cgb: IOReg,
     int_flags: IOReg,
     ie: IOReg,
     ds: IOReg
@@ -44,7 +43,6 @@ impl Cpu {
             prefixed: false,
             finished: false,
             ime: false,
-            cgb: IOReg::unset(),
             int_flags: IOReg::unset(),
             ie: IOReg::unset(),
             at: 0,
@@ -53,12 +51,11 @@ impl Cpu {
     }
 
     pub fn double_speed(&self) -> bool {
-        self.cgb.value() != 0 && self.ds.bit(7) != 0
+        self.ds.bit(7) != 0
     }
 
-    pub fn skip_boot(mut self) -> Self {
-        self.regs = if self.cgb.read() != 0 { Registers::GBC } else { Registers::GB };
-        self
+    pub fn skip_boot(&mut self, cgb: bool) {
+        self.regs = if cgb { Registers::GBC } else { Registers::GB };
     }
 
     pub fn registers(&self) -> &Registers { &self.regs }
@@ -137,7 +134,6 @@ impl Cpu {
 
 impl Device for Cpu {
     fn configure(&mut self, bus: &dyn IOBus) {
-        self.cgb = bus.io(IO::CGB);
         self.ie = bus.io(IO::IE);
         self.int_flags = bus.io(IO::IF);
         self.ds = bus.io(IO::KEY1);

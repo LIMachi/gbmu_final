@@ -78,7 +78,7 @@ impl tabs::Tab for Tabs {
 impl shared::Ui for Controller {
     fn init(&mut self, ctx: &mut Context) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        let count = if self.ppu.regs.cgb.read() != 0 { 768 } else { 384 };
+        let count = if self.ppu.regs.cgb.value() != 0 { 768 } else { 384 };
         for n in 0..count {
             let s = Textures::Tile(n);
             self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));

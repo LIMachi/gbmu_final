@@ -1,4 +1,4 @@
-use shared::io::{IO, IOReg};
+use shared::io::{CGB_MODE, IO, IOReg};
 use shared::mem::{Device, IOBus, Source};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -31,7 +31,7 @@ pub struct Hdma {
     control: IOReg, // FF55
     statv: u8,
     stat: IOReg,
-    cgb: IOReg,
+    key0: IOReg,
     count: u8,
     src: u16,
     dst: u16,
@@ -40,7 +40,7 @@ pub struct Hdma {
 impl Default for Hdma {
     fn default() -> Self {
         Self {
-            cgb: IOReg::unset(),
+            key0: IOReg::unset(),
             stat: IOReg::unset(),
             src_high: IOReg::unset(),
             src_low: IOReg::unset(),
@@ -73,7 +73,7 @@ impl Hdma {
     }
 
     pub fn tick(&mut self, bus: &mut dyn IOBus) -> bool {
-        if self.cgb.read() == 0 { return false };
+        if self.key0.value() & CGB_MODE == 0 { return false };
         if self.control.dirty() {
             self.control.reset_dirty();
             match self.mode {
@@ -148,7 +148,7 @@ impl Hdma {
 impl Device for Hdma {
     fn configure(&mut self, bus: &dyn IOBus) {
         self.stat = bus.io(IO::STAT);
-        self.cgb = bus.io(IO::CGB);
+        self.key0 = bus.io(IO::KEY0);
         self.src_high = bus.io(IO::HDMA1);
         self.src_low = bus.io(IO::HDMA2);
         self.dest_high = bus.io(IO::HDMA3);

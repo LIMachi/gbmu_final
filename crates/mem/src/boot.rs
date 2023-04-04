@@ -1,4 +1,3 @@
-use shared::io::IO;
 use shared::mem::{Device, IOBus, Mem};
 use shared::rom::Rom;
 use crate::mbc::{Mbc, MemoryController};
@@ -104,7 +103,7 @@ impl<MBC: Mbc> MemoryController for Boot<MBC> {
 impl<MBC: Mbc> Device for Boot<MBC> {
     fn configure(&mut self, bus: &dyn IOBus) {
         self.inner.as_mut().unwrap().configure(bus);
-        self.boot = if bus.io(IO::CGB).read() != 0 {
+        self.boot = if bus.is_cgb() {
             Box::new(CgbBoot::new())
         } else {
             Box::new(DmgBoot::new())

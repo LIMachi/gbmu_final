@@ -55,6 +55,8 @@ pub struct AppConfig {
     pub audio_settings: AudioSettings,
     #[serde(default)]
     pub mode: super::settings::Mode,
+    #[serde(default)]
+    pub bios: bool,
 }
 
 impl AppConfig {

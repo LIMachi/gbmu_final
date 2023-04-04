@@ -1,5 +1,5 @@
 use std::net::Ipv4Addr;
-use shared::io::{IO, IOReg};
+use shared::io::{CGB_MODE, IO, IOReg};
 use shared::mem::{Device, IOBus};
 use crate::com::Event;
 
@@ -10,7 +10,7 @@ pub struct Port {
     ctrl: IOReg,
     data: IOReg,
     ds: IOReg,
-    cgb: IOReg,
+    key0: IOReg,
     cable: com::Serial,
     transfer: Option<(u8, u8)>,
     recv: u8,
@@ -24,7 +24,7 @@ impl Port {
             ctrl: IOReg::unset(),
             data: IOReg::unset(),
             ds: IOReg::unset(),
-            cgb: IOReg::unset(),
+            key0: IOReg::unset(),
             int: IOReg::unset(),
             cable: com::Serial::build(),
             recv: 0,
@@ -74,8 +74,15 @@ impl Port {
                             i += 1;
                         }
                     }
-                    self.clk += if self.ds.bit(7) != 0 { 2 } else { 1 };
-                    let h = if self.ctrl.bit(1) != 0 { 16 } else { 512 };
+                    let h = {
+                        if self.key0.value() == CGB_MODE {
+                            self.clk += if self.ds.bit(7) != 0 { 2 } else { 1 };
+                            if self.ctrl.bit(1) != 0 { 16 } else { 512 }
+                        } else {
+                            self.clk += 1;
+                            16
+                        }
+                    };
                     Some((i, if o == 8 { o } else if self.clk >= h {
                         self.clk -= h;
                         let b = self.data.bit(7 - o);
@@ -111,7 +118,7 @@ impl Device for Port {
         self.ds = bus.io(IO::KEY1);
         self.data = bus.io(IO::SB);
         self.ctrl = bus.io(IO::SC);
-        self.cgb = bus.io(IO::CGB);
+        self.key0 = bus.io(IO::KEY0);
         self.int = bus.io(IO::IF);
     }
 }
