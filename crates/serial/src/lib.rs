@@ -45,11 +45,6 @@ pub struct Port {
     ctrl: IOReg,
     data: IOReg,
     cable: Serial,
-    transfer: bool,
-    recv: u8,
-    elapsed: u8,
-    clk: u32,
-    dc: usize,
 }
 
 impl Port {
@@ -59,8 +54,6 @@ impl Port {
             data: IOReg::unset(),
             int: IOReg::unset(),
             cable,
-            elapsed: 0,
-            transfer: false,
         }
     }
 
@@ -72,12 +65,6 @@ impl Port {
     }
 
     pub fn tick(&mut self) {
-        match self.cable.event() {
-            Some(Event::Connected(_addr)) => {
-                self.transfer = false;
-            },
-            _ => {}
-        }
         if self.ctrl.dirty() {
             if self.ctrl.value() & 0x81 == 0x81 {
                 self.cable.send(self.data.value());
