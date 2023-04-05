@@ -135,7 +135,7 @@ impl shared::Ui for Settings {
                 let mut chan2 = *self.audio.channels[1].as_ref().borrow();
                 let mut chan3 = *self.audio.channels[2].as_ref().borrow();
                 let mut chan4 = *self.audio.channels[3].as_ref().borrow();
-                let mut device = self.audio_device.device();
+                let mut device = &self.audio_device.device();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("JOYPAD");
                 });
@@ -173,9 +173,9 @@ impl shared::Ui for Settings {
                     ui.label("AUDIO OUTPUT");
                 });
                 self.devices.iter().for_each(|dev| {
-                    ui.radio_value(&mut device, dev.clone(), dev);
+                    ui.radio_value(&mut device, dev, dev);
                 });
-                if device != self.audio_device.device() {
+                if *device != self.audio_device.device() {
                     self.audio_device.switch(device);
                 }
                 ui.separator();

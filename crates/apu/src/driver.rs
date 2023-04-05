@@ -70,7 +70,7 @@ impl Iterator for Output {
 
 pub(crate) struct Audio {
     sample_rate: SampleRate,
-    dev_name: String,
+    dev_name: Rc<RefCell<String>>,
     device: Device,
     stream: Option<OutputStream>,
     handle: Option<OutputStreamHandle>,
@@ -87,33 +87,42 @@ impl Audio {
     }
 
     pub fn device(&self) -> String {
-        self.dev_name.clone()
+        self.dev_name.as_ref().borrow().clone()
     }
 
     pub fn sample_rate(&self) -> u32 { self.sample_rate.0 }
 
+    fn connect(&mut self) -> anyhow::Result<&mut Self> {
+        let dn = &self.device();
+        let (dev, dev_name) = Self::devices()
+            .filter_map(|x| x.name().ok().map(|n| (x, n)))
+            .find(|(_, n)| n == dn).context("no such device")?;
+        let config = dev.default_output_config().unwrap();
+        let (stream, handle) = OutputStream::try_from_device_config(
+            &dev, SupportedStreamConfig::new(
+                2,
+                config.sample_rate(),
+                config.buffer_size().clone(),
+                SampleFormat::F32))?;
+        let sink = Sink::try_new(&handle)?;
+        self.sample_rate = config.sample_rate();
+        self.device = dev;
+        self.dev_name.replace(dev_name);
+        self.stream = Some(stream);
+        self.handle = Some(handle);
+        self.sink = sink;
+        Ok(self)
+    }
+
     pub fn switch<S: Into<String>>(&mut self, name: S) -> anyhow::Result<&mut Self> {
         let name = name.into();
-        if name != self.dev_name {
-            let (dev, dev_name) = Self::devices()
-                .filter_map(|x| x.name().ok().map(|n| (x, n)))
-                .find(|(_, n)| n == &name).context("no such device")?;
-            let config = dev.default_output_config().unwrap();
-            let (stream, handle) = OutputStream::try_from_device_config(
-                &dev, SupportedStreamConfig::new(
-                    2,
-                    config.sample_rate(),
-                    config.buffer_size().clone(),
-                    SampleFormat::F32))?;
-            let sink = Sink::try_new(&handle)?;
-            self.sample_rate = config.sample_rate();
-            self.device = dev;
-            self.dev_name = dev_name;
-            self.stream = Some(stream);
-            self.handle = Some(handle);
-            self.sink = sink;
+        if name != *self.device() {
+            self.dev_name.replace(name);
+            self.connect()
         }
-        Ok(self)
+        else {
+            Ok(self)
+        }
     }
 
     pub(crate) fn bind(&self, input: &mut Input) {
@@ -126,13 +135,13 @@ impl Audio {
         let mut audio = Self {
             device: cpal::default_host().default_output_device().unwrap(),
             sink: Sink::new_idle().0,
-            dev_name: Default::default(),
+            dev_name: config.dev_name.clone(),
             sample_rate: SampleRate(44100),
             handle: None,
-            stream: None
+            stream: None,
         };
-        if let Err(e) = audio.switch(&config.dev_name) {
-            log::error!("failed to switch to audio device {}: {e:?}", &config.dev_name);
+        if let Err(e) = audio.connect() {
+            log::error!("failed to switch to audio device {}: {e:?}", *config.dev_name.as_ref().borrow());
             audio.switch(default_device()).ok();
         }
         audio
