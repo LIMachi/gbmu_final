@@ -45,8 +45,9 @@ pub struct Port {
     ctrl: IOReg,
     data: IOReg,
     cable: Serial,
-    transfer: Option<(u8, u8)>,
+    transfer: bool,
     recv: u8,
+    elapsed: u8,
     clk: u32,
     dc: usize,
 }
@@ -58,10 +59,8 @@ impl Port {
             data: IOReg::unset(),
             int: IOReg::unset(),
             cable,
-            recv: 0,
-            clk: 0,
-            transfer: None,
-            dc: 0,
+            elapsed: 0,
+            transfer: false,
         }
     }
 
@@ -75,21 +74,25 @@ impl Port {
     pub fn tick(&mut self) {
         match self.cable.event() {
             Some(Event::Connected(_addr)) => {
-                self.clk = 0;
-                self.dc = 0;
-                self.transfer = None;
+                self.transfer = false;
             },
             _ => {}
         }
         if self.ctrl.dirty() {
             if self.ctrl.value() & 0x81 == 0x81 {
-                self.transfer = Some((0, 0));
-                self.clk = 0;
-                self.recv = 0;
+                self.cable.send(self.data.value());
             }
             self.ctrl.reset_dirty();
         }
-        if let Some((i, o)) = {
+        if let Some(o) = self.cable.recv() {
+            if self.ctrl.bit(0) == 0 {
+                self.cable.send(self.data.value());
+            }
+            self.data.direct_write(o);
+            self.ctrl.reset(7);
+            self.int.set(3);
+        }
+        /*if let Some((i, o)) = {
             if self.ctrl.bit(0) != 0 {
                 if let Some((i, o)) = self.transfer.take() {
                     let mut i = if let Some(b) = self.cable.recv() {
@@ -122,8 +125,7 @@ impl Port {
                 self.cable.send(self.data.bit(7 - o));
                 Some((i + 1, o + 1))
             } else { self.transfer }
-        }
-        {
+        } {
             if i == 8 {  // received everything
                 self.transfer = None;
                 self.clk = 0;
@@ -135,7 +137,7 @@ impl Port {
             } else {
                 self.transfer = Some((i, o));
             }
-        }
+        }*/
     }
 
     pub fn disconnect(&mut self) -> Serial {
