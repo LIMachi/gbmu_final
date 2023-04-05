@@ -165,8 +165,8 @@ impl shared::Ui for Settings {
                 self.devices.iter().for_each(|dev| {
                     ui.radio_value(&mut device, dev, dev);
                 });
-                if *device != self.audio_device.device() {
-                    self.audio_device.switch(device);
+                if *device != self.emu.audio.device() {
+                    self.emu.audio.switch(device);
                 }
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
