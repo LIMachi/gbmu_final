@@ -1,8 +1,11 @@
+use std::borrow::BorrowMut;
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use winit::event::{VirtualKeyCode, WindowEvent};
 use dbg::BusWrapper;
 use mem::mbc;
+use serial::com::Serial;
+use serial::Link;
 use shared::breakpoints::Breakpoints;
 use shared::rom::Rom;
 use shared::{Events, Ui, egui::Context};
@@ -43,7 +46,7 @@ impl Default for Emu {
         let mut ppu = ppu::Controller::new(lcd.clone());
 
         let joy = joy::Joypad::new(Default::default());
-        let serial = serial::Port::new();
+        let serial = serial::Port::new(Serial::phantom());
         let dma = ppu::Dma::default();
         let hdma = ppu::Hdma::default();
         let timer = bus::Timer::default();
@@ -72,20 +75,26 @@ impl Default for Emu {
 
 #[derive(Clone)]
 pub struct Emulator {
-    proxy: Proxy,
-    audio: apu::Controller,
-    audio_settings: AudioSettings,
-    bindings: Keybindings,
+    pub proxy: Proxy,
+    pub audio: apu::Controller,
+    pub audio_settings: AudioSettings,
+    pub bindings: Keybindings,
     breakpoints: Breakpoints,
-    emu: Rc<RefCell<Emu>>,
-    cgb: Rc<RefCell<Mode>>,
-    bios: Rc<RefCell<bool>>,
+    pub emu: Rc<RefCell<Emu>>,
+    pub cgb: Rc<RefCell<Mode>>,
+    pub bios: Rc<RefCell<bool>>,
+    pub link: Rc<RefCell<Link>>,
+    pub link_port: u16,
 }
 
 impl Emulator {
 
     pub fn new(proxy: Proxy, bindings: Keybindings, conf: &AppConfig) -> Self {
+        let link = Link::new();
+        let port = link.port;
         Self {
+            link: link.cell(),
+            link_port: port,
             proxy,
             bindings,
             emu: Emu::default().cell(),
@@ -98,15 +107,27 @@ impl Emulator {
     }
 
     pub fn settings(&self) -> Settings {
-        Settings::new(self.bindings.clone(), self.cgb.clone(), self.bios.clone(), self.audio_settings.clone(), self.audio.clone(), self.proxy.clone())
+        Settings::new(self.clone())
     }
 
     pub fn mode(&self) -> Mode {
         *self.cgb.as_ref().borrow()
     }
 
+    pub fn link_do<R, F: Fn(&mut Serial) -> R>(&self, f: F) -> R {
+        self.link.as_ref().borrow_mut().as_mut()
+            .map(|x| f(x))
+            .unwrap_or_else(|| {
+                f(self.emu.as_ref().borrow_mut().serial.link())
+            })
+    }
+
     pub fn enabled_boot(&self) -> bool {
         *self.bios.as_ref().borrow()
+    }
+
+    pub fn serial_port(&self) -> serial::com::Serial {
+        RefCell::borrow_mut(&self.link).port()
     }
 
     pub fn cycle(&mut self, clock: u8) { self.emu.as_ref().borrow_mut().cycle(clock, &self.breakpoints); }
@@ -116,7 +137,6 @@ impl Emulator {
     pub fn stop(&mut self) {
         // TODO drop serial first ?
         self.emu.replace(Emu::default());
-
     }
 
     pub fn cycle_time(&self) -> f64 {
@@ -129,7 +149,13 @@ impl Emulator {
     }
 
     fn insert(&self, rom: Rom, running: bool) {
-        let emu = Emu::new(&self.audio, self.bindings.clone(), rom, self.mode().is_cgb(),self.enabled_boot(), running, self.audio_settings.clone());
+        {
+            let mut link = RefCell::borrow_mut(&self.link);
+            if link.borrowed() {
+                link.store(self.emu.take().serial.disconnect());
+            }
+        }
+        let emu = Emu::new(&self, rom, running);
         self.emu.replace(emu);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -157,9 +183,6 @@ impl Render for Emulator {
                 if let WindowEvent::KeyboardInput { input, .. } = event {
                     self.emu.as_ref().borrow_mut().joy.handle(*input);
                 }
-            },
-            Event::UserEvent(Events::Connect(addr, port)) => {
-                self.emu.as_ref().borrow_mut().serial.connect(*addr, *port);
             },
             _ => {}
         }
@@ -225,14 +248,15 @@ impl Emu {
 
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
-    pub fn new(audio: &apu::Controller, bindings: Keybindings, rom: Rom, cgb: bool, bios: bool, running: bool, audio_settings: AudioSettings) -> Self {
-        let skip_boot = !bios;
-        let mut joy = joy::Joypad::new(bindings);
+    pub fn new(controller: &Emulator, rom: Rom, running: bool) -> Self {
+        let skip_boot = !controller.enabled_boot();
+        let cgb = controller.mode().is_cgb();
+        let mut joy = joy::Joypad::new(controller.bindings.clone());
         let mut timer = bus::Timer::default();
         let mut dma = ppu::Dma::default();
         let mut hdma = ppu::Hdma::default();
-        let mut apu = audio.apu(audio_settings);
-        let mut serial = serial::Port::new(); // TODO move Serial over to Emulator (allows for earlier connection). use RefCell and borrow for Emu lifetime
+        let mut apu = controller.audio.apu(controller.audio_settings.clone());
+        let mut serial = serial::Port::new(controller.serial_port());
 
         let lcd = lcd::Lcd::new();
         let mut ppu = ppu::Controller::new(lcd.clone());
@@ -241,7 +265,7 @@ impl Emu {
         let mut cpu = cpu::Cpu::new();
         let bus = bus::Bus::new(cgb);
         let mbc = if skip_boot { mbc.skip_boot() } else { mbc };
-        let bus = if skip_boot { bus.skip_boot(rom.raw()[0x143]) } else { bus }
+        let bus = if skip_boot { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
             .with_mbc(mbc)
             .with_ppu(&mut ppu)
             .configure(&mut dma)
@@ -274,9 +298,9 @@ impl Emu {
         if !self.running { return }
         self.joy.tick();
         let tick = self.hdma.tick(&mut self.bus);
-        self.serial.tick();
         self.bus.tick();
         if clock == 0 || (clock == 2 && self.cpu.double_speed()) {
+            self.serial.tick();
             self.timer.tick();
             self.dma.tick(&mut self.bus);
             if !tick { self.cpu.cycle(&mut self.bus); }

@@ -544,8 +544,8 @@ impl AccessMode {
                 let mut mask = 0;
                 for b in 0..8 {
                     mask |= match bits[b] {
-                        Access::R | Access::RW | Access::U => 1,
-                        Access::W => 0
+                        Access::R | Access::RW | Access::U => 0,
+                        Access::W => 1
                     } << b;
                 }
                 mask
@@ -578,8 +578,8 @@ impl AccessMode {
 impl Access {
     pub fn read_mask(&self) -> u8 {
         match self {
-            Access::R | Access::RW => 0xFF,
-            Access::W | Access::U => 0x00,
+            Access::R | Access::RW | Access::U => 0x00,
+            Access::W => 0xFF,
         }
     }
 
@@ -603,7 +603,7 @@ impl HReg {
         HReg {
             v: 0,
             dirty: false,
-            rmask: !access.rmask(),
+            rmask: access.rmask(),
             wmask: access.wmask()
         }
     }
@@ -666,8 +666,9 @@ impl IOReg {
 
     pub fn value(&self) -> u8 { self.0.borrow().v }
 
-    pub fn direct_write(&self, value: u8) {
+    pub fn direct_write(&self, value: u8) -> &Self {
         self.0.as_ref().borrow_mut().direct_write(value);
+        self
     }
 
     pub fn set(&self, bit: u8) {
@@ -686,14 +687,6 @@ impl IOReg {
 
     pub fn reset_dirty(&self) { self.0.as_ref().borrow_mut().reset_dirty(); }
     pub fn dirty(&self) -> bool { self.0.as_ref().borrow().dirty }
-
-    pub fn set_read_mask(&self, rmask: u8) {
-        self.0.borrow_mut().rmask = rmask;
-    }
-
-    pub fn set_write_mask(&self, wmask: u8) {
-        self.0.borrow_mut().wmask = wmask;
-    }
 
     pub fn writable(&self) -> bool { self.0.borrow().wmask != 0 }
 
