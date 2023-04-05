@@ -1,5 +1,6 @@
 use std::borrow::{Borrow};
 use std::net::Ipv4Addr;
+use std::ops::DerefMut;
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use apu::Controller;
@@ -12,8 +13,6 @@ pub struct Settings {
     emu: Emulator,
     devices: Vec<String>,
     key: Option<Section>,
-    host: String,
-    port: String
 }
 
 impl Settings {
@@ -21,9 +20,7 @@ impl Settings {
         Self {
             devices: Controller::devices().collect(),
             emu,
-            key: None,
-            host: "127.0.0.1".to_string(),
-            port: "27542".to_string()
+            key: None
         }
     }
 
@@ -125,7 +122,6 @@ impl shared::Ui for Settings {
                 let mut chan3 = *self.emu.audio_settings.channels[2].as_ref().borrow();
                 let mut chan4 = *self.emu.audio_settings.channels[3].as_ref().borrow();
                 let mut device = &self.emu.audio.device();
-
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("JOYPAD");
                 });
@@ -173,18 +169,22 @@ impl shared::Ui for Settings {
                     ui.label(if self.emu.link_do(|x| x.connected()) { "SERIAL - (Connected)" } else { "SERIAL" });
                 });
                 ui.label(format!("server listening on port {}", self.emu.link_port));
+
+                let mut emu_settings = self.emu.settings.as_ref().borrow_mut();
                 ui.horizontal(|ui| {
-                    let host = TextEdit::singleline(&mut self.host).desired_width(120.);
+                    let host = &mut emu_settings.host;
+                    let host = TextEdit::singleline(host).desired_width(120.);
                     ui.label("Host: ");
                     ui.add(host);
                 });
                 ui.horizontal(|ui| {
-                    let port = TextEdit::singleline(&mut self.port).desired_width(48.);
+                    let port = &mut emu_settings.port;
+                    let port = TextEdit::singleline(port).desired_width(48.);
                     ui.label(" Port: ");
                     ui.add(port);
                 });
                 if ui.button("Connect").clicked() {
-                    match (self.host.parse(), self.port.parse()) {
+                    match (emu_settings.host.parse(), emu_settings.port.parse()) {
                         (Ok(addr), Ok(port)) => {
                             let addr: Ipv4Addr = addr;
                             let port: u16 = port;

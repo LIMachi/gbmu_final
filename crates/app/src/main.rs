@@ -23,6 +23,7 @@ use shared::input::Keybindings;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::app::{AppConfig, DbgConfig, RomConfig};
+use crate::emulator::EmuSettings;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
@@ -115,6 +116,7 @@ impl App {
                                 .filter(|x| !x.temp())
                                 .collect()
                         },
+                        emu: self.emu.settings.take(),
                         keys: self.bindings.clone(),
                         mode: self.emu.mode(),
                         bios: self.emu.enabled_boot(),

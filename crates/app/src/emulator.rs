@@ -1,6 +1,7 @@
 use std::borrow::BorrowMut;
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
+use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
 use dbg::BusWrapper;
 use mem::mbc;
@@ -73,10 +74,26 @@ impl Default for Emu {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EmuSettings {
+    pub host: String,
+    pub port: String
+}
+
+impl Default for EmuSettings {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: "27542".to_string()
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Emulator {
     pub proxy: Proxy,
     pub audio: apu::Controller,
+    pub settings: Rc<RefCell<EmuSettings>>,
     pub audio_settings: AudioSettings,
     pub bindings: Keybindings,
     breakpoints: Breakpoints,
@@ -97,6 +114,7 @@ impl Emulator {
             link_port: port,
             proxy,
             bindings,
+            settings: conf.emu.clone().cell(),
             emu: Emu::default().cell(),
             audio_settings: conf.audio_settings.clone(),
             audio: apu::Controller::new(&conf.sound_device),
