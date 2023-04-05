@@ -1,6 +1,4 @@
-use std::borrow::{Borrow, BorrowMut};
-use std::cell::RefCell;
-use std::io::empty;
+use std::borrow::{Borrow};
 use std::net::Ipv4Addr;
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
@@ -19,21 +17,6 @@ pub struct Settings {
 }
 
 impl Settings {
-    // pub fn new(bindings: Keybindings, cgb: Rc<RefCell<Mode>>, bios: Rc<RefCell<bool>>, audio: AudioSettings, audio_device: Controller, proxy: Proxy) -> Self {
-    //     Self {
-    //         bindings,
-    //         cgb,
-    //         bios,
-    //         audio,
-    //         audio_device,
-    //         devices: Controller::devices().collect(),
-    //         key:None,
-    //         host: "127.0.0.1".to_string(),
-    //         port: "27542".to_string(),
-    //         proxy
-    //     }
-    // }
-
     pub fn new(emu: Emulator) -> Self {
         Self {
             devices: Controller::devices().collect(),
@@ -141,7 +124,7 @@ impl shared::Ui for Settings {
                 let mut chan2 = *self.emu.audio_settings.channels[1].as_ref().borrow();
                 let mut chan3 = *self.emu.audio_settings.channels[2].as_ref().borrow();
                 let mut chan4 = *self.emu.audio_settings.channels[3].as_ref().borrow();
-                let mut device = self.emu.audio.device();
+                let mut device = &self.emu.audio.device();
 
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("JOYPAD");
@@ -180,10 +163,10 @@ impl shared::Ui for Settings {
                     ui.label("AUDIO OUTPUT");
                 });
                 self.devices.iter().for_each(|dev| {
-                    ui.radio_value(&mut device, dev.clone(), dev);
+                    ui.radio_value(&mut device, dev, dev);
                 });
-                if device != self.emu.audio.device() {
-                    self.emu.audio.switch(device);
+                if *device != self.audio_device.device() {
+                    self.audio_device.switch(device);
                 }
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
