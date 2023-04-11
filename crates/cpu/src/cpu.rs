@@ -1,7 +1,6 @@
 use crate::Bus;
 use shared::{cpu::{Reg, Value, Opcode}};
-use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus};
+use shared::mem::Device;
 use super::{ops::*, State, Registers, decode::decode};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

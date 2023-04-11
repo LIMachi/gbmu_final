@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use shared::io::{IO, IOReg};
+use shared::io::IOReg;
 use shared::mem::{Device, IOBus, Mem};
 
 const BANK_SIZE: u16 = 0x2000;

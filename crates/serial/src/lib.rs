@@ -1,7 +1,6 @@
 use std::net::Ipv4Addr;
-use shared::io::{IO, IOReg, IORegs};
-use shared::mem::{Device, IOBus};
-use crate::com::{Event, Serial};
+use shared::io::{IO, IORegs};
+use crate::com::Serial;
 
 pub mod com;
 

@@ -31,7 +31,7 @@ impl Client {
                     Err(e) => {
                         match e.kind() {
                             ErrorKind::WouldBlock => {},
-                            e => break
+                            _ => break
                         }
                     }
                 }

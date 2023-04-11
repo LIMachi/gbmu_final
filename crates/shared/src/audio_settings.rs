@@ -25,12 +25,10 @@ impl Serialize for AudioSettings {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
         let mut state = serializer.serialize_struct("AudioSettings", 1)?;
         state.serialize_field("volume", &*self.volume.as_ref().borrow())?;
-        println!("channels: {:?}", self.channels);
         let mut c = [true, true, true, true];
         for i in 0..4 {
             c[i] = *self.channels[i].as_ref().borrow();
         }
-        println!("c: {:?}", c);
         state.serialize_field("channels", &c)?;
         state.end()
     }

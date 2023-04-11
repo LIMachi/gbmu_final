@@ -1,6 +1,6 @@
 use shared::events::*;
 use shared::io::{IO, IORegs};
-use shared::mem::{Device, IOBus};
+use shared::mem::Device;
 
 use shared::input::{Section, Keybindings};
 

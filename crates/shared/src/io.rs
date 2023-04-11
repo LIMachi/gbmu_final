@@ -1,6 +1,5 @@
 use serde::{Serialize, Deserialize};
 use super::mem::Mem;
-use crate::utils::Cell;
 
 mod io_regs;
 

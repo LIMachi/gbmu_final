@@ -1,5 +1,5 @@
 use shared::io::{IO, IOReg, IORegs};
-use shared::mem::{Device, IOBus};
+use shared::mem::Device;
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
 
@@ -16,7 +16,7 @@ pub struct Channel {
     buffer: u16,
     freq_timer: u16,
     envelope: Envelope,
-    registers: Registers
+    // registers: Registers
 }
 
 impl Channel {
@@ -26,7 +26,7 @@ impl Channel {
             buffer: 0xFFFF,
             freq_timer: 0,
             envelope: Envelope::default(),
-            registers: Registers::default()
+            // registers: Registers::default()
         }
     }
 
@@ -40,37 +40,37 @@ impl Channel {
             (r, s) => 16 * (r << s)
         }
     }
-    fn update_envelope(&mut self) {
-        self.envelope.update(self.registers.volume.value());
-        self.registers.volume.reset_dirty();
-    }
 }
 
 impl Device for Channel {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.registers.length = bus.io(IO::NR41);
-        self.registers.volume = bus.io(IO::NR42);
-        self.registers.freq = bus.io(IO::NR43);
-        self.registers.ctrl = bus.io(IO::NR44);
-    }
+    // fn configure(&mut self, bus: &dyn IOBus) {
+    //     self.registers.length = bus.io(IO::NR41);
+    //     self.registers.volume = bus.io(IO::NR42);
+    //     self.registers.freq = bus.io(IO::NR43);
+    //     self.registers.ctrl = bus.io(IO::NR44);
+    // }
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> u8 {
+    fn output(&self, _io: &mut IORegs) -> u8 {
         ((self.buffer & 1) as u8 ^ 1) * self.envelope.volume()
     }
 
     fn channel(&self) -> Channels { Channels::Noise }
 
-    fn dac_enabled(&self) -> bool {
-        self.registers.volume.value() & 0xF8 != 0
+    fn dac_enabled(&self, io: &mut IORegs) -> bool {
+        io.io(IO::NR42).value() & 0xF8 != 0
     }
 
-    fn clock(&mut self) {
-        if self.registers.volume.dirty() { self.update_envelope(); }
+    fn clock(&mut self, io: &mut IORegs) {
+        let volume = io.io(IO::NR42);
+        if volume.dirty() {
+            self.envelope.update(volume.value());
+            volume.reset_dirty();
+        }
         if !self.triggered { return }
         if self.freq_timer == 0 {
-            self.freq_timer = self.frequency();
+            self.freq_timer = self.frequency(io);
             if self.freq_timer == 0 {
                 self.triggered = false;
                 return;
@@ -79,7 +79,7 @@ impl SoundChannel for Channel {
             self.buffer >>= 1;
             r ^= self.buffer & 1;
             self.buffer |= r << 14;
-            if self.registers.freq.bit(3) != 0 {
+            if io.io(IO::NR43).bit(3) != 0 {
                 self.buffer = (self.buffer & 0xFFBF) | (r << 6);
             }
         } else {
@@ -87,11 +87,11 @@ impl SoundChannel for Channel {
         }
     }
 
-    fn trigger(&mut self) -> bool {
+    fn trigger(&mut self, io: &mut IORegs) -> bool {
         self.triggered = true;
         self.buffer = 0xFFFF;
         self.envelope.trigger();
-        self.freq_timer = self.frequency();
+        self.freq_timer = self.frequency(io);
         false
     }
 

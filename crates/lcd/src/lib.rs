@@ -1,5 +1,4 @@
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
-use shared::utils::Cell;
 use shared::winit as winit;
 
 #[derive(Default)]

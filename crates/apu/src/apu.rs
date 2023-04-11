@@ -3,7 +3,7 @@ use super::Input;
 
 mod dsg;
 
-use shared::io::{IO, IOReg, IORegs};
+use shared::io::{IO, IORegs};
 use dsg::{Channel, Event};
 use shared::audio_settings::AudioSettings;
 use shared::utils::FEdge;
@@ -80,7 +80,7 @@ impl Apu {
     }
 
     fn power(&mut self, io: &mut IORegs, on: bool) {
-        self.sound.reset_dirty();
+        io.io(IO::NR52).reset_dirty();
         if on != self.on {
             if on {
                 log::info!("APU on");
@@ -102,7 +102,7 @@ impl Apu {
     pub fn tick(&mut self, regs: &mut IORegs, ds: bool) {
         self.sample += 1.;
         if self.sample >= self.tick {
-            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels), *self.settings.volume.as_ref().borrow());
+            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels, regs), *self.settings.volume.as_ref().borrow());
             self.sample -= self.tick;
         }
         let sound = regs.io(IO::NR52);
@@ -111,14 +111,14 @@ impl Apu {
         for channel in self.channels.iter_mut() {
             channel.clock(regs);
         }
-        if self.fedge.tick(self.div.bit(if ds { 5 } else { 4 }) != 0) {
+        if self.fedge.tick(regs.io(IO::DIV).bit(if ds { 5 } else { 4 }) != 0) {
             match self.div_apu {
-                0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length)),
+                0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length, regs)),
                 2 | 6 => self.channels.iter_mut().for_each(|x| {
-                    x.event(Event::Sweep);
-                    x.event(Event::Length);
+                    x.event(Event::Sweep, regs);
+                    x.event(Event::Length, regs);
                 }),
-                7 => self.channels.iter_mut().for_each(|x| x.event(Event::Envelope)),
+                7 => self.channels.iter_mut().for_each(|x| x.event(Event::Envelope, regs)),
                 _ => {}
             }
             self.div_apu += 1;
@@ -128,13 +128,13 @@ impl Apu {
 }
 
 impl shared::mem::Device for Apu {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.channels.iter_mut().for_each(|x| {
-            x.configure(bus);
-        });
-        self.sound = bus.io(IO::NR52);
-        self.dsg.configure(bus);
+    fn configure(&mut self, _bus: &dyn IOBus) {
+        // self.channels.iter_mut().for_each(|x| {
+        //     x.configure(bus);
+        // });
+        // self.sound = bus.io(IO::NR52);
+        // self.dsg.configure(bus);
         self.dsg.set_charge_factor(self.charge_factor());
-        self.div = bus.io(IO::DIV);
+        // self.div = bus.io(IO::DIV);
     }
 }

@@ -3,7 +3,7 @@ mod channel;
 use std::cell::RefCell;
 use std::rc::Rc;
 pub(crate) use channel::{Event, Channel};
-use shared::io::{AccessMode, IO, IOReg, IORegs};
+use shared::io::{AccessMode, IO, IORegs};
 
 #[repr(u8)]
 enum Panning {
@@ -11,12 +11,12 @@ enum Panning {
     Left = 4,
 }
 
-impl std::ops::AddAssign<&mut Channel> for DSG {
-    fn add_assign(&mut self, rhs: &mut Channel) {
-        self.output[0] += self.panned(Panning::Left, rhs);
-        self.output[1] += self.panned(Panning::Right, rhs);
-    }
-}
+// impl std::ops::AddAssign<&mut Channel> for DSG {
+//     fn add_assign(&mut self, rhs: &mut Channel) {
+//         self.output[0] += self.panned(Panning::Left, rhs);
+//         self.output[1] += self.panned(Panning::Right, rhs);
+//     }
+// }
 
 pub(crate) struct DSG {
     output: [f32; 2],
@@ -28,8 +28,6 @@ pub(crate) struct DSG {
 impl DSG {
     pub fn new(charge_factor: f32) -> Self {
         Self {
-            ctrl: Default::default(),
-            volume: Default::default(),
             cgb_mode: Default::default(),
             output: [0.; 2],
             capacitor: [0.; 2],
@@ -41,9 +39,8 @@ impl DSG {
         self.charge_factor = factor;
     }
 
-    pub fn hpf(&mut self) -> [f32; 2] {
-        let vol = self.volume.value();
-        let [l, r] = [1 + (vol & 0x70) >> 4, (vol & 0x7) + 1];
+    pub fn hpf(&mut self, volume: u8) -> [f32; 2] {
+        let [l, r] = [1 + (volume & 0x70) >> 4, (volume & 0x7) + 1];
         let [vl, vr] = [l as f32 / 8., r as f32 / 8.];
         let [l, r] = self.output; // 0.
         let [cl, cr] = self.capacitor; // -1.
@@ -52,25 +49,28 @@ impl DSG {
         [ol * vl, or * vr]
     }
 
-    fn panned(&self, side: Panning, channel: &mut Channel) -> f32 {
-        if self.ctrl.value() & (1 << (side as u8 + channel.channel() as u8)) != 0 {
-            channel.output(self.cgb_mode)
+    fn panned(&self, side: Panning, channel: &mut Channel, io: &mut IORegs) -> f32 {
+        let ctrl = io.io(IO::NR51).value();
+        if ctrl & (1 << (side as u8 + channel.channel() as u8)) != 0 {
+            channel.output(self.cgb_mode, io)
         } else { 0. }
     }
 
-    pub fn tick(&mut self, channels: &mut [Channel], state: &[Rc<RefCell<bool>>; 4]) -> [f32; 2] {
+    pub fn tick(&mut self, channels: &mut [Channel], state: &[Rc<RefCell<bool>>; 4], io: &mut IORegs) -> [f32; 2] {
         self.output = [0.; 2];
         let mut any_dac = false;
         let mut i = 0;
         channels.iter_mut()
             .for_each(|c| {
                 if *state[i].as_ref().borrow() {
-                    any_dac |= c.dac_enabled();
-                    *self += c;
+                    any_dac |= c.dac_enabled(io);
+                    // *self += c;
+                    self.output[0] += self.panned(Panning::Left, c, io);
+                    self.output[1] += self.panned(Panning::Right, c, io);
                 }
                 i += 1;
         });
-        if any_dac { self.hpf() } else { [0.; 2] }
+        if any_dac { self.hpf(io.io(IO::NR50).value()) } else { [0.; 2] }
     }
 
     pub fn power_on(&mut self, io: &mut IORegs) {
