@@ -1,8 +1,10 @@
 use serde::{Serialize, Deserialize};
 use super::mem::Mem;
-use std::rc::Rc;
-use std::cell::RefCell;
 use crate::utils::Cell;
+
+mod io_regs;
+
+pub use io_regs::IORegs;
 
 pub const CGB_MODE: u8 = 0x80;
 pub const DMG_MODE: u8 = 0x04;
@@ -215,7 +217,7 @@ pub enum IO {
 }
 
 impl IO {
-    pub fn name(&self) -> &str {
+    pub const fn name(&self) -> &str {
         match self {
             IO::CGB => "CGB",
             IO::JOYP => "JOY",
@@ -424,7 +426,7 @@ impl TryFrom<u16> for IO {
 }
 
 impl IO {
-    pub fn access(&self) -> AccessMode {
+    pub const fn access(&self) -> AccessMode {
         use Access::*;
         use AccessMode::*;
         match self {
@@ -507,7 +509,7 @@ impl IO {
             IO::IE => Custom([RW, RW, RW, RW, RW, U, U, U])
         }
     }
-    pub fn default(&self, cgb: bool) -> u8 {
+    pub const fn default(&self, cgb: bool) -> u8 {
         match self {
             IO::JOYP => 0xFF,
             IO::KEY0 if cgb => 0x80,
@@ -522,7 +524,7 @@ pub enum Access { W, R, RW, U }
 pub enum AccessMode { Generic(Access), Custom([Access; 8]) }
 
 impl Access {
-    pub fn format(&self) -> &'static str {
+    pub const fn format(&self) -> &'static str {
         match self {
             Access::R => "R",
             Access::W => "W",
@@ -569,21 +571,21 @@ impl AccessMode {
         }
     }
 
-    pub fn wronly() -> Self { Self::Generic(Access::W) }
-    pub fn unused() -> Self { Self::Generic(Access::U) }
-    pub fn rdonly() -> Self { Self::Generic(Access::R) }
-    pub fn rw() -> Self { Self::Generic(Access::RW) }
+    pub const fn wronly() -> Self { Self::Generic(Access::W) }
+    pub const fn unused() -> Self { Self::Generic(Access::U) }
+    pub const fn rdonly() -> Self { Self::Generic(Access::R) }
+    pub const fn rw() -> Self { Self::Generic(Access::RW) }
 }
 
 impl Access {
-    pub fn read_mask(&self) -> u8 {
+    pub const fn read_mask(&self) -> u8 {
         match self {
             Access::R | Access::RW | Access::U => 0x00,
             Access::W => 0xFF,
         }
     }
 
-    pub fn write_mask(&self) -> u8 {
+    pub const fn write_mask(&self) -> u8 {
         match self {
             Access::W | Access::RW => 0xFF,
             Access::R | Access::U => 0x00,
@@ -591,16 +593,38 @@ impl Access {
     }
 }
 
-pub(crate) struct HReg {
+#[derive(Clone)]
+pub struct IOReg {
     pub(crate) v: u8,
     dirty: bool,
     rmask: u8,
     wmask: u8
 }
 
-impl HReg {
+impl Default for IOReg {
+    fn default() -> Self { IOReg::new(AccessMode::unused()) }
+}
+
+impl Mem for IOReg {
+    fn read(&self, addr: u16, _: u16) -> u8 {
+        if addr != 0 { panic!("IO reg is only 1 byte") }
+        self.read()
+    }
+
+    fn value(&self, addr: u16, _: u16) -> u8 {
+        if addr != 0 { panic!("IO reg is only 1 byte") }
+        self.value()
+    }
+
+    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
+        if addr != 0 { panic!("IO reg is only 1 byte") }
+        self.write(addr, value, absolute);
+    }
+}
+
+impl IOReg {
     pub fn new(access: AccessMode) -> Self {
-        HReg {
+        IOReg {
             v: 0,
             dirty: false,
             rmask: access.rmask(),
@@ -608,92 +632,40 @@ impl HReg {
         }
     }
 
-    pub fn direct_write(&mut self, value: u8) {
-        self.v = value;
+    pub fn direct_write(&mut self, value: u8) -> &mut Self {
+        self.v = value; self
     }
     pub fn reset_dirty(&mut self) { self.dirty = false; }
-}
 
-impl Mem for HReg {
-    fn read(&self, _: u16, _absolute: u16) -> u8 {
-        self.v | self.rmask
+    pub fn rdonly() -> Self { IOReg::new(AccessMode::rdonly()) }
+    pub fn wronly() -> Self { IOReg::new(AccessMode::wronly()) }
+    pub fn rw() -> Self { IOReg::new(AccessMode::rw()) }
+    pub fn custom(bits: [Access; 8]) -> Self { IOReg::new(AccessMode::Custom(bits)) }
+    pub fn with_access(mode: AccessMode) -> Self { IOReg::new(mode) }
+    pub fn with_value(mut self, value: u8) -> Self { self.direct_write(value); self }
+    pub fn unset() -> Self { IOReg::new(AccessMode::Generic(Access::U)) }
+
+    pub const fn value(&self) -> u8 { self.v }
+
+    pub fn reset(&mut self, bit: u8) {
+        self.direct_write(self.value() & !(1 << bit));
     }
-
-    fn value(&self, _addr: u16, _absolute: u16) -> u8 {
-        self.v
-    }
-
-    fn write(&mut self, _: u16, value: u8, _io: u16) {
-        self.v = (self.v & !self.wmask) | (value & self.wmask);
-        self.dirty = true;
-    }
-}
-
-#[derive(Clone)]
-pub struct IOReg(Rc<RefCell<HReg>>);
-
-impl Default for IOReg {
-    fn default() -> Self {
-        IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::unused()))))
-    }
-}
-
-impl Mem for IOReg {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
-        if addr != 0 { panic!("IO reg is only 1 byte") }
-        self.0.borrow().read(addr, absolute)
-    }
-
-    fn value(&self, addr: u16, absolute: u16) -> u8 {
-        if addr != 0 { panic!("IO reg is only 1 byte") }
-        self.0.borrow().value(addr, absolute)
-    }
-
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        if addr != 0 { panic!("IO reg is only 1 byte") }
-        self.0.borrow_mut().write(addr, value, absolute);
-    }
-}
-
-impl IOReg {
-    pub fn rdonly() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::rdonly())))) }
-    pub fn wronly() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::wronly())))) }
-    pub fn rw() -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::rw())))) }
-    pub fn custom(bits: [Access; 8]) -> Self { IOReg(Rc::new(RefCell::new(HReg::new(AccessMode::Custom(bits))))) }
-    pub fn with_access(mode: AccessMode) -> Self { IOReg(HReg::new(mode).cell()) }
-    pub fn with_value(self, value: u8) -> Self { self.direct_write(value); self }
-    pub fn unset() -> Self { IOReg(HReg::new(AccessMode::Generic(Access::U)).cell()) }
-
-    pub fn value(&self) -> u8 { self.0.borrow().v }
-
-    pub fn direct_write(&self, value: u8) -> &Self {
-        self.0.as_ref().borrow_mut().direct_write(value);
-        self
-    }
-
-    pub fn set(&self, bit: u8) {
+    pub fn set(&mut self, bit: u8) {
         self.direct_write(self.value() | (1 << bit));
     }
-
-    pub fn bit(&self, bit: u8) -> u8 {
+    pub const fn bit(&self, bit: u8) -> u8 {
         (self.value() >> bit) & 0x1
-    }
-
-    pub fn reset(&self, bit: u8) {
-        self.direct_write(self.value() & !(1 << bit));
     }
 
     pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }
 
-    pub fn reset_dirty(&self) { self.0.as_ref().borrow_mut().reset_dirty(); }
-    pub fn dirty(&self) -> bool { self.0.as_ref().borrow().dirty }
+    pub fn dirty(&self) -> bool { self.dirty }
 
-    pub fn writable(&self) -> bool { self.0.borrow().wmask != 0 }
+    pub const fn writable(&self) -> bool { self.wmask != 0 }
 
-    pub fn set_access(&self, mode: AccessMode) -> &Self {
-        let mut t = self.0.borrow_mut();
-        t.wmask = mode.wmask();
-        t.rmask = mode.rmask();
+    pub fn set_access(&mut self, mode: AccessMode) -> &Self {
+        self.wmask = mode.wmask();
+        self.rmask = mode.rmask();
         self
     }
 }

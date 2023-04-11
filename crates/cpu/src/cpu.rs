@@ -19,10 +19,7 @@ pub struct Cpu {
     cache: Vec<Value>,
     prefixed: bool,
     finished: bool,
-    ime: bool,
-    int_flags: IOReg,
-    ie: IOReg,
-    ds: IOReg
+    ime: bool
 }
 
 impl shared::Cpu for Cpu {
@@ -31,9 +28,8 @@ impl shared::Cpu for Cpu {
     fn register(&self, reg: Reg) -> Value { self.regs.read(reg) }
 }
 
-impl Cpu {
-
-    pub fn new() -> Self {
+impl Default for Cpu {
+    fn default() -> Self {
         Self {
             mode: Mode::Running,
             prev: Opcode::Nop,
@@ -43,32 +39,27 @@ impl Cpu {
             prefixed: false,
             finished: false,
             ime: false,
-            int_flags: IOReg::unset(),
-            ie: IOReg::unset(),
             at: 0,
-            ds: IOReg::unset()
         }
     }
+}
 
-    pub fn double_speed(&self) -> bool {
-        self.ds.bit(7) != 0
-    }
-
+impl Cpu {
     pub fn skip_boot(&mut self, cgb: bool) {
         self.regs = if cgb { Registers::GBC } else { Registers::GB };
     }
 
     pub fn registers(&self) -> &Registers { &self.regs }
 
-    fn check_interrupts(&mut self) {
+    fn check_interrupts(&mut self, bus: &mut dyn Bus) {
         if !self.instructions.is_empty() || self.prev == Opcode::Ei { return };
-        let int = (self.int_flags.read() & self.ie.read()) & 0x1F;
+        let int = bus.interrupt();
         if int != 0 {
             if self.mode == Mode::Halt { self.mode = Mode::Running };
             if self.ime {
                 self.ime = false;
                 let (bit, ins) = super::decode::interrupt(int);
-                self.int_flags.reset(bit);
+                bus.int_reset(bit);
                 self.instructions = ins.iter().rev().map(|x| x.to_vec()).collect();
             }
         }
@@ -77,7 +68,7 @@ impl Cpu {
     pub fn cycle(&mut self, bus: &mut dyn Bus) {
         let prefixed = self.prefixed;
         self.prefixed = false;
-        if !prefixed { self.check_interrupts(); }
+        if !prefixed { self.check_interrupts(bus); }
         if self.mode == Mode::Halt {
             return ;
         }
@@ -133,9 +124,9 @@ impl Cpu {
 }
 
 impl Device for Cpu {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.ie = bus.io(IO::IE);
-        self.int_flags = bus.io(IO::IF);
-        self.ds = bus.io(IO::KEY1);
-    }
+    // fn configure(&mut self, bus: &dyn IOBus) {
+        // self.ie = bus.io(IO::IE);
+        // self.int_flags = bus.io(IO::IF);
+        // self.ds = bus.io(IO::KEY1);
+    // }
 }

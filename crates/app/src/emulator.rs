@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
+use bus::Console;
 use dbg::BusWrapper;
 use mem::mbc;
 use serial::com::Serial;
@@ -18,8 +19,6 @@ use shared::utils::Cell;
 use crate::{AppConfig, Proxy};
 use crate::render::{Event, Render};
 
-mod joy;
-
 use shared::audio_settings::AudioSettings;
 use shared::input::{Keybindings, Section};
 use crate::settings::{Settings, Mode};
@@ -27,49 +26,19 @@ use crate::settings::{Settings, Mode};
 pub struct Emu {
     speed: i32,
     rom: Option<Rom>,
-    joy: joy::Joypad,
-    pub lcd: lcd::Lcd,
     pub bus: bus::Bus,
-    pub cpu: cpu::Cpu,
-    pub ppu: ppu::Controller,
-    pub dma: ppu::Dma,
-    pub hdma: ppu::Hdma,
-    pub timer: bus::Timer,
-    pub apu: apu::Apu,
-    pub serial: serial::Port,
+    pub gb: Console,
     running: bool
 }
 
 impl Default for Emu {
     fn default() -> Self {
-        let lcd = lcd::Lcd::new();
-        let mbc = mbc::Controller::unplugged();
-        let mut ppu = ppu::Controller::new(lcd.clone());
-
-        let joy = joy::Joypad::new(Default::default());
-        let serial = serial::Port::new(Serial::phantom());
-        let dma = ppu::Dma::default();
-        let hdma = ppu::Hdma::default();
-        let timer = bus::Timer::default();
-        let cpu = cpu::Cpu::new();
-        let apu = apu::Apu::default();
-        let bus = bus::Bus::new(false)
-            .with_mbc(mbc)
-            .with_ppu(&mut ppu);
         Self {
-            apu,
             speed: Default::default(),
             rom: None,
-            lcd,
-            joy,
-            ppu,
-            cpu,
-            dma,
-            hdma,
             bus,
-            timer,
-            serial,
-            running: false
+            running: false,
+            gb: Console::builder().build()
         }
     }
 }
@@ -136,7 +105,7 @@ impl Emulator {
         self.link.as_ref().borrow_mut().as_mut()
             .map(|x| f(x))
             .unwrap_or_else(|| {
-                f(self.emu.as_ref().borrow_mut().serial.link())
+                f(self.emu.as_ref().borrow_mut().gb.serial.link())
             })
     }
 
@@ -170,7 +139,7 @@ impl Emulator {
         {
             let mut link = RefCell::borrow_mut(&self.link);
             if link.borrowed() {
-                link.store(self.emu.take().serial.disconnect());
+                link.store(self.emu.take().gb.serial.disconnect());
             }
         }
         let emu = Emu::new(&self, rom, running);
@@ -185,11 +154,11 @@ impl Render for Emulator {
         self.emu.as_ref().borrow_mut().lcd.init(window);
     }
     fn render(&mut self) {
-        self.emu.as_ref().borrow_mut().lcd.render();
+        self.emu.as_ref().borrow_mut().gb.lcd.render();
     }
 
     fn resize(&mut self, w: u32, h: u32) {
-        self.emu.as_ref().borrow_mut().lcd.resize(w, h);
+        self.emu.as_ref().borrow_mut().gb.lcd.resize(w, h);
     }
 
     fn handle(&mut self, event: &Event, window: &Window) {
@@ -199,7 +168,7 @@ impl Render for Emulator {
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
                 if event == &WindowEvent::CloseRequested { self.stop(); }
                 if let WindowEvent::KeyboardInput { input, .. } = event {
-                    self.emu.as_ref().borrow_mut().joy.handle(*input);
+                    self.emu.as_ref().borrow_mut().gb.joy.handle(*input);
                 }
             },
             _ => {}
@@ -209,21 +178,21 @@ impl Render for Emulator {
 
 impl Ui for Emulator {
     fn init(&mut self, ctx: &mut Context) {
-        self.emu.as_ref().borrow_mut().ppu.init(ctx);
+        self.emu.as_ref().borrow_mut().gb.ppu.init(ctx);
     }
 
     fn draw(&mut self, ctx: &mut Context) {
-        self.emu.as_ref().borrow_mut().ppu.draw(ctx);
+        self.emu.as_ref().borrow_mut().gb.ppu.draw(ctx);
     }
 
     fn handle(&mut self, event: &shared::Event) {
-        self.emu.as_ref().borrow_mut().ppu.handle(event);
+        self.emu.as_ref().borrow_mut().gb.ppu.handle(event);
     }
 }
 
 impl dbg::ReadAccess for Emulator {
     fn cpu_register(&self, reg: shared::cpu::Reg) -> shared::cpu::Value {
-        self.emu.as_ref().borrow().cpu.registers().read(reg)
+        self.emu.as_ref().borrow().gb.cpu.registers().read(reg)
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
@@ -267,66 +236,34 @@ impl Emu {
     pub const CYCLE_TIME: f64 = 1.0 / Emu::CLOCK_PER_SECOND as f64;
 
     pub fn new(controller: &Emulator, rom: Rom, running: bool) -> Self {
-        let skip_boot = !controller.enabled_boot();
         let cgb = controller.mode().is_cgb();
-        let mut joy = joy::Joypad::new(controller.bindings.clone());
-        let mut timer = bus::Timer::default();
-        let mut dma = ppu::Dma::default();
-        let mut hdma = ppu::Hdma::default();
-        let mut apu = controller.audio.apu(controller.audio_settings.clone());
-        let mut serial = serial::Port::new(controller.serial_port());
-
-        let lcd = lcd::Lcd::new();
-        let mut ppu = ppu::Controller::new(lcd.clone());
-
+        let skip = !controller.enabled_boot();
+        let mut gb = Console::builder()
+            .skip_boot(skip)
+            .set_cgb(cgb)
+            .with_link(controller.serial_port())
+            .with_apu(controller.audio.apu(controller.audio_settings.clone()))
+            .with_keybinds(controller.bindings.clone())
+            .build();
         let mbc = mem::mbc::Controller::new(&rom);
-        let mut cpu = cpu::Cpu::new();
+        let mbc = if skip { mbc.skip_boot() } else { mbc };
         let bus = bus::Bus::new(cgb);
-        let mbc = if skip_boot { mbc.skip_boot() } else { mbc };
-        let bus = if skip_boot { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
+        let mut bus = if skip { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
             .with_mbc(mbc)
-            .with_ppu(&mut ppu)
-            .configure(&mut dma)
-            .configure(&mut hdma)
-            .configure(&mut timer)
-            .configure(&mut cpu)
-            .configure(&mut joy)
-            .configure(&mut apu)
-            .configure(&mut serial);
+            .with_ppu(&mut gb.ppu);
         log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
-        if skip_boot { cpu.skip_boot(cgb); timer.offset() };
         Self {
             speed: Default::default(),
-            joy,
-            lcd,
-            bus,
-            cpu,
-            ppu,
-            dma,
-            hdma,
-            timer,
-            serial,
             rom: Some(rom),
             running,
-            apu
+            gb,
+            bus
         }
     }
 
     pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) {
         if !self.running { return }
-        self.joy.tick();
-        let tick = self.hdma.tick(&mut self.bus);
-        self.bus.tick();
-        if clock == 0 || (clock == 2 && self.cpu.double_speed()) {
-            self.serial.tick();
-            self.timer.tick();
-            self.dma.tick(&mut self.bus);
-            if !tick { self.cpu.cycle(&mut self.bus); }
-        }
-        self.ppu.tick();
-        self.apu.tick(self.cpu.double_speed());
-        self.running &= bp.tick(&self.cpu, self.bus.last());
-        self.cpu.reset_finished();
+        self.bus.tick(&mut self.gb, clock, bp);
     }
 }
 

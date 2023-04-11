@@ -19,6 +19,7 @@ mod hdma;
 
 pub use dma::Dma;
 pub use hdma::Hdma;
+use shared::io::IORegs;
 
 pub struct Controller {
     tab: render::Tabs,
@@ -29,18 +30,18 @@ pub struct Controller {
 }
 
 impl Controller {
-    pub fn new(lcd: Lcd) -> Self {
+    pub fn new() -> Self {
         Self {
             tab: render::Tabs::Oam,
             init: false,
             storage: HashMap::with_capacity(256),
-            ppu: ppu::Ppu::new(lcd),
+            ppu: ppu::Ppu::new(),
             state: ppu::Ppu::default_state()
         }
     }
 
-    pub fn tick(&mut self) {
-        self.ppu.tick(&mut self.state);
+    pub fn tick(&mut self, io: &mut IORegs, lcd: &mut Lcd) {
+        self.ppu.tick(&mut self.state, io, lcd);
     }
 }
 

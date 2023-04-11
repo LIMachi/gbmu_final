@@ -1,5 +1,7 @@
 use std::fmt::{Debug, Formatter};
+use lcd::Lcd;
 use mem::oam::Sprite;
+use shared::io::IORegs;
 use shared::mem::Source;
 
 use super::{
@@ -17,7 +19,7 @@ pub enum Mode {
 
 pub(crate) trait State: Debug {
     fn mode(&self) -> Mode;
-    fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>>;
+    fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, lcd: &mut Lcd) -> Option<Box<dyn State>>;
     fn boxed(self) -> Box<dyn State> where  Self: 'static + Sized { Box::new(self) }
     fn name(&self) -> String {
         format!("{:?}", self.mode())
@@ -97,7 +99,7 @@ impl TransferState {
 impl State for TransferState {
     fn mode(&self) -> Mode { Mode::Transfer }
 
-    fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
+    fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs) -> Option<Box<dyn State>> {
         self.dots += 1;
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
@@ -128,7 +130,7 @@ impl State for TransferState {
                 self.scx -= 1;
                 return None;
             }
-            ppu.set(self.lx as usize, self.ly as usize, pixel);
+            ppu.set(io, self.lx as usize, self.ly as usize, pixel);
             self.sprite = None;
             self.lx += 1;
             if self.lx == 160 {

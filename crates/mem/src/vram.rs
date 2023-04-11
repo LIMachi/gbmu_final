@@ -54,7 +54,6 @@ impl Mem for Storage {
 pub struct Vram {
     pub tile_cache: HashSet<usize>,
     mem: Storage,
-    bank: IOReg,
 }
 
 impl Vram {
@@ -107,9 +106,7 @@ impl Vram {
 impl Device for Vram {
     fn configure(&mut self, bus: &dyn IOBus) {
         if bus.is_cgb() {
-            log::info!("vram: detected cgb");
             self.mem = Storage::CGB([0; BANK_SIZE as usize * 2]);
-            self.bank = bus.io(IO::VBK);
         }
     }
 }

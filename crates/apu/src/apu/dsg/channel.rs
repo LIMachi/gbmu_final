@@ -1,4 +1,4 @@
-use shared::io::{AccessMode, IO, IOReg};
+use shared::io::{AccessMode, IO, IOReg, IORegs};
 use shared::mem::{Device, IOBus};
 
 mod wave;
@@ -34,7 +34,7 @@ pub(crate) trait SoundChannel: Device {
     fn dac_enabled(&self) -> bool { false }
 
     fn clock(&mut self);
-    fn trigger(&mut self) -> bool;
+    fn trigger(&mut self, io: &mut IORegs) -> bool;
     fn sweep(&mut self) -> bool { false }
     fn envelope(&mut self) { }
 
@@ -51,7 +51,7 @@ impl SoundChannel for () {
     fn output(&self) -> u8 { 0 }
     fn channel(&self) -> Channels { Channels::Noise }
     fn clock(&mut self) { }
-    fn trigger(&mut self) -> bool { false }
+    fn trigger(&mut self, io: &mut IORegs) -> bool { false }
     fn length(&self) -> u8 { 0 }
 }
 
@@ -81,13 +81,10 @@ impl Capacitor {
 pub(crate) struct Channel {
     pub enabled: bool,
     length_timer: u8,
-    regs: [IO; 4],
-    nr1: IOReg,
-    nr2: IOReg,
-    nr3: IOReg,
-    nr4: IOReg,
-    nr52: IOReg,
-    pcm: IOReg,
+    nr1: IO,
+    nr2: IO,
+    nr3: IO,
+    nr4: IO,
     dac: Capacitor,
     inner: Box<dyn SoundChannel + 'static>
 }
@@ -103,14 +100,11 @@ impl Channel {
             length_timer: 0,
             enabled: false,
             inner: Box::new(channel),
-            regs: [nr1, nr2, nr3, nr4],
-            nr1: IOReg::unset(),
-            nr2: IOReg::unset(),
-            nr3: IOReg::unset(),
+            nr1,
+            nr2,
+            nr3,
+            nr4,
             dac: Capacitor::new(0.1),
-            nr4: IOReg::unset(),
-            nr52: IOReg::unset(),
-            pcm: IOReg::unset(),
         }
     }
 
@@ -125,31 +119,31 @@ impl Channel {
     }
     pub fn noise() -> Self { Self::new(NoiseChannel::new()) }
 
-    pub fn power_on(&mut self) {
-        self.nr1.set_access(self.regs[0].access());
-        self.nr2.set_access(self.regs[1].access());
-        self.nr3.set_access(self.regs[2].access());
-        self.nr4.set_access(self.regs[3].access());
+    pub fn power_on(&mut self, io: &mut IORegs) {
+        io.io(self.nr1).set_access(self.nr1.access());
+        io.io(self.nr2).set_access(self.nr2.access());
+        io.io(self.nr3).set_access(self.nr3.access());
+        io.io(self.nr4).set_access(self.nr4.access());
         self.inner.power_on();
     }
 
-    pub fn power_off(&mut self) {
-        self.nr1.set_access(AccessMode::rdonly()).direct_write(0); //FIXME: DMG allow length modification!
-        self.nr2.set_access(AccessMode::rdonly()).direct_write(0);
-        self.nr3.set_access(AccessMode::rdonly()).direct_write(0);
-        self.nr4.set_access(AccessMode::rdonly()).direct_write(0);
+    pub fn power_off(&mut self, io: &mut IORegs) {
+       io.io(self.nr1).set_access(AccessMode::rdonly()).direct_write(0); //FIXME: DMG allow length modification!
+       io.io(self.nr2).set_access(AccessMode::rdonly()).direct_write(0);
+       io.io(self.nr3).set_access(AccessMode::rdonly()).direct_write(0);
+       io.io(self.nr4).set_access(AccessMode::rdonly()).direct_write(0);
         self.inner.power_off();
     }
 
-    pub fn enable(&mut self) {
+    pub fn enable(&mut self, io: &mut IORegs) {
         self.enabled = true;
-        self.nr52.set(self.inner.channel() as u8);
+        io.io(IO::NR52).set(self.inner.channel() as u8);
         self.inner.on_enable();
     }
 
-    pub fn disable(&mut self) {
+    pub fn disable(&mut self, io: &mut IORegs) {
         self.enabled = false;
-        self.nr52.reset(self.inner.channel() as u8);
+        io.io(IO::NR52).reset(self.inner.channel() as u8);
         self.inner.on_disable();
     }
 
@@ -165,9 +159,9 @@ impl Channel {
         }
     }
 
-    fn reload_length(&mut self) {
+    fn reload_length(&mut self, v: u8) {
         let mask = self.inner.length();
-        self.length_timer = (mask - (self.nr1.value() & mask)) + 1;
+        self.length_timer = (mask - (v & mask)) + 1;
     }
 
     pub fn output(&mut self, cgb: bool) -> f32 {
@@ -186,58 +180,25 @@ impl Channel {
         self.inner.dac_enabled()
     }
 
-    pub fn clock(&mut self) {
-        if self.nr4.dirty() {
-            self.nr4.reset_dirty();
-            if self.nr4.bit(7) != 0 { self.trigger(); }
+    pub fn clock(&mut self, io: &mut IORegs) {
+        let nr4 = io.io(self.nr4);
+        if nr4.dirty() {
+            nr4.reset_dirty();
+            if nr4.bit(7) != 0 { self.trigger(io); }
         }
-        if self.nr1.dirty() {
-            self.nr1.reset_dirty();
-            self.reload_length();
+        let nr1 = io.io(self.nr1);
+        if nr1.dirty() {
+            nr1.reset_dirty();
+            self.reload_length(nr1.value());
         }
-        if !self.inner.dac_enabled() { self.disable(); }
-        if self.enabled { self.inner.clock(); }
+        if !self.inner.dac_enabled(io) { self.disable(io); }
+        if self.enabled { self.inner.clock(io); }
     }
 
-    pub fn trigger(&mut self) -> bool {
-        self.enable();
-        if self.inner.trigger() { self.disable(); }
-        self.reload_length();
+    pub fn trigger(&mut self, io: &mut IORegs) -> bool {
+        self.enable(io);
+        if self.inner.trigger(io) { self.disable(io); }
+        self.reload_length(io.io(self.nr1).value());
         false
-    }
-}
-
-impl Device for Channel {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.nr1 = bus.io(match self.inner.channel() {
-            Channels::Sweep => IO::NR11,
-            Channels::Pulse => IO::NR21,
-            Channels::Wave => IO::NR31,
-            Channels::Noise => IO::NR41
-        });
-        self.nr2 = bus.io(match self.inner.channel() {
-            Channels::Sweep => IO::NR12,
-            Channels::Pulse => IO::NR22,
-            Channels::Wave => IO::NR32,
-            Channels::Noise => IO::NR42
-        });
-        self.nr3 = bus.io(match self.inner.channel() {
-            Channels::Sweep => IO::NR13,
-            Channels::Pulse => IO::NR23,
-            Channels::Wave => IO::NR33,
-            Channels::Noise => IO::NR43
-        });
-        self.nr4 = bus.io(match self.inner.channel() {
-            Channels::Sweep => IO::NR14,
-            Channels::Pulse => IO::NR24,
-            Channels::Wave => IO::NR34,
-            Channels::Noise => IO::NR44
-        });
-        self.inner.configure(bus);
-        self.pcm = bus.io(match self.inner.channel() {
-            Channels::Sweep | Channels::Pulse => IO::PCM12,
-            Channels::Wave | Channels::Noise => IO::PCM34,
-        });
-        self.nr52 = bus.io(IO::NR52);
     }
 }

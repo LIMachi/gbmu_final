@@ -2,7 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
-use shared::io::LCDC;
+use shared::io::{IO, IORegs, LCDC};
 use shared::mem::{Device, IOBus, *};
 use crate::ppu::registers::Registers;
 
@@ -52,10 +52,8 @@ pub(crate) struct Ppu {
     pub(crate) dots: usize,
     pub(crate) oam: Rc<RefCell<Lock<Oam>>>,
     pub(crate) vram: Rc<RefCell<Lock<Vram>>>,
-    pub(crate) regs: Registers,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
-    pub(crate) lcd: Lcd,
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
@@ -63,17 +61,15 @@ pub(crate) struct Ppu {
 }
 
 impl Ppu {
-    pub fn new(lcd: Lcd) -> Self {
+    pub fn new() -> Self {
         let sprites = Vec::with_capacity(10);
         Self {
             sc: Scroll::default(),
             dots: 0,
             oam: Oam::new().locked().cell(),
             vram: Vram::new().locked().cell(),
-            regs: Registers::default(),
             cram: cram::CRAM::default(),
             sprites,
-            lcd,
             lcdc: LCDC(0),
             win: Default::default(),
             stat: REdge::new()
@@ -85,19 +81,20 @@ impl Ppu {
     pub(crate) fn oam_mut(&self) -> RefMut<Lock<Oam>> { self.oam.as_ref().borrow_mut() }
     pub(crate) fn vram_mut(&self) -> RefMut<Lock<Vram>> { self.vram.as_ref().borrow_mut() }
 
-    fn set_state(&mut self, state: &mut Box<dyn State>, next: Box<dyn State>) {
+    fn set_state(&mut self, regs: &mut IORegs, state: &mut Box<dyn State>, next: Box<dyn State>) {
         let mode = next.mode();
+        let stat = regs.io(IO::STAT);
         *state = next;
-        self.regs.stat.reset(0);
-        self.regs.stat.reset(1);
-        if (mode as u8 & 0x1) != 0 { self.regs.stat.set(0); }
-        if (mode as u8 & 0x2) != 0 { self.regs.stat.set(1); }
-        let input = self.regs.stat.bit(3) != 0 && mode == Mode::HBlank;
-        let input = input || (self.regs.stat.bit(4) != 0 && mode == Mode::VBlank);
-        let input = input || (self.regs.stat.bit(5) != 0 && mode == Mode::Search);
-        let input = input || (self.regs.stat.bit(6) != 0 && self.regs.stat.bit(2) != 0);
+        stat.reset(0);
+        stat.reset(1);
+        if (mode as u8 & 0x1) != 0 { stat.set(0); }
+        if (mode as u8 & 0x2) != 0 { stat.set(1); }
+        let input = stat.bit(3) != 0 && mode == Mode::HBlank;
+        let input = input || (stat.bit(4) != 0 && mode == Mode::VBlank);
+        let input = input || (stat.bit(5) != 0 && mode == Mode::Search);
+        let input = input || (stat.bit(6) != 0 && stat.bit(2) != 0);
         if self.stat.tick(input) {
-            self.regs.interrupt.set(1);
+            regs.io(IO::IF).set(1);
         }
 
         match mode {
@@ -111,29 +108,29 @@ impl Ppu {
         };
     }
 
-    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>) {
-        self.cram.tick();
-        let lcdc = LCDC(self.regs.lcdc.read());
+    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
+        self.cram.tick(io);
+        let lcdc = LCDC(io.io(IO::LCDC).read());
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
-            self.regs.ly.direct_write(0);
-            self.set_state(state, Box::new(HState::last()));
-            self.lcd.disable();
+            io.io(IO::LY).direct_write(0);
+            self.set_state(io, state, Box::new(HState::last()));
+            lcd.disable();
         }
         self.lcdc = lcdc;
         self.dots += 1;
         if self.lcdc.enabled() {
             if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
-            if let Some(next) = state.tick(self) {
+            if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     self.dots = 0;
-                    self.lcd.enable();
+                    lcd.enable();
                 }
-                self.set_state(state, next);
+                self.set_state(io, state, next);
             }
         } else if self.dots == 65664 {
-            self.set_state(state, VState::immediate().boxed());
+            self.set_state(io, state, VState::immediate().boxed());
         }
     }
 
@@ -141,8 +138,8 @@ impl Ppu {
         self.oam().inner().sprites[index]
     }
 
-    pub fn set(&mut self, lx: usize, ly: usize, pixel: Pixel) {
-        self.lcd.set(lx, ly, self.cram.color(pixel));
+    pub fn set(&mut self, lcd: &mut Lcd, io: &mut IORegs, lx: usize, ly: usize, pixel: Pixel) {
+        lcd.set(lx, ly, self.cram.color(pixel, io));
     }
 
     pub fn default_state() -> PpuState { VState::new().boxed() }
@@ -150,7 +147,6 @@ impl Ppu {
 
 impl Device for Ppu {
     fn configure(&mut self, bus: &dyn IOBus) {
-        self.regs.configure(bus);
         self.cram.configure(bus);
         self.vram_mut().configure(bus);
     }

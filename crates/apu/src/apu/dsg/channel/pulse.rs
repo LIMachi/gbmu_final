@@ -1,4 +1,4 @@
-use shared::io::{AccessMode, IO, IOReg};
+use shared::io::{AccessMode, IO, IOReg, IORegs};
 use shared::mem::{Device, IOBus};
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
@@ -100,8 +100,12 @@ impl Channel {
         }
     }
 
-    fn frequency(&self) -> u16 {
-        self.registers.wave1.value() as u16 | ((self.registers.wave2.value() as u16 & 0x7) << 8)
+    fn frequency(&self, io: &mut IORegs) -> u16 {
+        if self.has_sweep {
+            io.io(IO::NR13).value() as u16 | ((io.io(IO::NR14).value() as u16 & 0x7) << 8)
+        } else {
+            io.io(IO::NR23).value() as u16 | ((io.io(IO::NR24).value() as u16 & 0x7) << 8)
+        }
     }
 
     fn update_sweep(&mut self) {

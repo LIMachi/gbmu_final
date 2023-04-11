@@ -3,7 +3,7 @@ mod channel;
 use std::cell::RefCell;
 use std::rc::Rc;
 pub(crate) use channel::{Event, Channel};
-use shared::io::{AccessMode, IO, IOReg};
+use shared::io::{AccessMode, IO, IOReg, IORegs};
 
 #[repr(u8)]
 enum Panning {
@@ -19,8 +19,6 @@ impl std::ops::AddAssign<&mut Channel> for DSG {
 }
 
 pub(crate) struct DSG {
-    ctrl: IOReg,
-    volume: IOReg,
     output: [f32; 2],
     capacitor: [f32; 2],
     charge_factor: f32,
@@ -75,21 +73,13 @@ impl DSG {
         if any_dac { self.hpf() } else { [0.; 2] }
     }
 
-    pub fn power_on(&mut self) {
-        self.ctrl.set_access(IO::NR51.access());
-        self.volume.set_access(IO::NR50.access());
+    pub fn power_on(&mut self, io: &mut IORegs) {
+        io.io(IO::NR51).set_access(IO::NR51.access());
+        io.io(IO::NR50).set_access(IO::NR50.access());
     }
 
-    pub fn power_off(&mut self) {
-        self.ctrl.set_access(AccessMode::rdonly()).direct_write(0);
-        self.volume.set_access(AccessMode::rdonly()).direct_write(0);
-    }
-}
-
-impl shared::mem::Device for DSG {
-    fn configure(&mut self, bus: &dyn shared::mem::IOBus) {
-        self.ctrl = bus.io(IO::NR51);
-        self.volume = bus.io(IO::NR50);
-        self.cgb_mode = bus.is_cgb();
+    pub fn power_off(&mut self, io: &mut IORegs) {
+        io.io(IO::NR51).set_access(AccessMode::rdonly()).direct_write(0);
+        io.io(IO::NR50).set_access(AccessMode::rdonly()).direct_write(0);
     }
 }

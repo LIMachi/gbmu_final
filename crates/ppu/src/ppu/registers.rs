@@ -18,10 +18,10 @@ pub struct Registers {
     pub bcpd: IOReg,
     pub ocps: IOReg,
     pub ocpd: IOReg,
-    pub opri: IOReg,
     pub interrupt: IOReg,
-    pub cgb: IOReg,
-    pub key0: IOReg,
+    pub cgb: u8,
+    pub key0: u8,
+    pub opri: u8,
 }
 
 impl Device for Registers {
@@ -41,9 +41,15 @@ impl Device for Registers {
         self.bcpd = bus.io(IO::BCPD);
         self.ocps = bus.io(IO::OCPS);
         self.ocpd = bus.io(IO::OCPD);
-        self.opri = bus.io(IO::OPRI);
         self.interrupt = bus.io(IO::IF);
-        self.cgb = bus.io(IO::CGB);
-        self.key0 = bus.io(IO::KEY0);
+        self.cgb = bus.io(IO::CGB).value();
+        self.key0 = bus.io(IO::KEY0).value();
+        self.opri = bus.io(IO::OPRI).value();
+    }
+
+    fn latch(&mut self, bus: &dyn IOBus) {
+        self.cgb = bus.io(IO::CGB).value();
+        self.key0 = bus.io(IO::KEY0).value();
+        self.opri = bus.io(IO::OPRI).value();
     }
 }

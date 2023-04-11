@@ -1,6 +1,4 @@
-use shared::io::{Access, AccessMode, DMG_MODE, IO, IOReg};
-use shared::mem::Mem;
-
+use super::*;
 
 pub struct IORegs {
     cgb: IOReg,
@@ -23,7 +21,7 @@ impl IORegs {
     }
 
     fn set(&mut self, io: IO, value: u8) {
-        let addr = io as u16 - shared::mem::IO;
+        let addr = io as u16 - crate::mem::IO;
         self.range[addr as usize].direct_write(value);
     }
 
@@ -52,17 +50,30 @@ impl IORegs {
         self.set(IO::OBP0, 0xFF);
         self.set(IO::OBP1, 0xFF);
         self.set(IO::LCDC, 0x91);
+        self.set(IO::DIV, 0xAC);
         self.compat_mode();
         self.post();
     }
 
-    pub fn io(&self, io: IO) -> IOReg {
-        if io == IO::CGB { return self.cgb.clone() }
-        self.range[io as u16 as usize - shared::mem::IO as usize].clone()
+    pub fn io(&mut self, io: IO) -> &mut IOReg {
+        if io == IO::CGB { return &mut self.cgb }
+        &mut self.range[io as u16 as usize - crate::mem::IO as usize]
+    }
+
+    pub fn io_addr(&mut self, io: u16) -> Option<&mut IOReg> {
+        self.range.get_mut(io as usize - crate::mem::IO as usize)
+    }
+
+    pub fn int_set(&mut self, bit: u8) {
+        self.io(IO::IF).set(bit);
+    }
+
+    pub fn int_reset(&mut self, bit: u8) {
+        self.io(IO::IF).reset(bit);
     }
 
     pub fn writable(&self, io: IO) -> bool {
-        self.range[io as u16 as usize - shared::mem::IO as usize].writable()
+        self.range[io as u16 as usize - crate::mem::IO as usize].writable()
     }
 }
 

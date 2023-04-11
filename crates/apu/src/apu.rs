@@ -3,7 +3,7 @@ use super::Input;
 
 mod dsg;
 
-use shared::io::{IO, IOReg};
+use shared::io::{IO, IOReg, IORegs};
 use dsg::{Channel, Event};
 use shared::audio_settings::AudioSettings;
 use shared::utils::FEdge;
@@ -18,8 +18,6 @@ pub struct Apu {
     tick: f64,
     input: Input,
     dsg: dsg::DSG,
-    sound: IOReg,
-    div: IOReg,
     channels: Vec<Channel>,
     on: bool,
     settings: AudioSettings
@@ -37,8 +35,6 @@ impl Default for Apu {
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
             channels: vec![],
-            sound: Default::default(),
-            div: Default::default(),
             on: false,
             settings: Default::default(),
         }
@@ -68,10 +64,8 @@ impl Apu {
             sample_rate,
             tick: TICK_RATE / sample_rate as f64,
             input,
-            sound: IOReg::unset(),
             dsg: dsg::DSG::new(1.),
             channels,
-            div: IOReg::unset(),
             on: false,
             settings
         }
@@ -85,39 +79,39 @@ impl Apu {
         self.dsg.set_charge_factor(self.charge_factor());
     }
 
-    fn power(&mut self) {
+    fn power(&mut self, io: &mut IORegs, on: bool) {
         self.sound.reset_dirty();
-        let on = self.on;
-        self.on = self.sound.bit(7) != 0;
-        if self.on != on {
-            if self.on {
+        if on != self.on {
+            if on {
                 log::info!("APU on");
                 for channel in self.channels.iter_mut() {
-                    channel.power_on();
+                    channel.power_on(io);
                 }
-                self.dsg.power_on();
+                self.dsg.power_on(io);
             } else {
                 log::info!("APU off");
                 for channel in self.channels.iter_mut() {
-                    channel.power_off();
+                    channel.power_off(io);
                 }
-                self.dsg.power_off();
+                self.dsg.power_off(io);
             }
         }
+        self.on = on;
     }
 
-    pub fn tick(&mut self, double_speed: bool) {
+    pub fn tick(&mut self, regs: &mut IORegs, ds: bool) {
         self.sample += 1.;
         if self.sample >= self.tick {
             self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels), *self.settings.volume.as_ref().borrow());
             self.sample -= self.tick;
         }
-        if self.sound.dirty() { self.power(); }
+        let sound = regs.io(IO::NR52);
+        if sound.dirty() { sound.reset_dirty(); let on = sound.bit(7) != 0; self.power(regs, on); }
         if !self.on { return; }
         for channel in self.channels.iter_mut() {
-            channel.clock();
+            channel.clock(regs);
         }
-        if self.fedge.tick(self.div.bit(if double_speed { 5 } else { 4 }) != 0) {
+        if self.fedge.tick(self.div.bit(if ds { 5 } else { 4 }) != 0) {
             match self.div_apu {
                 0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length)),
                 2 | 6 => self.channels.iter_mut().for_each(|x| {

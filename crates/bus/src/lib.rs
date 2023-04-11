@@ -4,13 +4,15 @@ use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 use mem::{Hram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
-use shared::io::{IO, IOReg};
+use shared::breakpoints::Breakpoints;
+use shared::io::{IO, IOReg, IORegs};
 use shared::utils::Cell;
 
-mod io;
 mod timer;
+mod devices;
 
 pub use timer::Timer;
+pub use devices::Console;
 
 pub struct Empty {}
 impl Mem for Empty {}
@@ -28,7 +30,7 @@ pub struct Bus {
     un_1: LockedMem,
     vram: Rc<RefCell<dyn Mem>>,
     oam: Rc<RefCell<dyn Mem>>,
-    io: io::IORegs,
+    io: IORegs,
     ie: IOReg,
     status: MemStatus,
     last: Option<Op>
@@ -40,15 +42,15 @@ impl Bus {
             clock: 0,
             mbc: mem::mbc::Controller::unplugged().cell(),
             last: None,
-            io: io::IORegs::init(cgb),
-            rom: Empty { }.locked_cell(),
-            srom: Empty { }.locked_cell(),
-            sram: Empty { }.locked_cell(),
-            vram: Empty { }.cell(),
-            oam: Empty { }.cell(),
-            ram: Empty { }.locked_cell(),
+            io: IORegs::init(cgb),
+            rom: Empty {}.locked_cell(),
+            srom: Empty {}.locked_cell(),
+            sram: Empty {}.locked_cell(),
+            vram: Empty {}.cell(),
+            oam: Empty {}.cell(),
+            ram: Empty {}.locked_cell(),
             hram: Hram::new().locked_cell(),
-            un_1: Empty { }.locked_cell(),
+            un_1: Empty {}.locked_cell(),
             ie: IOReg::with_access(IO::IE.access()),
             status: MemStatus::ReqRead(0x0)
         }.with_wram(Wram::new(cgb))
@@ -76,7 +78,66 @@ impl Bus {
         }
     }
 
+    pub fn last(&mut self) -> Option<Op> {
+        self.last.take()
+    }
+
+    pub fn tick(&mut self, devices: &mut devices::Console, clock: u8, bp: &Breakpoints) -> bool {
+        if self.clock == 127 {
+            self.mbc.as_ref().borrow_mut().tick();
+            self.clock = 0;
+        } else { self.clock += 1; }
+        devices.joy.tick(&mut self.io);
+        let tick = devices.hdma.tick(&mut self);
+
+        self.last = None;
+        self.status = match self.status {
+            MemStatus::ReqRead(addr) => {
+                let v = self.read(addr);
+                self.last = Some(Op::Read(addr, v));
+                MemStatus::Read(v)
+            },
+            MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
+            st => st
+        };
+        let ds = self.io.io(IO::KEY1).bit(7) != 0;
+        if clock == 0 || (clock == 2 && ds) { // TODO pull this out of IO
+            devices.serial.tick(&mut self.io);
+            devices.timer.tick(&mut self.io);
+            devices.dma.tick(&mut self);
+            if !tick { devices.cpu.cycle(&mut self); }
+        }
+        devices.ppu.tick(&mut self.io, &mut devices.lcd);
+        devices.apu.tick(&mut self.io, ds);
+        let bp = bp.tick(&devices.cpu, self.last());
+        self.cpu.reset_finished();
+        bp
+    }
+}
+
+impl shared::cpu::Bus for Bus {
+
+    /// Debug function
+    /// will return a range starting from start and up to len bytes long, if possible.
+    /// Will end early if the underlying memory range is smaller.
+    fn get_range(&self, start: u16, len: u16) -> Vec<u8> {
+        match start {
+            ROM..=ROM_END => self.rom.get_range(start, len),
+            SROM..=SROM_END => self.srom.get_range(start, len),
+            VRAM..=VRAM_END => self.vram.get_range(start, len),
+            SRAM..=SRAM_END => self.sram.get_range(start, len),
+            RAM..=RAM_END => self.ram.get_range(start, len),
+            OAM..=OAM_END => self.oam.get_range(start, len),
+            UN_1..=UN_1_END => self.un_1.get_range(start, len),
+            IO..=IO_END => self.io.get_range(start, len),
+            HRAM..=HRAM_END => self.hram.get_range(start, len),
+            END => self.rom.get_range(start, len),
+            ECHO..=ECHO_END => self.ram.get_range(start - ECHO + RAM, len)
+        }
+    }
+
     fn write(&mut self, addr: u16, value: u8) {
+        self.last = Some(Op::Write(addr, value));
         match addr {
             ROM..=ROM_END => self.rom.write(addr - ROM, value, addr),
             SROM..=SROM_END => self.srom.write(addr - SROM, value, addr),
@@ -89,11 +150,40 @@ impl Bus {
             IO..=IO_END => self.io.write(addr - IO, value, addr),
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
+        };
+        match addr {
+            0xFF50 if self.io.writable(IO::POST) => {
+                self.mbc.as_ref().borrow_mut().post();
+                self.io.post();
+            },
+            0xFF4C if self.io.writable(IO::KEY0) => {
+                self.io.compat_mode();
+            }
+            _ => {}
         }
     }
+    fn status(&self) -> MemStatus {
+        self.status
+    }
 
-    pub fn last(&mut self) -> Option<Op> {
-        self.last.take()
+    fn update(&mut self, status: MemStatus) {
+        self.status = status;
+    }
+
+    fn direct_read(&self, offset: u16) -> u8 {
+        self.read(offset)
+    }
+
+    fn int_reset(&mut self, bit: u8) {
+        self.io.io(IO::IF).reset(bit);
+    }
+
+    fn int_set(&mut self, bit: u8) {
+        sef.io.int_set(bit);
+    }
+
+    fn interrupt(&mut self) -> u8 {
+        (self.io.io(IO::IF).read() & self.ie.read()) & 0x1F
     }
 }
 
@@ -122,18 +212,22 @@ impl MemoryBus for Bus {
 }
 
 impl IOBus for Bus {
-    fn io(&self, io: IO) -> IOReg {
+    fn io(&mut self, io: IO) -> &mut IOReg {
         match io {
-            IO::IE => self.ie.clone(),
+            IO::IE => &mut self.ie,
             io => self.io.io(io)
         }
+    }
+
+    fn io_addr(&mut self, io: u16) -> Option<&mut IOReg> {
+        self.io.io_addr(io)
     }
 
     fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 
-    fn is_cgb(&self) -> bool { self.io.io(IO::CGB).value() != 0 }
+    fn is_cgb(&mut self) -> bool { self.io.io(IO::CGB).value() != 0 }
 
     fn read_with(&self, addr: u16, source: Source) -> u8 {
         match addr {
@@ -187,70 +281,5 @@ impl IOBus for Bus {
 
     fn mbc(&self) -> Ref<dyn MBCController> {
         self.mbc.as_ref().borrow()
-    }
-}
-
-impl shared::cpu::Bus for Bus {
-    fn status(&self) -> MemStatus {
-        self.status
-    }
-
-    fn update(&mut self, status: MemStatus) {
-        self.status = status;
-    }
-
-    fn tick(&mut self) {
-        if self.clock == 127 {
-            self.mbc.as_ref().borrow_mut().tick();
-            self.clock = 0;
-        } else { self.clock += 1; }
-        self.last = None;
-        self.status = match self.status {
-            MemStatus::ReqRead(addr) => {
-                let v = self.read(addr);
-                self.last = Some(Op::Read(addr, v));
-                MemStatus::Read(v)
-            },
-            MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
-            st => st
-        };
-    }
-
-    /// Debug function
-    /// will return a range starting from start and up to len bytes long, if possible.
-    /// Will end early if the underlying memory range is smaller.
-    fn get_range(&self, start: u16, len: u16) -> Vec<u8> {
-        match start {
-            ROM..=ROM_END => self.rom.get_range(start, len),
-            SROM..=SROM_END => self.srom.get_range(start, len),
-            VRAM..=VRAM_END => self.vram.get_range(start, len),
-            SRAM..=SRAM_END => self.sram.get_range(start, len),
-            RAM..=RAM_END => self.ram.get_range(start, len),
-            OAM..=OAM_END => self.oam.get_range(start, len),
-            UN_1..=UN_1_END => self.un_1.get_range(start, len),
-            IO..=IO_END => self.io.get_range(start, len),
-            HRAM..=HRAM_END => self.hram.get_range(start, len),
-            END => self.rom.get_range(start, len),
-            ECHO..=ECHO_END => self.ram.get_range(start - ECHO + RAM, len)
-        }
-    }
-
-    fn write(&mut self, addr: u16, value: u8) {
-        self.last = Some(Op::Write(addr, value));
-        self.write(addr, value);
-        match addr {
-            0xFF50 if self.io.writable(IO::POST) => {
-                self.mbc.as_ref().borrow_mut().post();
-                self.io.post();
-            },
-            0xFF4C if self.io.writable(IO::KEY0) => {
-                self.io.compat_mode();
-            }
-            _ => {}
-        }
-    }
-
-    fn direct_read(&self, offset: u16) -> u8 {
-        self.read(offset)
     }
 }

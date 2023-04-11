@@ -1,28 +1,24 @@
 use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus, OAM, Source};
 
-
-#[derive(Default)]
 pub struct Dma {
-    reg: IOReg,
     st: u16,
     p: usize
 }
 
-impl Dma {
-    pub fn new() -> Self {
-        Self {
-            reg: Default::default(),
-            st: 0,
-            p: 160
-        }
+impl Default for Dma {
+    fn default() -> Self {
+        Self { st: 0, p: 160 }
     }
+}
 
+impl Dma {
     pub fn tick(&mut self, bus: &mut dyn IOBus) {
-        if self.reg.dirty() {
-            self.reg.reset_dirty();
+        let reg = bus.io(IO::DMA);
+        if reg.dirty() {
+            reg.reset_dirty();
             self.p = 0;
-            self.st = (self.reg.value() as u16) << 8;
+            self.st = (reg.value() as u16) << 8;
             bus.lock();
         }
         if self.p != 160 {
@@ -37,8 +33,4 @@ impl Dma {
     }
 }
 
-impl Device for Dma {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.reg = bus.io(IO::DMA);
-    }
-}
+impl Device for Dma {}

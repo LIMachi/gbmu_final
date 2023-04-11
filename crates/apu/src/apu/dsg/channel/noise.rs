@@ -1,4 +1,4 @@
-use shared::io::{IO, IOReg};
+use shared::io::{IO, IOReg, IORegs};
 use shared::mem::{Device, IOBus};
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
@@ -30,8 +30,8 @@ impl Channel {
         }
     }
 
-    fn frequency(&self) -> u16 {
-        let f = self.registers.freq.value() as u16;
+    fn frequency(&self, io: &mut IORegs) -> u16 {
+        let f = io.io(IO::NR43).value() as u16;
         let r = f & 0x7;
         let s = f >> 4;
         match (r, s) {

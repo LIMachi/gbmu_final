@@ -31,25 +31,19 @@ version = "1.0.152"
 features = ["derive"]
 
 [features]
-debug = ["cpu/log_opcode", "apu/debug"]
-doctor = ["cpu/doctor"]
+debug = []
 file_log = []
+
+[dependencies.dbg]
+path = "../dbg"
 
 [dependencies.shared]
 path = "../shared"
-[dependencies.cpu]
-path = "../cpu"
-[dependencies.lcd]
-path = "../lcd"
 [dependencies.bus]
 path = "../bus"
-[dependencies.mem]
-path = "../mem"
-[dependencies.dbg]
-path = "../dbg"
-[dependencies.ppu]
-path = "../ppu"
-[dependencies.apu]
-path = "../apu"
 [dependencies.serial]
 path = "../serial"
+[dependencies.apu]
+path = "../apu"
+[dependencies.mem]
+path = "../mem"
