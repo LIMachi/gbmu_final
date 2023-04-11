@@ -79,7 +79,7 @@ impl DSG {
     }
 
     pub fn power_off(&mut self, io: &mut IORegs) {
-        io.io(IO::NR51).set_access(AccessMode::rdonly()).direct_write(0);
-        io.io(IO::NR50).set_access(AccessMode::rdonly()).direct_write(0);
+        io.io(IO::NR51).direct_write(0).set_access(AccessMode::rdonly());
+        io.io(IO::NR50).direct_write(0).set_access(AccessMode::rdonly());
     }
 }

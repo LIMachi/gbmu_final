@@ -1,4 +1,4 @@
-use shared::io::{AccessMode, IO, IOReg, IORegs};
+use shared::io::{AccessMode, IO, IORegs};
 use shared::mem::{Device, IOBus};
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
@@ -54,7 +54,7 @@ impl Sweep {
         if self.negate { self.shadow.wrapping_sub(f) } else { self.shadow + f }
     }
 
-    pub fn tick(&mut self, wave1: &mut IOReg, wave2: &mut IOReg) -> bool {
+    pub fn tick(&mut self, io: &mut IORegs, wave1: IO, wave2: IO) -> bool {
         if !self.enabled { return false }
         self.timer -= 1;
         if self.timer == 0 {
@@ -63,7 +63,8 @@ impl Sweep {
             if self.enabled && self.pace != 0 {
                 let f = self.calc();
                 if f <= 2047 && self.shift != 0 {
-                    wave1.direct_write(f as u8);
+                    io.io(wave1).direct_write(f as u8);
+                    let wave2 = io.io(wave2);
                     wave2.direct_write((wave2.value() & 0x40) | ((f & 0x7FF) >> 8) as u8);
                     self.shadow = f;
                 }
@@ -161,7 +162,7 @@ impl SoundChannel for Channel {
     }
 
     fn sweep(&mut self, io: &mut IORegs) -> bool {
-        if self.has_sweep { self.sweep.tick(io.io(self.registers.wave1), io.io(self.registers.wave2)) }
+        if self.has_sweep { self.sweep.tick(io, self.registers.wave1, self.registers.wave2) }
         else { false }
     }
 
@@ -172,16 +173,20 @@ impl SoundChannel for Channel {
     fn length(&self) -> u8 { 0x3F }
 
     fn power_on(&mut self, io: &mut IORegs) {
-        self.registers.sweep.set_access(IO::NR10.access());
+        if self.has_sweep {
+            io.io(IO::NR10).set_access(IO::NR10.access());
+        }
     }
 
     fn power_off(&mut self, io: &mut IORegs) {
-        self.registers.sweep.set_access(AccessMode::rdonly()).direct_write(0);
+        if self.has_sweep {
+            io.io(IO::NR10).direct_write(0).set_access(AccessMode::rdonly());
+        }
     }
 }
 
 impl Device for Channel {
-    fn configure(&mut self, bus: &dyn IOBus) {
+    fn configure(&mut self, _bus: &dyn IOBus) {
         // if self.has_sweep {
         //     self.registers.sweep = bus.io(IO::NR10);
         //     self.registers.length = bus.io(IO::NR11);

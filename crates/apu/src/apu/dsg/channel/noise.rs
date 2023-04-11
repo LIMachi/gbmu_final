@@ -1,22 +1,13 @@
-use shared::io::{IO, IOReg, IORegs};
+use shared::io::{IO, IORegs};
 use shared::mem::Device;
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
-
-#[derive(Default)]
-struct Registers {
-    length: IOReg,
-    volume: IOReg,
-    freq: IOReg,
-    ctrl: IOReg,
-}
 
 pub struct Channel {
     triggered: bool,
     buffer: u16,
     freq_timer: u16,
     envelope: Envelope,
-    // registers: Registers
 }
 
 impl Channel {
@@ -26,7 +17,6 @@ impl Channel {
             buffer: 0xFFFF,
             freq_timer: 0,
             envelope: Envelope::default(),
-            // registers: Registers::default()
         }
     }
 
@@ -42,14 +32,7 @@ impl Channel {
     }
 }
 
-impl Device for Channel {
-    // fn configure(&mut self, bus: &dyn IOBus) {
-    //     self.registers.length = bus.io(IO::NR41);
-    //     self.registers.volume = bus.io(IO::NR42);
-    //     self.registers.freq = bus.io(IO::NR43);
-    //     self.registers.ctrl = bus.io(IO::NR44);
-    // }
-}
+impl Device for Channel {}
 
 impl SoundChannel for Channel {
     fn output(&self, _io: &mut IORegs) -> u8 {

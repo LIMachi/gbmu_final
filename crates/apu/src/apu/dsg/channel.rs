@@ -92,8 +92,8 @@ pub(crate) struct Channel {
 
 impl Channel {
     pub fn new<C: SoundChannel + 'static>(channel: C) -> Self {
-        let c = channel.channel();
-        let s = c as u16 * 5 + IO::NR11 as u16;
+        let c = channel.channel() as u16;
+        let s = c * 5 + IO::NR11 as u16;
         let nr1 = IO::try_from(s).unwrap();
         let nr2 = IO::try_from(s + 1).unwrap();
         let nr3 = IO::try_from(s + 2).unwrap();
@@ -108,8 +108,8 @@ impl Channel {
             nr4,
             dac: Capacitor::new(0.1),
             pcm: match c {
-                Channels::Sweep | Channels::Pulse => IO::PCM12,
-                Channels::Wave | Channels::Noise => IO::PCM34,
+                0 | 1 => IO::PCM12,
+                _ => IO::PCM34,
             }
         }
     }
