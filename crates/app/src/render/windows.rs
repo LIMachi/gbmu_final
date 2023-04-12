@@ -42,9 +42,6 @@ impl Windows {
     }
 
     pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow) {
-        if let Event::UserEvent(Events::Connect(a, p)) = event {
-            log::info!("got connect event ! {a:?} {p}");
-        }
         for (_, win) in &mut self.windows {
             win.handle(event);
         }

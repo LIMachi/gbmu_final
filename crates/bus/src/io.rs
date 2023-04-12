@@ -30,13 +30,13 @@ impl IORegs {
     pub fn compat_mode(&mut self) {
         if self.io(IO::KEY0).value() == DMG_MODE {
             log::info!("DMG compatibility mode: enabled");
-            self.io(IO::HDMA5).set_access(IORegs::DISABLED);
-            self.io(IO::KEY1).set_access(IORegs::DISABLED);
-            self.io(IO::OCPD).set_access(IORegs::DISABLED);
-            self.io(IO::BCPD).set_access(IORegs::DISABLED);
-            self.io(IO::SVBK).set_access(IORegs::DISABLED);
-            self.io(IO::VBK).set_access(IORegs::DISABLED);
-            self.io(IO::OPRI).set_access(IORegs::DISABLED);
+            self.io(IO::HDMA5).direct_write(0).set_access(IORegs::DISABLED);
+            self.io(IO::KEY1).direct_write(0).set_access(IORegs::DISABLED);
+            self.io(IO::OCPD).direct_write(0).set_access(IORegs::DISABLED);
+            self.io(IO::BCPD).direct_write(0).set_access(IORegs::DISABLED);
+            self.io(IO::SVBK).direct_write(0).set_access(IORegs::DISABLED);
+            self.io(IO::VBK).direct_write(0).set_access(IORegs::DISABLED);
+            self.io(IO::OPRI).direct_write(0xFF).set_access(IORegs::DISABLED);
         }
     }
 

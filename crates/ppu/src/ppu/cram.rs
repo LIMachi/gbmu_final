@@ -76,14 +76,14 @@ impl CRAM {
             self.bcpd.reset_dirty();
             let inc = self.bcps.bit(7) != 0;
             let addr = self.bcps.value() & 0x3F;
-            if inc { self.bcps.direct_write(0x80 | ((addr + 1) & 0x3F)) }
+            if inc { self.bcps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
             self.bgdata[addr as usize] = self.bcpd.value();
         }
         if self.ocpd.dirty() {
             self.ocpd.reset_dirty();
             let inc = self.ocps.bit(7) != 0;
             let addr = self.ocps.value() & 0x3F;
-            if inc { self.ocps.direct_write(0x80 | ((addr + 1) & 0x3F)) }
+            if inc { self.ocps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
             self.objdata[addr as usize] = self.ocpd.value();
         }
     }

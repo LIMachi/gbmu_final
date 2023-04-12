@@ -56,6 +56,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub mode: super::settings::Mode,
     #[serde(default)]
+    pub emu: super::emulator::EmuSettings,
+    #[serde(default)]
     pub bios: bool,
 }
 

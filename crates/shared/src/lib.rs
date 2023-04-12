@@ -2,7 +2,6 @@
 #![feature(drain_filter)]
 #![feature(hash_drain_filter)]
 
-use std::net::Ipv4Addr;
 pub use egui;
 pub use winit;
 use crate::cpu::Opcode;
@@ -39,7 +38,6 @@ pub enum Events {
     Load(String),
     Loaded,
     Open(Handle),
-    Connect(Ipv4Addr, u16),
     Close
 }
 

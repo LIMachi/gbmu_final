@@ -90,15 +90,13 @@ impl SoundChannel for Channel {
 
     fn on_enable(&mut self) {
         for w in self.registers.pattern.iter() {
-            w.set_read_mask(0);
-            w.set_write_mask(0);
+            w.set_access(AccessMode::unused());
         }
     }
 
     fn on_disable(&mut self) {
         for w in self.registers.pattern.iter() {
-            w.set_read_mask(0xFF);
-            w.set_write_mask(0xFF);
+            w.set_access(AccessMode::rw());
         }
     }
 

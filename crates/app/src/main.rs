@@ -23,6 +23,7 @@ use shared::input::Keybindings;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::app::{AppConfig, DbgConfig, RomConfig};
+use crate::emulator::EmuSettings;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
@@ -115,6 +116,7 @@ impl App {
                                 .filter(|x| !x.temp())
                                 .collect()
                         },
+                        emu: self.emu.settings.take(),
                         keys: self.bindings.clone(),
                         mode: self.emu.mode(),
                         bios: self.emu.enabled_boot(),
@@ -142,31 +144,37 @@ fn main() {
     let mut acc = 0.0;
     let mut cycles = 0;
     let mut clock = Clock::new(4);
+    let mut run = false;
     app.create(menu)
         .run(move |app| {
             if app.emu.is_running() {
-                if st.paused() {
+                if st.paused() { st.start(); }
+                if run {
+                    acc += current.elapsed().as_secs_f64();
                     current = std::time::Instant::now();
-                    st.start();
+                    let cy = app.emu.cycle_time();
+                    while acc >= cy {
+                        cycles += 1;
+                        app.emu.cycle(clock.tick());
+                        acc -= cy;
+                    }
                 }
-                acc += current.elapsed().as_secs_f64();
-                current = std::time::Instant::now();
-                let cy = app.emu.cycle_time();
-                while acc >= cy {
-                    cycles += 1;
-                    app.emu.cycle(clock.tick());
-                    acc -= cy;
+                if st.elapsed().as_secs() != 0 {
+                    if !run {
+                        run = true;
+                        current = std::time::Instant::now();
+                    }
+                    let t = cycles as f64 / st.elapsed().as_secs_f64();
+                    let p = (t / 4194304.) * 100.;
+                    log::debug!("cycles: {:.0} ({:0.2} %)", t, p);
+                    st.stop();
+                    st.start();
+                    cycles = 0;
                 }
             } else {
-                st.pause();
-            }
-            if st.elapsed().as_secs() != 0 {
-                let t = cycles as f64 / st.elapsed().as_secs_f64();
-                let p = (t / 4194304.) * 100.;
-                log::debug!("cycles: {:.0} ({:0.2} %)", t, p);
                 st.stop();
-                st.start();
                 cycles = 0;
+                run = false;
             }
         });
 }

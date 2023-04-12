@@ -1,38 +1,63 @@
 use std::net::Ipv4Addr;
-use shared::io::{CGB_MODE, IO, IOReg};
+use shared::io::{IO, IOReg};
 use shared::mem::{Device, IOBus};
-use crate::com::Event;
+use crate::com::{Event, Serial};
 
-mod com;
+pub mod com;
+
+pub struct Link {
+    pub port: u16,
+    cable: Option<Serial>,
+}
+
+impl Link {
+    pub fn new() -> Self {
+        let serial = Serial::build();
+        let port = serial.port;
+        Self {
+            port,
+            cable: Some(serial)
+        }
+    }
+
+    pub fn port(&mut self) -> Serial {
+        self.cable.take().unwrap()
+    }
+
+    pub fn as_ref(&self) -> Option<&Serial> { self.cable.as_ref() }
+    pub fn as_mut(&mut self) -> Option<&mut Serial> { self.cable.as_mut() }
+
+    /// Assumption: this is the port that was given out by Self::port()
+    /// we're only retrieving it. We're not supposed to have multiple copies flying around
+    pub fn store(&mut self, serial: Serial) {
+        self.cable = Some(serial);
+    }
+
+    pub fn connect(&mut self, addr: Ipv4Addr, port: u16) {
+        self.cable.as_mut().unwrap().connect(addr, port);
+    }
+
+    pub fn borrowed(&self) -> bool { self.cable.is_none() }
+}
 
 pub struct Port {
     int: IOReg,
     ctrl: IOReg,
     data: IOReg,
-    ds: IOReg,
-    key0: IOReg,
-    cable: com::Serial,
-    transfer: Option<(u8, u8)>,
-    recv: u8,
-    clk: u32,
-    dc: usize,
+    cable: Serial,
 }
 
 impl Port {
-    pub fn new() -> Self {
+    pub fn new(cable: Serial) -> Self {
         Self {
             ctrl: IOReg::unset(),
             data: IOReg::unset(),
-            ds: IOReg::unset(),
-            key0: IOReg::unset(),
             int: IOReg::unset(),
-            cable: com::Serial::build(),
-            recv: 0,
-            clk: 0,
-            transfer: None,
-            dc: 0,
+            cable,
         }
     }
+
+    pub fn link(&mut self) -> &mut Serial { &mut self.cable }
 
     pub fn connect(&mut self, addr: Ipv4Addr, port: u16) {
         log::info!("trying to connect to remote...");
@@ -40,24 +65,21 @@ impl Port {
     }
 
     pub fn tick(&mut self) {
-        match self.cable.event() {
-            Some(Event::Connected(addr)) => {
-                log::info!("connected to peer {addr:?}");
-                self.clk = 0;
-                self.dc = 0;
-                self.transfer = None;
-            },
-            _ => {}
-        }
         if self.ctrl.dirty() {
-            if self.ctrl.bit(0) != 0 {
-                self.transfer = Some((0, 0));
-                self.clk = 0;
-                self.recv = 0;
+            if self.ctrl.value() & 0x81 == 0x81 {
+                self.cable.send(self.data.value());
             }
             self.ctrl.reset_dirty();
         }
-        if let Some((i, o)) = {
+        if let Some(o) = self.cable.recv() {
+            if self.ctrl.bit(0) == 0 {
+                self.cable.send(self.data.value());
+            }
+            self.data.direct_write(o);
+            self.ctrl.reset(7);
+            self.int.set(3);
+        }
+        /*if let Some((i, o)) = {
             if self.ctrl.bit(0) != 0 {
                 if let Some((i, o)) = self.transfer.take() {
                     let mut i = if let Some(b) = self.cable.recv() {
@@ -74,15 +96,8 @@ impl Port {
                             i += 1;
                         }
                     }
-                    let h = {
-                        if self.key0.value() == CGB_MODE {
-                            self.clk += if self.ds.bit(7) != 0 { 2 } else { 1 };
-                            if self.ctrl.bit(1) != 0 { 16 } else { 512 }
-                        } else {
-                            self.clk += 1;
-                            16
-                        }
-                    };
+                    let h = if self.ctrl.bit(1) != 0 { 4 } else { 128 };
+                    self.clk += 1;
                     Some((i, if o == 8 { o } else if self.clk >= h {
                         self.clk -= h;
                         let b = self.data.bit(7 - o);
@@ -97,8 +112,7 @@ impl Port {
                 self.cable.send(self.data.bit(7 - o));
                 Some((i + 1, o + 1))
             } else { self.transfer }
-        }
-        {
+        } {
             if i == 8 {  // received everything
                 self.transfer = None;
                 self.clk = 0;
@@ -106,19 +120,22 @@ impl Port {
                 self.recv = 0;
                 self.ctrl.reset(7);
                 self.int.set(3);
+                log::info!("requested serial interrupt");
             } else {
                 self.transfer = Some((i, o));
             }
-        }
+        }*/
+    }
+
+    pub fn disconnect(&mut self) -> Serial {
+        std::mem::replace(&mut self.cable, Serial::phantom())
     }
 }
 
 impl Device for Port {
     fn configure(&mut self, bus: &dyn IOBus) {
-        self.ds = bus.io(IO::KEY1);
         self.data = bus.io(IO::SB);
         self.ctrl = bus.io(IO::SC);
-        self.key0 = bus.io(IO::KEY0);
         self.int = bus.io(IO::IF);
     }
 }
