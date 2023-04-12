@@ -19,11 +19,40 @@ mod hdma;
 
 pub use dma::Dma;
 pub use hdma::Hdma;
+use crate::render::Textures;
+
+struct UiData {
+    textures: HashMap<render::Textures, shared::egui::TextureHandle>,
+    bg_data: Option<render::TileData>
+}
+
+impl UiData {
+    pub fn new() -> Self {
+        Self {
+            textures: HashMap::with_capacity(256),
+            bg_data: None,
+        }
+    }
+
+    pub fn get(&self, tile: usize) -> shared::egui::TextureHandle {
+        self.textures.get(&render::Textures::Tile(tile))
+            .or(self.textures.get(&render::Textures::Blank))
+            .cloned().unwrap()
+    }
+
+    pub fn insert(&mut self, tile: Textures, tex: shared::egui::TextureHandle) {
+        self.textures.insert(tile, tex);
+    }
+
+    pub fn tex(&self, tex: Textures) -> Option<shared::egui::TextureHandle> {
+        self.textures.get(&tex).cloned()
+    }
+}
 
 pub struct Controller {
     tab: render::Tabs,
     init: bool,
-    storage: HashMap<render::Textures, shared::egui::TextureHandle>,
+    ui: UiData,
     ppu: ppu::Ppu,
     state: ppu::PpuState,
 }
@@ -33,7 +62,7 @@ impl Controller {
         Self {
             tab: render::Tabs::Oam,
             init: false,
-            storage: HashMap::with_capacity(256),
+            ui: UiData::new(),
             ppu: ppu::Ppu::new(lcd),
             state: ppu::Ppu::default_state()
         }
