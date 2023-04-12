@@ -10,7 +10,6 @@ mod oam;
 mod bgmap;
 
 pub(crate) use bgmap::TileData;
-use shared::egui::Key::Tab;
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
@@ -101,9 +100,8 @@ impl shared::Ui for Controller {
         let tiles: Vec<usize> = { self.ppu.vram_mut().inner_mut().tile_cache.drain().collect() };
         for n in tiles {
             let buf = PixelBuffer::<8, 8>::new(self.ppu.vram().inner().tile_data(n % 384, n / 384)).image::<64, 64>();
-            ctx.tex_manager()
-                .write()
-                .set(self.ui.tex(Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id(), ImageDelta::full(buf, TextureOptions::NEAREST));
+            let id = self.ui.tex(Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id();
+            ctx.tex_manager().write().set(id, ImageDelta::full(buf, TextureOptions::NEAREST));
         }
         CentralPanel::default()
             .show(ctx, |ui|

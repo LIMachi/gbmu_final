@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use std::hash::Hash;
 use shared::egui;
 use shared::egui::{Margin, Response, Sense, Ui, Vec2, Widget};

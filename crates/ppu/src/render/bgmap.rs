@@ -1,8 +1,5 @@
-use std::collections::HashMap;
 use shared::egui;
-use shared::egui::{Color32, Image, Response, Stroke, TextureHandle, Ui, Vec2, Widget};
-use shared::mem::Mem;
-use crate::render::Textures;
+use shared::egui::{Color32, Image, Response, Stroke, Ui, Vec2, Widget};
 
 pub struct BgMap<'a>(pub(crate) &'a mut crate::UiData, pub(crate) &'a super::Ppu, pub(crate) &'a egui::Context);
 
@@ -23,6 +20,7 @@ impl Widget for BgMap<'_> {
         egui::Area::new("scrolled_area")
             .fixed_pos([self.1.sc.x as f32 + ui.available_rect_before_wrap().min.x, self.1.sc.y as f32 + ui.available_rect_before_wrap().min.y])
             .movable(false)
+            .interactable(false)
             .show(self.2, |ui| {
                 egui::Frame::none()
                     .stroke(Stroke::new(2., Color32::BLACK))
@@ -69,12 +67,12 @@ impl Widget for BgMap<'_> {
                         let data = self.0.bg_data.unwrap_or_default();
                         let tex = self.0.get(data.tile as usize).id();
                         ui.add(Image::new(tex, [256., 256.]));
-                        ui.label(format!("x : {}", data.x));
-                        ui.label(format!("Y : {}", data.y));
-                        ui.label(format!("Tile Number: {}", data.tile));
-                        ui.label(format!("Attribute: {}", data.attribute));
-                        ui.label(format!("Tile Address: {}", data.tile_addr));
-                        ui.label(format!("Map Address: {}", data.map_addr));
+                        ui.label(format!("x : {:02}", data.x));
+                        ui.label(format!("Y : {:02}", data.y));
+                        ui.label(format!("Tile Number: {:02X}{}", data.tile & 0xFF, if data.tile > 0xFF { "(H)" } else { "" }));
+                        ui.label(format!("Attribute: {:02X}", data.attribute));
+                        ui.label(format!("Tile Address: {:#04X}", 0x8000 + data.tile_addr * 16));
+                        ui.label(format!("Map Address: {:#04X}", data.map_addr + 0x8000));
                     });
             });
         }).response

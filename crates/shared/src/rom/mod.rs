@@ -5,6 +5,7 @@ use std::io::{Read, Result};
 mod header;
 
 pub use header::{Capabilities, Mbc};
+use crate::utils::image::RawData;
 
 #[derive(Debug, Clone)]
 pub struct Rom {
@@ -12,6 +13,7 @@ pub struct Rom {
     pub location: PathBuf,
     pub header: header::Header,
     pub cover: Option<String>,
+    pub raw: Option<RawData>,
     content: Vec<u8>,
 }
 
@@ -30,7 +32,8 @@ impl Rom {
             location,
             header: h,
             content: v,
-            cover: None
+            cover: None,
+            raw: None
         })
     }
 

@@ -1,8 +1,23 @@
-use std::collections::HashMap;
-use shared::egui::{Image, Response, TextureHandle, Ui, Widget};
+use shared::egui::{Image, Response, TextureId, Ui, Widget};
 use crate::render::Textures;
 
 pub struct Tilemap<'a>(pub(crate) &'a mut crate::UiData);
+struct Tile(Image, u8, bool);
+
+impl Widget for Tile {
+    fn ui(self, ui: &mut Ui) -> Response {
+        ui.add(self.0)
+            .on_hover_text(format!("tile: {:02X}{}", self.1, if self.2 { "(H)" } else { "" }))
+    }
+}
+
+impl Tile {
+    pub fn new(tex: TextureId, n: usize) -> Self {
+        let img = Image::new(tex, [32., 32.]);
+        Tile(img, n as u8, n > 0xFF)
+    }
+}
+
 
 impl Widget for Tilemap<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
@@ -17,14 +32,16 @@ impl Widget for Tilemap<'_> {
                         let addr = i + j * 16;
                         let tex = self.0.get(addr).id();
                         if i == 15 { ui.spacing_mut().item_spacing.x = 8. }
-                        ui.add(Image::new(tex, [32., 32.]));
+                        ui.add(Tile::new(tex, addr));
                     }
                     let blank = self.0.tex(Textures::Blank).unwrap().id();
                     ui.spacing_mut().item_spacing.x = 1.;
                     for i in 0..16 {
-                        let addr = i + j * 16 + 384;
-                        let tex = self.0.get(addr).id();
-                        ui.add(Image::new(tex, [32., 32.]));
+                        let n = i + j * 16;
+                        let tex = self.0.tex(Textures::Tile(n + 384))
+                            .map(|x| x.id())
+                            .unwrap_or(blank);
+                        ui.add(Tile::new(tex, n));
                     }
                 });
             }
