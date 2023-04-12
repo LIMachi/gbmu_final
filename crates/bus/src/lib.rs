@@ -1,8 +1,6 @@
 #![feature(trait_upcasting)]
 
-use std::cell::{Ref, RefCell};
-use std::rc::Rc;
-use mem::{Hram, Wram};
+use mem::{Hram, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::breakpoints::Breakpoints;
 use shared::io::{IO, IOReg, IORegs};
@@ -17,19 +15,14 @@ pub use devices::Console;
 pub struct Empty {}
 impl Mem for Empty {}
 
-type LockedMem = Lock<Rc<RefCell<dyn Mem>>>;
-
 pub struct Bus {
     clock: u8,
-    mbc: Rc<RefCell<dyn MBCController>>,
-    rom: LockedMem,
-    srom: LockedMem,
-    sram: LockedMem,
-    ram: LockedMem,
-    hram: LockedMem,
-    un_1: LockedMem,
-    vram: Rc<RefCell<dyn Mem>>,
-    oam: Rc<RefCell<dyn Mem>>,
+    mbc: Lock<mem::mbc::Controller>,
+    ram: Lock<Wram>,
+    hram: Hram,
+    un_1: Empty,
+    vram: Lock<Vram>,
+    oam: Lock<Oam>,
     io: IORegs,
     ie: IOReg,
     status: MemStatus,
@@ -40,20 +33,23 @@ impl Bus {
     pub fn new(cgb: bool) -> Self {
         Self {
             clock: 0,
-            mbc: mem::mbc::Controller::unplugged().cell(),
+            mbc: mem::mbc::Controller::unplugged().locked(),
             last: None,
             io: IORegs::init(cgb),
-            rom: Empty {}.locked_cell(),
-            srom: Empty {}.locked_cell(),
-            sram: Empty {}.locked_cell(),
-            vram: Empty {}.cell(),
-            oam: Empty {}.cell(),
-            ram: Empty {}.locked_cell(),
-            hram: Hram::new().locked_cell(),
-            un_1: Empty {}.locked_cell(),
+            vram: Vram::new(cgb).locked(),
+            oam: Oam::new().locked(),
+            ram: Wram::new(cgb).locked(),
+            hram: Hram::new(),
+            un_1: Empty {},
             ie: IOReg::with_access(IO::IE.access()),
             status: MemStatus::ReqRead(0x0)
-        }.with_wram(Wram::new(cgb))
+        }
+    }
+
+    pub fn with_mbc<C: MBCController + 'static>(mut self, mut controller: C) -> Self {
+        controller.configure(&mut self);
+        self.mbc = controller;
+        self
     }
 
     pub fn skip_boot(mut self, console: u8) -> Self {
@@ -64,10 +60,10 @@ impl Bus {
 
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            ROM..=ROM_END => self.rom.read(addr - ROM, addr),
-            SROM..=SROM_END => self.srom.read(addr - SROM, addr),
+            ROM..=ROM_END => self.mbc.read(addr, addr),
+            SROM..=SROM_END => self.mbc.read(addr - SROM, addr),
             VRAM..=VRAM_END => self.vram.read(addr - VRAM, addr),
-            SRAM..=SRAM_END => self.sram.read(addr - SRAM, addr),
+            SRAM..=SRAM_END => self.mbc.read(addr - SRAM, addr),
             RAM..=RAM_END => self.ram.read(addr - RAM, addr),
             ECHO..=ECHO_END => self.ram.read(addr - ECHO, addr),
             OAM..=OAM_END => self.oam.read(addr - OAM, addr),
@@ -107,7 +103,7 @@ impl Bus {
             devices.dma.tick(&mut self);
             if !tick { devices.cpu.cycle(&mut self); }
         }
-        devices.ppu.tick(&mut self.io, &mut devices.lcd);
+        devices.ppu.tick(&mut self.io, &mut self.vram, &mut self.oam, &mut devices.lcd);
         devices.apu.tick(&mut self.io, ds);
         let bp = bp.tick(&devices.cpu, self.last());
         self.cpu.reset_finished();
@@ -122,16 +118,16 @@ impl shared::cpu::Bus for Bus {
     /// Will end early if the underlying memory range is smaller.
     fn get_range(&self, start: u16, len: u16) -> Vec<u8> {
         match start {
-            ROM..=ROM_END => self.rom.get_range(start, len),
-            SROM..=SROM_END => self.srom.get_range(start, len),
+            ROM..=ROM_END => self.mbc.get_range(start, len),
+            SROM..=SROM_END => self.mbc.get_range(start, len),
             VRAM..=VRAM_END => self.vram.get_range(start, len),
-            SRAM..=SRAM_END => self.sram.get_range(start, len),
+            SRAM..=SRAM_END => self.mbc.get_range(start, len),
             RAM..=RAM_END => self.ram.get_range(start, len),
             OAM..=OAM_END => self.oam.get_range(start, len),
             UN_1..=UN_1_END => self.un_1.get_range(start, len),
             IO..=IO_END => self.io.get_range(start, len),
             HRAM..=HRAM_END => self.hram.get_range(start, len),
-            END => self.rom.get_range(start, len),
+            END => vec![self.ie.value()],
             ECHO..=ECHO_END => self.ram.get_range(start - ECHO + RAM, len)
         }
     }
@@ -139,10 +135,10 @@ impl shared::cpu::Bus for Bus {
     fn write(&mut self, addr: u16, value: u8) {
         self.last = Some(Op::Write(addr, value));
         match addr {
-            ROM..=ROM_END => self.rom.write(addr - ROM, value, addr),
-            SROM..=SROM_END => self.srom.write(addr - SROM, value, addr),
+            ROM..=ROM_END => self.mbc.write(addr - ROM, value, addr),
+            SROM..=SROM_END => self.mbc.write(addr - SROM, value, addr),
             VRAM..=VRAM_END => self.vram.write(addr - VRAM, value, addr),
-            SRAM..=SRAM_END => self.sram.write(addr - SRAM, value, addr),
+            SRAM..=SRAM_END => self.mbc.write(addr - SRAM, value, addr),
             RAM..=RAM_END => self.ram.write(addr - RAM, value, addr),
             ECHO..=ECHO_END => self.ram.write(addr - ECHO, value, addr),
             OAM..=OAM_END => self.oam.write(addr - OAM, value, addr),
@@ -153,7 +149,7 @@ impl shared::cpu::Bus for Bus {
         };
         match addr {
             0xFF50 if self.io.writable(IO::POST) => {
-                self.mbc.as_ref().borrow_mut().post();
+                self.mbc.post();
                 self.io.post();
             },
             0xFF4C if self.io.writable(IO::KEY0) => {
@@ -187,30 +183,6 @@ impl shared::cpu::Bus for Bus {
     }
 }
 
-impl MemoryBus for Bus {
-    fn with_mbc<C: MBCController + 'static>(mut self, mut controller: C) -> Self {
-        controller.configure(&mut self);
-        self.mbc = controller.cell();
-        self.rom = Lock::new(self.mbc.clone());
-        self.srom = Lock::new(self.mbc.clone());
-        self.sram = Lock::new(self.mbc.clone());
-        self
-    }
-
-    fn with_ppu<P: PPU>(mut self, ppu: &mut P) -> Self {
-        ppu.configure(&self);
-        self.vram = ppu.vram();
-        self.oam = ppu.oam();
-        self
-    }
-
-    fn with_wram<R: Device + Mem + 'static>(mut self, mut wram: R) -> Self {
-        wram.configure(&mut self);
-        self.ram = wram.locked_cell();
-        self
-    }
-}
-
 impl IOBus for Bus {
     fn io(&mut self, io: IO) -> &mut IOReg {
         match io {
@@ -231,10 +203,10 @@ impl IOBus for Bus {
 
     fn read_with(&self, addr: u16, source: Source) -> u8 {
         match addr {
-            ROM..=ROM_END => self.rom.read_with(addr - ROM, addr, source),
-            SROM..=SROM_END => self.srom.read_with(addr - SROM, addr, source),
+            ROM..=ROM_END => self.mbc.read_with(addr - ROM, addr, source),
+            SROM..=SROM_END => self.mbc.read_with(addr - SROM, addr, source),
             VRAM..=VRAM_END => self.vram.read_with(addr - VRAM, addr, source),
-            SRAM..=SRAM_END => self.sram.read_with(addr - SRAM, addr, source),
+            SRAM..=SRAM_END => self.mbc.read_with(addr - SRAM, addr, source),
             RAM..=RAM_END => self.ram.read_with(addr - RAM, addr, source),
             ECHO..=ECHO_END => self.ram.read_with(addr - ECHO, addr, source),
             OAM..=OAM_END => self.oam.read_with(addr - OAM, addr, source),
@@ -262,24 +234,20 @@ impl IOBus for Bus {
     }
 
     fn lock(&mut self) {
-        self.rom.lock(Source::Dma);
-        self.srom.lock(Source::Dma);
+        self.mbc.lock(Source::Dma);
         self.ram.lock(Source::Dma);
-        self.sram.lock(Source::Dma);
         self.vram.lock(Source::Ppu);
         self.oam.lock(Source::Dma);
     }
 
     fn unlock(&mut self) {
-        self.rom.unlock(Source::Dma);
-        self.srom.unlock(Source::Dma);
+        self.mbc.unlock(Source::Dma);
         self.ram.unlock(Source::Dma);
-        self.sram.unlock(Source::Dma);
         self.vram.unlock(Source::Ppu);
         self.oam.unlock(Source::Dma);
     }
 
-    fn mbc(&self) -> Ref<dyn MBCController> {
-        self.mbc.as_ref().borrow()
+    fn mbc(&self) -> Box<&dyn MBCController> {
+        Box::new(self.mbc.inner())
     }
 }

@@ -269,5 +269,5 @@ impl Emu {
 
 impl BusWrapper for Emu {
     fn bus(&self) -> Box<&dyn dbg::Bus> { Box::new(&self.bus) }
-    fn mbc(&self) -> Ref<dyn MBCController> { self.bus.mbc() }
+    fn mbc(&self) -> Box<&dyn MBCController> { self.bus.mbc() }
 }

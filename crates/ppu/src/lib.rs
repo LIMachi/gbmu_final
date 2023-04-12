@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use lcd::Lcd;
-use shared::mem::{Device, IOBus, Mem, PPU};
+use shared::mem::{Device, IOBus, Lock, Mem, PPU};
 
 mod render;
 mod ppu;
@@ -19,6 +19,7 @@ mod hdma;
 
 pub use dma::Dma;
 pub use hdma::Hdma;
+use mem::{Oam, Vram};
 use shared::io::IORegs;
 
 pub struct Controller {
@@ -40,8 +41,10 @@ impl Controller {
         }
     }
 
-    pub fn tick(&mut self, io: &mut IORegs, lcd: &mut Lcd) {
+    pub fn tick(&mut self, io: &mut IORegs, oam: &mut Lock<Oam>, vram: &mut Lock<Vram>, lcd: &mut Lcd) {
+        self.ppu.claim(oam, vram);
         self.ppu.tick(&mut self.state, io, lcd);
+        self.ppu.release();
     }
 }
 

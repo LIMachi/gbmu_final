@@ -61,7 +61,7 @@ impl App {
 
     pub fn proxy(&self) -> Proxy { self.event_loop.as_ref().unwrap().create_proxy() }
 
-    pub fn open(&mut self, handle: WindowType, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
+    pub fn open<'a>(&mut self, handle: WindowType<'a>, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
         self.windows.create(handle, event_loop);
         self
     }
@@ -79,16 +79,16 @@ impl App {
         match event {
             Event::UserEvent(Events::Play(_)) => {
                 if !self.windows.is_open(Handle::Game) {
-                    self.open(WindowType::Game(self.emu.clone()), target);
+                    self.open(WindowType::Game(&mut self.emu), target);
                 }
             },
             Event::UserEvent(Events::Open(handle)) => {
               self.open(match handle {
                   Handle::Main => unreachable!(),
-                  Handle::Debug => WindowType::Debug(self.dbg.clone()),
-                  Handle::Game => WindowType::Game(self.emu.clone()),
-                  Handle::Sprites => WindowType::Sprites(self.emu.clone()),
-                  Handle::Settings => WindowType::Settings(self.emu.clone()),
+                  Handle::Debug => WindowType::Debug(&mut self.dbg),
+                  Handle::Game => WindowType::Game(&mut self.emu),
+                  Handle::Sprites => WindowType::Sprites(&mut self.emu),
+                  Handle::Settings => WindowType::Settings(&mut self.emu),
               }, target);
             },
             _ => {}

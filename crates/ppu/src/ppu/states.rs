@@ -66,7 +66,7 @@ pub struct VState {
 impl State for OamState {
     fn mode(&self) -> Mode { Mode::Search }
 
-    fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
+    fn tick(&mut self, ppu: &mut Ppu, _: &mut IORegs, _: &mut Lcd) -> Option<Box<dyn State>> {
         self.clock += 1; // we only tick one every 2 clock cycle
         if self.clock < 2 { return None }
         self.clock = 0;
@@ -99,7 +99,7 @@ impl TransferState {
 impl State for TransferState {
     fn mode(&self) -> Mode { Mode::Transfer }
 
-    fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs) -> Option<Box<dyn State>> {
+    fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, lcd: &mut Lcd) -> Option<Box<dyn State>> {
         self.dots += 1;
         if ppu.win.scan_enabled && ppu.regs.wx.read() <= self.lx + 7 {
             if ppu.lcdc.win_enable() && !ppu.win.enabled {
@@ -130,7 +130,7 @@ impl State for TransferState {
                 self.scx -= 1;
                 return None;
             }
-            ppu.set(io, self.lx as usize, self.ly as usize, pixel);
+            ppu.set(lcd, io, self.lx as usize, self.ly as usize, pixel);
             self.sprite = None;
             self.lx += 1;
             if self.lx == 160 {
@@ -159,7 +159,7 @@ impl VState {
 impl State for VState {
     fn mode(&self) -> Mode { Mode::VBlank }
 
-    fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
+    fn tick(&mut self, ppu: &mut Ppu, _: &mut IORegs, _: &mut Lcd) -> Option<Box<dyn State>> {
         if self.dots == Self::DOTS || self.dots == 0 {
             ppu.win.y = 0;
             ppu.regs.interrupt.set(0);
@@ -191,7 +191,7 @@ impl HState {
 impl State for HState {
     fn mode(&self) -> Mode { Mode::HBlank }
 
-    fn tick(&mut self, ppu: &mut Ppu) -> Option<Box<dyn State>> {
+    fn tick(&mut self, ppu: &mut Ppu, _: &mut IORegs, _: &mut Lcd) -> Option<Box<dyn State>> {
         self.dots = self.dots.saturating_sub(1);
         if self.dots == 0 {
             let ly = ppu.regs.ly.read() + 1;

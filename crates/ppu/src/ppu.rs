@@ -50,14 +50,14 @@ pub(crate) struct Scroll {
 
 pub(crate) struct Ppu {
     pub(crate) dots: usize,
-    pub(crate) oam: Rc<RefCell<Lock<Oam>>>,
-    pub(crate) vram: Rc<RefCell<Lock<Vram>>>,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
-    pub(crate) lcdc: LCDC
+    pub(crate) lcdc: LCDC,
+    pub(crate) oam: Option<&'static mut Lock<Oam>>,
+    pub(crate) vram: Option<&'static mut Lock<Vram>>,
 }
 
 impl Ppu {
@@ -66,20 +66,20 @@ impl Ppu {
         Self {
             sc: Scroll::default(),
             dots: 0,
-            oam: Oam::new().locked().cell(),
-            vram: Vram::new().locked().cell(),
             cram: cram::CRAM::default(),
             sprites,
             lcdc: LCDC(0),
             win: Default::default(),
-            stat: REdge::new()
+            stat: REdge::new(),
+            oam: None,
+            vram: None
         }
     }
 
-    pub(crate) fn oam(&self) -> Ref<Lock<Oam>> { self.oam.as_ref().borrow() }
-    pub(crate) fn vram(&self) -> Ref<Lock<Vram>> { self.vram.as_ref().borrow() }
-    pub(crate) fn oam_mut(&self) -> RefMut<Lock<Oam>> { self.oam.as_ref().borrow_mut() }
-    pub(crate) fn vram_mut(&self) -> RefMut<Lock<Vram>> { self.vram.as_ref().borrow_mut() }
+    pub(crate) fn oam(&self) -> &Lock<Oam> { self.oam.unwrap() }
+    pub(crate) fn vram(&self) -> &Lock<Vram> { self.vram.unwrap() }
+    pub(crate) fn oam_mut(&self) -> &mut Lock<Oam> { self.oam.unwrap() }
+    pub(crate) fn vram_mut(&self) -> &mut Lock<Vram> { self.vram.unwrap() }
 
     fn set_state(&mut self, regs: &mut IORegs, state: &mut Box<dyn State>, next: Box<dyn State>) {
         let mode = next.mode();
@@ -108,7 +108,18 @@ impl Ppu {
         };
     }
 
-    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
+    pub(crate) fn claim(&mut self, oam: &mut Lock<Oam>, vram: &mut Lock<Vram>) {
+        self.oam = Some(oam);
+        self.vram = Some(vram);
+    }
+
+    pub(crate) fn release(&mut self) {
+        self.oam.take();
+        self.vram.take();
+    }
+
+    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>,
+        io: &mut IORegs, lcd: &mut Lcd) {
         self.cram.tick(io);
         let lcdc = LCDC(io.io(IO::LCDC).read());
         if self.lcdc.enabled() && !lcdc.enabled() {
@@ -148,6 +159,5 @@ impl Ppu {
 impl Device for Ppu {
     fn configure(&mut self, bus: &dyn IOBus) {
         self.cram.configure(bus);
-        self.vram_mut().configure(bus);
     }
 }

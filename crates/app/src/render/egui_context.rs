@@ -8,7 +8,7 @@ use shared::{Ui, egui};
 
 pub use super::*;
 
-pub struct EguiContext<U: Ui> {
+pub struct EguiContext<Ctx, U: Ui<Context = Ctx>> {
     data: U,
     window: Window,
     surface: wgpu::Surface,
@@ -21,8 +21,8 @@ pub struct EguiContext<U: Ui> {
     queue: Queue
 }
 
-impl<U: 'static + Ui> EguiContext<U> {
-    pub fn new(instance: &Instance, window: Window, mut data: U) -> Self {
+impl<Ctx, U: 'static + Ui<Context = Ctx>> EguiContext<Ctx, U> {
+    pub fn new(instance: &Instance, window: Window, mut data: U, ctx: &mut Ctx) -> Self {
         let surface = unsafe { instance.create_surface(&window) };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
@@ -61,7 +61,7 @@ impl<U: 'static + Ui> EguiContext<U> {
             style: Default::default()
         });
         let mut inner = platform.context();
-        data.init(&mut inner);
+        data.init(&mut inner, ctx);
         Self {
             data,
             inner,
@@ -76,18 +76,18 @@ impl<U: 'static + Ui> EguiContext<U> {
         }
     }
 
-    pub fn builder(data: U) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
+    pub fn builder(data: U, ctx: &mut Ctx) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
         Box::new(move |instance, window, _|
-            Box::new(Self::new(instance, window, data)))
+            Box::new(Self::new(instance, window, data, ctx)))
     }
 }
 
-impl<U: 'static + Ui> Context for EguiContext<U> {
+impl<Ctx, U: 'static + Ui<Context = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
     fn inner(&mut self) -> &mut Window {
         &mut self.window
     }
 
-    fn redraw(&mut self) {
+    fn redraw(&mut self, ctx: &mut Ctx) {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             Err(wgpu::SurfaceError::Outdated) => return,

@@ -6,14 +6,14 @@ const WRAM_SIZE: usize = 2 * BANK_SIZE;
 
 enum Storage {
     Dmg([u8; WRAM_SIZE]),
-    Cgb(IOReg, [[u8; BANK_SIZE]; 8])
+    Cgb(usize, [[u8; BANK_SIZE]; 8])
 }
 
 impl Storage {
     fn bank(&self) -> usize {
         match self {
             Storage::Dmg(_) => 0,
-            Storage::Cgb(r, _) => { r.read().clamp(1, 7) as usize }
+            Storage::Cgb(bank, _) => { (*bank).clamp(1, 7) as usize }
         }
     }
 }
@@ -21,13 +21,12 @@ impl Storage {
 impl Mem for Storage {
     fn read(&self, addr: u16, _: u16) -> u8 {
         let addr = addr as usize;
-        let b = self.bank();
         match self {
             Storage::Dmg(v) => v[addr],
-            Storage::Cgb(_bank, banks) => {
+            Storage::Cgb(bank, banks) => {
                 match addr as usize {
                     0..BANK_SIZE => banks[0][addr],
-                    BANK_SIZE..WRAM_SIZE => banks[b][addr - BANK_SIZE],
+                    BANK_SIZE..WRAM_SIZE => banks[*bank][addr - BANK_SIZE],
                     _ => unreachable!()
                 }
             }
@@ -36,13 +35,12 @@ impl Mem for Storage {
 
     fn write(&mut self, addr: u16, value: u8, _: u16) {
         let addr = addr as usize;
-        let b = self.bank();
         match self {
             Storage::Dmg(v) => v[addr] = value,
-            Storage::Cgb(_bank, banks) => {
+            Storage::Cgb(bank, banks) => {
                 match addr as usize {
                     0..BANK_SIZE => banks[0][addr] = value,
-                    BANK_SIZE..WRAM_SIZE => banks[b][addr - BANK_SIZE] = value,
+                    BANK_SIZE..WRAM_SIZE => banks[*bank][addr - BANK_SIZE] = value,
                     _ => unreachable!()
                 }
             }
@@ -54,14 +52,13 @@ impl Mem for Storage {
         let len = len as usize;
         match self {
             Storage::Dmg(v) => v[st..(st + len).min(WRAM_SIZE)].to_vec(),
-            Storage::Cgb(_bank, banks) => {
-                let bank = self.bank();
+            Storage::Cgb(bank, banks) => {
                 match (st, len) {
-                    (st @ BANK_SIZE..WRAM_SIZE, len) => banks[bank][(st - BANK_SIZE)..(st + len - BANK_SIZE).min(BANK_SIZE)].to_vec(),
+                    (st @ BANK_SIZE..WRAM_SIZE, len) => banks[*bank][(st - BANK_SIZE)..(st + len - BANK_SIZE).min(BANK_SIZE)].to_vec(),
                     (st @ 0..BANK_SIZE, len) if st + len < BANK_SIZE => banks[0][st..(st + len)].to_vec(),
                     (st @ 0..BANK_SIZE, len) => {
                         let mut ret = banks[0][st..].to_vec();
-                        ret.extend_from_slice(&banks[bank][..(len - BANK_SIZE - st).min(BANK_SIZE)]);
+                        ret.extend_from_slice(&banks[*bank][..(len - BANK_SIZE - st).min(BANK_SIZE)]);
                         ret
                     },
                     _ => unreachable!()
@@ -93,15 +90,6 @@ impl Wram {
     pub fn new(cgb: bool) -> Self {
         Self {
             storage: if cgb { Storage::Cgb(Default::default(), [[0; BANK_SIZE]; 8]) } else { Storage::Dmg([0; WRAM_SIZE]) }
-        }
-    }
-}
-
-impl Device for Wram {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        match &mut self.storage {
-            Storage::Dmg(_) => {},
-            Storage::Cgb(ref mut svbk, _) => { *svbk = bus.io(IO::SVBK); svbk.direct_write(1); }
         }
     }
 }

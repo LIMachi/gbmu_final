@@ -10,16 +10,18 @@ mod raw_context;
 
 pub mod windows;
 
+// TODO make those not depend on Emulator, it will be the ext context
+// the internal type is already there for some (Settings, Debug), need a new struct for the others
 #[derive(Clone)]
-pub enum WindowType {
-    Main(Menu), // debugger / library
-    Debug(Debugger<Emulator>),
-    Game(Emulator),
-    Sprites(Emulator),
-    Settings(Emulator)
+pub enum WindowType<'a> {
+    Main(&'a mut Menu), // debugger / library
+    Debug(&'a mut Debugger<Emulator>),
+    Game(&'a mut Emulator),
+    Sprites(&'a mut Emulator),
+    Settings(&'a mut Emulator)
 }
 
-impl WindowType {
+impl<'a> WindowType<'a> {
     pub fn handle(&self) -> Handle {
         match self {
             WindowType::Main(_) => Handle::Main,
@@ -54,7 +56,8 @@ impl WindowType {
         }.build(evt).unwrap()
     }
 
-    pub fn ctx(self) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
+    // TODO add types to builders, menu/emu/ninja are already good (they're the external context in this case)
+    pub fn ctx(self) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Emulator>>> {
         match self {
             WindowType::Main(menu) => EguiContext::builder(menu),
             WindowType::Game(emu) => RawContext::builder(emu),
@@ -69,15 +72,15 @@ pub type Event<'a> = winit::event::Event<'a, Events>;
 pub type Proxy = winit::event_loop::EventLoopProxy<Events>;
 pub type EventLoop = winit::event_loop::EventLoop<Events>;
 
-pub trait Context {
+pub trait Context<Ctx> {
     fn inner(&mut self) -> &mut Window;
-    fn redraw(&mut self);
+    fn redraw(&mut self, ctx: &mut Ctx);
     fn request_redraw(&mut self);
 
     fn resize(&mut self, physical: PhysicalSize<u32>);
     fn data(&mut self) -> Box<&mut dyn std::any::Any>;
 
-    fn handle(&mut self, event: &Event);
+    fn handle(&mut self, event: &Event, ctx: &mut Ctx);
 }
 
 pub trait Render {

@@ -11,31 +11,22 @@ pub enum Source {
     Dma = 0x2
 }
 
-pub struct Lock<M: ?Sized + Mem> {
-    inner: Box<M>,
+pub struct Lock<M: Mem> {
+    inner: M,
     lock: HashSet<Source>
 }
 
 pub trait Locked {
-    fn locked(self) -> Lock<Self> where Self: Mem;
-    fn locked_cell(self) -> Lock<Rc<RefCell<dyn Mem>>> where Self: 'static;
-    // fn cell_locked(self) -> Rc<RefCell<Lock<dyn Mem>>> where Self: 'static;
+    fn locked(self) -> Lock<Self> where Self: Sized + Mem;
 }
 
 impl<M: Mem> Locked for M {
     fn locked(self) -> Lock<Self> { Lock::new(self) }
-    fn locked_cell(self) -> Lock<Rc<RefCell<dyn Mem>>> where M: 'static {
-        let cell = RefCell::new(self);
-        Lock::new(Rc::new(cell))
-    }
-    // fn cell_locked(self) -> Rc<RefCell<Lock<dyn Mem>>> where M: 'static {
-    //     Rc::new(RefCell::new(Lock::new(self)))
-    // }
 }
 
 impl<M: Mem> Lock<M> {
     pub fn new(inner: M) -> Self {
-        Self { inner: Box::new(inner), lock: HashSet::with_capacity(4) }
+        Self { inner, lock: HashSet::with_capacity(4) }
     }
 
     pub fn lock(&mut self, level: Source) {

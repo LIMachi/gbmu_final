@@ -89,12 +89,6 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
 
 impl Mem for () { }
 
-pub trait MemoryBus {
-    fn with_mbc<C: MBCController + 'static>(self, controller: C) -> Self;
-    fn with_ppu<P: PPU>(self, ppu: &mut P) -> Self;
-    fn with_wram<R: Device + Mem + 'static>(self, ram: R) -> Self;
-}
-
 pub trait IOBus {
     fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
 
@@ -111,7 +105,7 @@ pub trait IOBus {
     fn lock(&mut self);
     fn unlock(&mut self);
 
-    fn mbc(&self) -> std::cell::Ref<dyn MBCController>;
+    fn mbc(&self) -> Box<&dyn MBCController>;
 }
 
 pub trait Device {

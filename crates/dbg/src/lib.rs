@@ -21,7 +21,7 @@ pub trait Bus: cpu::Bus + IOBus { }
 
 pub trait BusWrapper {
     fn bus(&self) -> Box<&dyn Bus>;
-    fn mbc(&self) -> Ref<dyn MBCController>;
+    fn mbc(&self) -> Box<&dyn MBCController>;
 }
 
 impl<E: ReadAccess + Schedule> Emulator for E { }

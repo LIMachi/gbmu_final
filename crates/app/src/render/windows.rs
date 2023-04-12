@@ -73,7 +73,7 @@ impl Windows {
         }
     }
 
-    pub fn create(&mut self, kind: WindowType, event_loop: &EventLoopWindowTarget<Events>) {
+    pub fn create<'a>(&mut self, kind: WindowType<'a>, event_loop: &EventLoopWindowTarget<Events>) {
         let handle = kind.handle();
         if self.handles.contains_key(&handle) {
             log::warn!("window {handle:?} already opened. Please don't do that.");
