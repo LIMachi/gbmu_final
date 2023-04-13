@@ -9,6 +9,8 @@ mod tilemap;
 mod oam;
 mod bgmap;
 
+pub(crate) use bgmap::TileData;
+
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -81,12 +83,12 @@ impl shared::Ui for Controller {
         let count = if self.ppu.regs.cgb.value() != 0 { 768 } else { 384 };
         for n in 0..count {
             let s = Textures::Tile(n);
-            self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
+            self.ui.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
         }
-        self.storage.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
-        self.storage.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
-        self.storage.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
-        self.storage.insert(Textures::Miniature,ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.ui.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
+        self.ui.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.ui.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
+        self.ui.insert(Textures::Miniature, ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.init = true;
     }
 
@@ -98,18 +100,16 @@ impl shared::Ui for Controller {
         let tiles: Vec<usize> = { self.ppu.vram_mut().inner_mut().tile_cache.drain().collect() };
         for n in tiles {
             let buf = PixelBuffer::<8, 8>::new(self.ppu.vram().inner().tile_data(n % 384, n / 384)).image::<64, 64>();
-            ctx.tex_manager()
-                .write()
-                .set(self.storage.get(&Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id(), ImageDelta::full(buf, TextureOptions::NEAREST));
+            let id = self.ui.tex(Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id();
+            ctx.tex_manager().write().set(id, ImageDelta::full(buf, TextureOptions::NEAREST));
         }
         CentralPanel::default()
-            .show(ctx, |ui| {
-                ui.add(tabs::Tabs::new(&mut self.tab)
-                    .with_tab(Tabs::Oam, || oam::Oam(&self.storage, &self.ppu))
-                    .with_tab(Tabs::Tiledata, || bgmap::BgMap(&self.storage, &self.ppu, ctx))
-                    .with_tab(Tabs::Tilemap, || tilemap::Tilemap(&self.storage))
-                );
-            });
+            .show(ctx, |ui|
+                tabs::Tabs::new(&mut self.tab, ui,&[Tabs::Oam, Tabs::Tiledata, Tabs::Tilemap])
+                    .with_tab(Tabs::Oam, oam::Oam(&mut self.ui, &self.ppu))
+                    .with_tab(Tabs::Tiledata, bgmap::BgMap(&mut self.ui, &self.ppu, ctx))
+                    .with_tab(Tabs::Tilemap, tilemap::Tilemap(&mut self.ui))
+                    .response());
     }
 
     fn handle(&mut self, _event: &shared::Event) {

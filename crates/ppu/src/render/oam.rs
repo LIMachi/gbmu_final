@@ -28,7 +28,7 @@ impl Widget for Sprite<'_> {
     }
 }
 
-pub struct Oam<'a>(pub &'a HashMap<Textures, TextureHandle>, pub(crate) &'a Ppu);
+pub struct Oam<'a>(pub(crate) &'a mut crate::UiData, pub(crate) &'a Ppu);
 
 impl Widget for Oam<'_> {
     fn ui(self, ui: &mut Ui) -> Response {
@@ -41,8 +41,8 @@ impl Widget for Oam<'_> {
                     for i in 0..8 {
                         let index = i + j * 8;
                         let sprite = self.1.sprite(index);
-                        let h = self.0.get(&if sprite.x > 0 && sprite.y > 0 { Textures::Tile(sprite.tile as usize) } else { Textures::Placeholder }).unwrap().id();
-                        let h2 = self.0.get(&if self.1.lcdc.obj_tall() { Textures::Tile(sprite.tile as usize + 1) } else { Textures::Placeholder }).unwrap().id();
+                        let h = self.0.tex(if sprite.x > 0 && sprite.y > 0 { Textures::Tile(sprite.tile as usize) } else { Textures::Placeholder }).unwrap().id();
+                        let h2 = self.0.tex(if self.1.lcdc.obj_tall() { Textures::Tile(sprite.tile as usize + 1) } else { Textures::Placeholder }).unwrap().id();
                         if ui.add(Sprite(&sprite, h, h2)).hovered() {
                         }
                     }

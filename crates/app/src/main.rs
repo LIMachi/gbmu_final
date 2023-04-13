@@ -23,7 +23,6 @@ use shared::input::Keybindings;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::app::{AppConfig, DbgConfig, RomConfig};
-use crate::emulator::EmuSettings;
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {

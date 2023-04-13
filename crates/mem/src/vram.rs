@@ -19,6 +19,7 @@ impl Storage {
 
     fn read_bank(&self, addr: u16, bank: usize) -> u8 {
         match self {
+            Storage::DMG(_) if bank == 1 => 0,
             Storage::DMG(bank) => bank[addr as usize],
             Storage::CGB(banks) => banks[addr as usize + (bank & 0x1) * BANK_SIZE as usize]
         }

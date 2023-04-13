@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use serde::{Deserialize, Serialize};
@@ -163,7 +162,13 @@ impl Render for Emulator {
 
     fn handle(&mut self, event: &Event, window: &Window) {
         match event {
-            Event::UserEvent(Events::Play(rom)) => { self.insert(rom.clone(), true); },
+            Event::UserEvent(Events::Play(rom)) => {
+                self.insert(rom.clone(), true);
+                if let Some(raw) = &rom.raw {
+                    window.set_window_icon(raw.icon());
+                }
+                window.set_title(self.emu.as_ref().borrow().name());
+            },
             Event::UserEvent(Events::Reload) => { Render::init(self, window); },
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
                 if event == &WindowEvent::CloseRequested { self.stop(); }
@@ -264,6 +269,10 @@ impl Emu {
     pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) {
         if !self.running { return }
         self.bus.tick(&mut self.gb, clock, bp);
+    }
+
+    pub fn name(&self) -> &str {
+        self.rom.as_ref().map(|x| x.header.title.as_ref()).unwrap_or("GBMU")
     }
 }
 

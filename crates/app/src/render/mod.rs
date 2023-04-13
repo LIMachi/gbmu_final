@@ -39,8 +39,8 @@ impl WindowType {
                 .with_title("GBMU - Spritesheet")
                 .with_min_inner_size(PhysicalSize::new(1200, 860))
                 .with_resizable(false),
-            WindowType::Game(_) => WindowBuilder::new()
-                .with_title(" ")
+            WindowType::Game(emu) => WindowBuilder::new()
+                .with_title(emu.emu.as_ref().borrow().name())
                 .with_min_inner_size(PhysicalSize::new(160, 144))
                 .with_inner_size(PhysicalSize::<u32>::from((640, 576))),
             WindowType::Debug(_) => WindowBuilder::new()
