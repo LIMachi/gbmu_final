@@ -6,6 +6,16 @@ pub mod clock;
 pub mod rtc;
 pub mod convert;
 
+pub trait ToBox {
+    fn boxed(&self) -> Box<&Self> where Self: Sized;
+}
+
+impl<T: Sized> ToBox for T {
+    fn boxed(&self) -> Box<&Self> where Self: Sized {
+        Box::new(self)
+    }
+}
+
 pub trait Cell {
     fn cell(self) -> Rc<RefCell<Self>>;
 }

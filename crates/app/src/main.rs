@@ -15,7 +15,7 @@ pub mod app;
 
 use app::Menu;
 use apu::SoundConfig;
-use dbg::{Debugger, Schedule};
+use dbg::{Ninja, Schedule};
 use render::{windows::Windows, WindowType};
 use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
@@ -32,7 +32,6 @@ pub struct App {
     bindings: Keybindings,
     roms: Rc<RefCell<RomConfig>>,
     emu: emulator::Emulator,
-    dbg: Debugger<emulator::Emulator>,
     event_loop: Option<EventLoop>,
     pub windows: Windows
 }
@@ -46,7 +45,6 @@ impl App {
         let bindings = conf.keys.clone();
         let emu = emulator::Emulator::new(proxy.clone(), bindings.clone(), &conf);
         let roms = conf.roms.cell();
-        let dbg = Debugger::new(emu.clone());
         Self {
             sound_device: conf.sound_device,
             audio_settings: conf.audio_settings,
@@ -55,14 +53,13 @@ impl App {
             event_loop: Some(e),
             windows: Windows::new(proxy),
             emu,
-            dbg
         }
     }
 
     pub fn proxy(&self) -> Proxy { self.event_loop.as_ref().unwrap().create_proxy() }
 
-    pub fn open<'a>(&mut self, handle: WindowType<'a>, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
-        self.windows.create(handle, event_loop);
+    pub fn open<'a>(&mut self, handle: Handle, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
+        self.windows.create(handle, &mut self.emu, event_loop);
         self
     }
 
@@ -70,8 +67,8 @@ impl App {
         Menu::new(self.roms.clone(), self.proxy())
     }
 
-    pub fn create(mut self, handle: WindowType) -> Self {
-        self.windows.create(handle, self.event_loop.as_ref().unwrap());
+    pub fn create(mut self, handle: Handle) -> Self {
+        self.windows.create(handle, &mut self.emu, self.event_loop.as_ref().unwrap());
         self
     }
 
@@ -79,17 +76,14 @@ impl App {
         match event {
             Event::UserEvent(Events::Play(_)) => {
                 if !self.windows.is_open(Handle::Game) {
-                    self.open(WindowType::Game(&mut self.emu), target);
+                    self.open(Handle::Game, target);
                 }
             },
             Event::UserEvent(Events::Open(handle)) => {
-              self.open(match handle {
-                  Handle::Main => unreachable!(),
-                  Handle::Debug => WindowType::Debug(&mut self.dbg),
-                  Handle::Game => WindowType::Game(&mut self.emu),
-                  Handle::Sprites => WindowType::Sprites(&mut self.emu),
-                  Handle::Settings => WindowType::Settings(&mut self.emu),
-              }, target);
+                let handle = *handle;
+                if !self.windows.is_open(handle) {
+                    self.open(handle, target);
+                }
             },
             _ => {}
         }

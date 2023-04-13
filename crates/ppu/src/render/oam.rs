@@ -28,9 +28,9 @@ impl Widget for Sprite<'_> {
     }
 }
 
-pub struct Oam<'a>(pub &'a HashMap<Textures, TextureHandle>, pub(crate) &'a Ppu);
+pub struct Oam<'a, E: Emulator + MemAccess>(pub &'a HashMap<Textures, TextureHandle>, pub(crate) &'a mut E);
 
-impl Widget for Oam<'_> {
+impl<E: Emulator + MemAccess> Widget for Oam<'_, E> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.vertical(|ui| {
             for j in 0..5 {

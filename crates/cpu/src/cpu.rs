@@ -21,7 +21,7 @@ pub struct Cpu {
     ime: bool
 }
 
-impl shared::Cpu for Cpu {
+impl shared::cpu::Cpu for Cpu {
     fn done(&self) -> bool { self.finished }
     fn previous(&self) -> Opcode { self.prev }
     fn register(&self, reg: Reg) -> Value { self.regs.read(reg) }

@@ -41,6 +41,8 @@ path = "../dbg"
 path = "../shared"
 [dependencies.bus]
 path = "../bus"
+[dependencies.ppu]
+path = "../ppu"
 [dependencies.serial]
 path = "../serial"
 [dependencies.apu]

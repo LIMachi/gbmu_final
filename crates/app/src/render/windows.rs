@@ -9,7 +9,7 @@ pub struct Windows {
     instance: Instance,
     proxy: Proxy,
     handles: HashMap<Handle, WindowId>,
-    windows: HashMap<WindowId, Box<dyn Context>>
+    windows: HashMap<WindowId, Box<dyn Context<Emulator>>>
 }
 
 impl Windows {
@@ -73,18 +73,17 @@ impl Windows {
         }
     }
 
-    pub fn create<'a>(&mut self, kind: WindowType<'a>, event_loop: &EventLoopWindowTarget<Events>) {
-        let handle = kind.handle();
+    pub fn create<'a>(&mut self, handle: Handle, emu: &mut Emulator, event_loop: &EventLoopWindowTarget<Events>) {
         if self.handles.contains_key(&handle) {
             log::warn!("window {handle:?} already opened. Please don't do that.");
             return ;
         }
         let proxy = self.proxy.clone();
+        let kind = WindowType(handle);
         let window = kind.build(event_loop);
         let id = window.id();
 
-        let ctx_builder = kind.ctx();
-        let ctx = ctx_builder(&self.instance, window, proxy);
+        let ctx = kind.builder(emu)(&self.instance, window, proxy);
 
         self.handles.insert(handle, id);
         self.windows.insert(id, ctx);

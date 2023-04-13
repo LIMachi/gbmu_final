@@ -8,7 +8,7 @@ use shared::{Ui, egui};
 
 pub use super::*;
 
-pub struct EguiContext<Ctx, U: Ui<Context = Ctx>> {
+pub struct EguiContext<Ctx, U: Ui<Ext= Ctx>> {
     data: U,
     window: Window,
     surface: wgpu::Surface,
@@ -21,7 +21,7 @@ pub struct EguiContext<Ctx, U: Ui<Context = Ctx>> {
     queue: Queue
 }
 
-impl<Ctx, U: 'static + Ui<Context = Ctx>> EguiContext<Ctx, U> {
+impl<Ctx, U: 'static + Ui<Ext= Ctx>> EguiContext<Ctx, U> {
     pub fn new(instance: &Instance, window: Window, mut data: U, ctx: &mut Ctx) -> Self {
         let surface = unsafe { instance.create_surface(&window) };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -76,13 +76,13 @@ impl<Ctx, U: 'static + Ui<Context = Ctx>> EguiContext<Ctx, U> {
         }
     }
 
-    pub fn builder(data: U, ctx: &mut Ctx) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context>> {
+    pub fn builder(ctx: &mut Ctx) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Ctx>>> {
         Box::new(move |instance, window, _|
-            Box::new(Self::new(instance, window, data, ctx)))
+            Box::new(Self::new(instance, window, Ui::new(ctx), ctx)))
     }
 }
 
-impl<Ctx, U: 'static + Ui<Context = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
+impl<Ctx, U: 'static + Ui<Ext = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
     fn inner(&mut self) -> &mut Window {
         &mut self.window
     }
@@ -98,7 +98,7 @@ impl<Ctx, U: 'static + Ui<Context = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
         };
         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
         self.platform.begin_frame();
-        self.data.draw(&mut self.inner);
+        self.data.draw(&mut self.inner, ctx);
         let out = self.platform.end_frame(Some(&self.window));
         let jobs = self.inner.tessellate(out.shapes);
         let delta = out.textures_delta;
@@ -122,7 +122,7 @@ impl<Ctx, U: 'static + Ui<Context = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
         self.window.request_redraw();
     }
 
-    fn resize(&mut self, physical: PhysicalSize<u32>) {
+    fn resize(&mut self, physical: PhysicalSize<u32>, _ctx: &mut Ctx) {
         if physical.width > 0 && physical.height > 0 {
             self.config.width = physical.width;
             self.config.height = physical.height;
@@ -136,13 +136,13 @@ impl<Ctx, U: 'static + Ui<Context = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
         Box::new(&mut self.data)
     }
 
-    fn handle(&mut self, event: &Event) {
+    fn handle(&mut self, event: &Event, ctx: &mut Ctx) {
         match event {
             Event::WindowEvent { window_id, .. } if window_id == &self.window.id() => {
                 self.platform.handle_event(event);
-                self.data.handle(event);
+                self.data.handle(event, ctx);
             },
-            Event::UserEvent(_) => self.data.handle(event),
+            Event::UserEvent(_) => self.data.handle(event, ctx),
             Event::WindowEvent { event: wevent, .. } => {
                 match wevent {
                     WindowEvent::CursorEntered { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::CursorMoved { ..} => {

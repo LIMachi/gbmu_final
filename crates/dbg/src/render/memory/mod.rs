@@ -6,6 +6,7 @@ use shared::egui::{Color32, Label, Response, ScrollArea, Sense, TextStyle, Ui, V
 use shared::egui::RichText;
 use shared::mem::*;
 use crate::Bus;
+use crate::render::DARK_BLACK;
 use super::render::DARK_BLACK;
 
 struct View {
@@ -45,12 +46,11 @@ pub struct Viewer {
     ranges: [View; 7],
     current: usize,
     hover: Option<u16>,
-    breakpoints: Breakpoints,
     input: String,
     value: Value
 }
 
-impl Viewer {
+impl Default for Viewer {
     fn default() -> Self {
         Self {
             options: Default::default(),
@@ -65,16 +65,8 @@ impl Viewer {
             ],
             current: 0,
             hover: None,
-            breakpoints: Breakpoints::default(),
             input: String::new(),
             value: Value::Any
-        }
-    }
-
-    pub fn new(breakpoints: Breakpoints) -> Self {
-        Self {
-            breakpoints,
-            ..Viewer::default()
         }
     }
 }

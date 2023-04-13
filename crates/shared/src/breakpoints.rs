@@ -1,11 +1,12 @@
 use std::cell::{RefCell, RefMut};
 use std::fmt::Formatter;
 use std::rc::Rc;
-use super::{Cpu, registers, value};
 use serde::{Serialize, Deserialize};
-use crate::cpu::{Op, Opcode};
-use crate::utils::Cell;
-use crate::utils::convert::Converter;
+use crate::{
+    value,
+    cpu::{Cpu, Op, Opcode, Reg},
+    utils::{Cell, convert::Converter}
+};
 
 #[derive(Clone, Default)]
 pub struct Breakpoints {
@@ -127,7 +128,7 @@ pub enum Break {
     Cycles(usize),
     Instructions(usize),
     Instruction(Opcode),
-    Register(registers::Reg, value::Value)
+    Register(Reg, value::Value)
 }
 
 impl Break {
@@ -145,7 +146,7 @@ impl Break {
     }
 
     pub fn address(addr: u16) -> Self {
-        Self::Register(registers::Reg::PC, addr.into())
+        Self::Register(Reg::PC, addr.into())
     }
 }
 
@@ -186,7 +187,7 @@ impl Breakpoint {
 
     pub fn access(access: Access) -> Self { Self::new(Break::Access(access), false) }
 
-    pub fn register(reg: registers::Reg, value: value::Value) -> Self {
+    pub fn register(reg: Reg, value: value::Value) -> Self {
         Self::new(Break::Register(reg, value), false)
     }
 
@@ -239,3 +240,4 @@ impl Breakpoints {
         self.breakpoints.as_ref().borrow_mut().push(bp);
     }
 }
+use crate::utils::convert;

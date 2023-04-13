@@ -9,10 +9,25 @@ mod tilemap;
 mod oam;
 mod bgmap;
 
+pub struct VramViewer<E> {
+    tab: Tabs,
+    storage: HashMap<Textures, TextureHandle>,
+    init: bool,
+    emu: PhantomData<E>
+}
+
+pub trait MemAccess {
+    fn vram(&self) -> &Vram;
+    fn vram_mut(&mut self) -> &mut Vram;
+
+    fn oam(&self) -> &Oam;
+    fn oam_mut(&mut self) -> &mut Oam;
+}
+
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum Textures {
+enum Textures {
     None,
     Blank,
     Placeholder,
@@ -20,7 +35,7 @@ pub enum Textures {
     Miniature
 }
 
-pub struct PixelBuffer<const W: usize, const H: usize> where [(); W * H]: Sized {
+struct PixelBuffer<const W: usize, const H: usize> where [(); W * H]: Sized {
     pixels: [u8; W * H]
 }
 
@@ -63,7 +78,7 @@ impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized 
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum Tabs {
+enum Tabs {
     Oam,
     Tiledata,
     Tilemap
@@ -75,10 +90,21 @@ impl tabs::Tab for Tabs {
     }
 }
 
-impl shared::Ui for Controller {
-    fn init(&mut self, ctx: &mut Context) {
+impl<E: Emulator + MemAccess> shared::Ui for VramViewer<E> {
+    type Ext = E;
+
+    fn new(ctx: &mut E) -> Self where Self: Sized {
+        VramViewer {
+            tab: Tabs::Oam,
+            storage: Default::default(),
+            init: false,
+            emu: Default::default(),
+        }
+    }
+
+    fn init(&mut self, ctx: &mut Context, emu: &mut E) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        let count = if self.ppu.regs.cgb.value() != 0 { 768 } else { 384 };
+        let count = if emu.bus().is_cgb() { 768 } else { 384 };
         for n in 0..count {
             let s = Textures::Tile(n);
             self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
@@ -90,14 +116,15 @@ impl shared::Ui for Controller {
         self.init = true;
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
+    fn draw(&mut self, ctx: &mut Context, emu: &mut E) {
         if !self.init {
             self.init(ctx);
             self.init = true;
         }
-        let tiles: Vec<usize> = { self.ppu.vram_mut().inner_mut().tile_cache.drain().collect() };
+        let tiles: Vec<usize> = emu.vram_mut().tile_cache.drain().take(5).collect();
+        let vram = emu.vram();
         for n in tiles {
-            let buf = PixelBuffer::<8, 8>::new(self.ppu.vram().inner().tile_data(n % 384, n / 384)).image::<64, 64>();
+            let buf = PixelBuffer::<8, 8>::new(vram.tile_data(n % 384, n / 384)).image::<64, 64>();
             ctx.tex_manager()
                 .write()
                 .set(self.storage.get(&Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id(), ImageDelta::full(buf, TextureOptions::NEAREST));
@@ -105,8 +132,8 @@ impl shared::Ui for Controller {
         CentralPanel::default()
             .show(ctx, |ui| {
                 ui.add(tabs::Tabs::new(&mut self.tab)
-                    .with_tab(Tabs::Oam, || oam::Oam(&self.storage, &self.ppu))
-                    .with_tab(Tabs::Tiledata, || bgmap::BgMap(&self.storage, &self.ppu, ctx))
+                    .with_tab(Tabs::Oam, || oam::Oam(&self.storage, emu))
+                    .with_tab(Tabs::Tiledata, || bgmap::BgMap(&self.storage, emu, ctx))
                     .with_tab(Tabs::Tilemap, || tilemap::Tilemap(&self.storage))
                 );
             });

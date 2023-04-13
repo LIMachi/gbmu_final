@@ -10,7 +10,7 @@ mod timer;
 mod devices;
 
 pub use timer::Timer;
-pub use devices::Console;
+pub use devices::Devices;
 
 pub struct Empty {}
 impl Mem for Empty {}
@@ -78,7 +78,7 @@ impl Bus {
         self.last.take()
     }
 
-    pub fn tick(&mut self, devices: &mut devices::Console, clock: u8, bp: &Breakpoints) -> bool {
+    pub fn tick(&mut self, devices: &mut devices::Devices, clock: u8, bp: &Breakpoints) -> bool {
         if self.clock == 127 {
             self.mbc.as_ref().borrow_mut().tick();
             self.clock = 0;

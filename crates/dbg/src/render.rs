@@ -12,6 +12,8 @@ use shared::utils::image::ImageLoader;
 use shared::winit::event::{ElementState, KeyboardInput, WindowEvent};
 use crate::{Bus, Context, Texture};
 
+mod disassembly;
+mod memory;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Kind {
@@ -128,7 +130,19 @@ fn io_table(ui: &mut Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str, extra
 }
 
 impl<E: Emulator> shared::Ui for Ninja<E> {
-    fn init(&mut self, ctx: &mut Context) {
+    type Ext = E;
+
+    fn new(ctx: &mut E) -> Self where Self: Sized {
+        Self {
+            render_data: Data::default(),
+            disassembly: disassembly::Disassembly::new(),
+            viewer: memory::Viewer::default(),
+            textures: Default::default(),
+            keys: Default::default(),
+        }
+    }
+
+    fn init(&mut self, ctx: &mut Context, _ext: &mut E) {
         self.textures.insert(Texture::Play, ctx.load_svg::<40, 40>("play", "assets/icons/play.svg"));
         self.textures.insert(Texture::Pause, ctx.load_svg::<40, 40>("pause", "assets/icons/pause.svg"));
         self.textures.insert(Texture::Step, ctx.load_svg::<32, 32>("step", "assets/icons/step.svg"));
@@ -136,7 +150,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
         self.textures.insert(Texture::Into, ctx.load_svg::<40, 40>("into", "assets/icons/into.svg"));
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
+    fn draw(&mut self, ctx: &mut Context, ext: &mut E) {
         use egui::{FontId, TextStyle::*, FontFamily::Proportional};
         let mut style = (*ctx.style()).clone();
         style.visuals.override_text_color = Some(Color32::WHITE);
@@ -150,7 +164,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
         ctx.set_style(style.clone());
         SidePanel::left("left")
             .show(ctx, |ui| {
-                let emu = self.emu.bus();
+                let emu = ext.bus();
                 let bus = emu.bus();
                 self.viewer.render(ui, &bus);
             });
@@ -162,26 +176,26 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                             .outer_margin(Margin::symmetric(0., 2.))
                             .show(ui, |ui: &mut Ui| {
                                 ui.columns(6, |uis: &mut [Ui]| {
-                                    let flags = self.emu.cpu_register(Reg::F);
+                                    let flags = ext.cpu_register(Reg::F);
                                     uis[0].vertical(|ui| {
-                                        ui.add(Register("A", self.emu.cpu_register(Reg::A)));
+                                        ui.add(Register("A", ext.cpu_register(Reg::A)));
                                         ui.add(Register("F", flags));
                                     });
                                     uis[1].vertical(|ui| {
-                                        ui.add(Register("B", self.emu.cpu_register(Reg::B)));
-                                        ui.add(Register("C", self.emu.cpu_register(Reg::C)));
+                                        ui.add(Register("B", ext.cpu_register(Reg::B)));
+                                        ui.add(Register("C", ext.cpu_register(Reg::C)));
                                     });
                                     uis[2].vertical(|ui| {
-                                        ui.add(Register("D", self.emu.cpu_register(Reg::D)));
-                                        ui.add(Register("E", self.emu.cpu_register(Reg::E)));
+                                        ui.add(Register("D", ext.cpu_register(Reg::D)));
+                                        ui.add(Register("E", ext.cpu_register(Reg::E)));
                                     });
                                     uis[3].vertical(|ui| {
-                                        ui.add(Register("H", self.emu.cpu_register(Reg::H)));
-                                        ui.add(Register("L", self.emu.cpu_register(Reg::L)));
+                                        ui.add(Register("H", ext.cpu_register(Reg::H)));
+                                        ui.add(Register("L", ext.cpu_register(Reg::L)));
                                     });
                                     uis[4].vertical(|ui| {
-                                        ui.add(Register("SP", self.emu.cpu_register(Reg::SP)));
-                                        ui.add(Register("PC", self.emu.cpu_register(Reg::PC)));
+                                        ui.add(Register("SP", ext.cpu_register(Reg::SP)));
+                                        ui.add(Register("PC", ext.cpu_register(Reg::PC)));
                                     });
                                     uis[5].with_layout(Layout::top_down(Align::Center), |ui: &mut Ui| {
                                         //ui.label("Flags");
@@ -198,7 +212,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                         egui::Frame::group(ui.style())
                             .fill(DARK_BLACK)
                             .show(ui, |ui| {
-                                ui.push_id("disassembly", |ui| { self.disassembly.render(&self.emu, ui, &self.breakpoints); });
+                                ui.push_id("disassembly", |ui| { self.disassembly.render(&ext, ui, &self.breakpoints); });
                             });
                     });
                     ui.allocate_ui_with_layout(Vec2::new(340., 364.), Layout::top_down(Align::LEFT), |ui| {
@@ -214,21 +228,21 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     let step = egui::ImageButton::new(self.tex(Texture::Step), sz).frame(false);
                                     let into = egui::ImageButton::new(self.tex(Texture::Into), sz).frame(false);
                                     ui.allocate_ui_with_layout(Vec2::splat(64.), Layout::top_down(Align::Center), |ui| {
-                                        let sp = self.emu.speed();
-                                        if ui.add(egui::Button::new("+")).clicked() { self.emu.set_speed((sp + 1).min(1)); }
+                                        let sp = ext.speed();
+                                        if ui.add(egui::Button::new("+")).clicked() { ext.set_speed((sp + 1).min(1)); }
                                         let text = match sp {
                                             0 => egui::Label::new("Normal"),
                                             1 => egui::Label::new("x2"),
                                             n => egui::Label::new(format!("x1/{}", 1 << -n))
                                         };
                                         ui.add(text);
-                                        if ui.add(egui::Button::new("-")).clicked() { self.emu.set_speed((sp - 1).max(-15)); }
+                                        if ui.add(egui::Button::new("-")).clicked() { ext.set_speed((sp - 1).max(-15)); }
                                     });
                                     if ui.add(into.clone()).clicked() { self.step_into(); };
                                     if ui.add(pause.clone()).clicked() { self.pause(); };
                                     if ui.add(play).clicked() { self.play(); };
                                     if ui.add(step).clicked() { self.step() };
-                                    if ui.add(reset).clicked() { self.emu.reset(); };
+                                    if ui.add(reset).clicked() { ext.reset(); };
                                 });
                                 ui.horizontal(|ui| {
                                     if ui.add(egui::TextEdit::singleline(&mut self.render_data.raw_op).desired_width(64.)).changed() {
@@ -275,7 +289,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                 egui::Frame::group(ui.style())
                     .fill(DARK_BLACK)
                     .show(ui, |ui| {
-                        let emu = self.emu.bus();
+                        let emu = ext.bus();
                         let bus = emu.bus();
                         egui_extras::TableBuilder::new(ui)
                             .columns(Column::exact(200.), 4)
@@ -321,10 +335,10 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
             });
     }
 
-    fn handle(&mut self, event: &Event) {
+    fn handle(&mut self, event: &Event, ext: &mut E) {
         match event {
             Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
-            Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&self.emu),
+            Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&ext),
             Event::WindowEvent { event: WindowEvent::KeyboardInput {
                 input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Released, ..  }, .. }, ..
             } => {
@@ -335,7 +349,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
             } => {
                 if self.keys.contains(input) { return }
                 self.keys.insert(*input);
-                if let Some(Section::Dbg(key)) = self.emu.binding(*input) {
+                if let Some(Section::Dbg(key)) = ext.binding(*input) {
                     match key {
                         Shortcut::Step => self.step(),
                         Shortcut::Run => self.play(),

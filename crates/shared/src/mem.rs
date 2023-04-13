@@ -115,12 +115,6 @@ pub trait Device {
 
 impl Device for () { }
 
-
-pub trait PPU: Device {
-    fn vram(&self) -> Rc<RefCell<dyn Mem>>;
-    fn oam(&self) -> Rc<RefCell<dyn Mem>>;
-}
-
 pub trait MBCController: Device + Mem {
     fn rom_bank(&self) -> usize;
     fn ram_bank(&self) -> usize;
