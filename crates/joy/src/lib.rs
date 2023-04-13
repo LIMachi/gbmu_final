@@ -25,7 +25,7 @@ impl Joypad {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        let joy = io.io(IO::JOYP);
+        let joy = io.io_mut(IO::JOYP);
         let p4 = joy.bit(4);
         let p5 = joy.bit(5);
         let dir = if p4 == 0 { self.state >> 4 } else { 0 };
@@ -34,7 +34,7 @@ impl Joypad {
         let v =  0xF ^ (dir | act);
         let int = (p ^ v) & p != 0;
         joy.direct_write((p4 << 4) | (p5 << 5) | v);
-        if int { { io.io(IO::IF).set(4); } }
+        if int { { io.io_mut(IO::IF).set(4); } }
     }
 }
 

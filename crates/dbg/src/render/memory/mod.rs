@@ -1,13 +1,12 @@
 use std::ops::Range;
 use shared::breakpoints::{Breakpoint, Breakpoints, Value};
+use shared::emulator::Emulator;
 
 use shared::egui;
 use shared::egui::{Color32, Label, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
 use shared::egui::RichText;
 use shared::mem::*;
-use crate::Bus;
 use crate::render::DARK_BLACK;
-use super::render::DARK_BLACK;
 
 struct View {
     mem: &'static str,
@@ -121,7 +120,7 @@ impl Viewer {
             .max(ui.text_style_height(&self.options.text_style))
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, bus: &Box<&dyn Bus>) {
+    pub fn render(&mut self, ui: &mut egui::Ui, emu: &dyn Emulator) {
         egui::Frame::group(ui.style())
             .fill(DARK_BLACK)
             .show(ui, |ui| {
@@ -174,7 +173,7 @@ impl Viewer {
                                         for c in 0..8 {
                                             let addr = st + c;
                                             if !space.range.contains(&addr) { break; }
-                                            let v = bus.read(addr);
+                                            let v = emu.bus().read(addr);
                                             let text = format!("{:02X}", v);
                                             let text = RichText::new(text).text_style(text_style.clone())
                                                 .color(if Some(addr) == self.hover { highlight_color } else if v == 0 { zero_color } else { ui.style().visuals.text_color() });
@@ -185,7 +184,7 @@ impl Viewer {
                                                 ui.add(ContextMenu {
                                                     value: &mut self.value,
                                                     input: &mut self.input,
-                                                    breaks: &mut self.breakpoints,
+                                                    breaks: &mut emu.breakpoints(),
                                                     addr
                                                 });
                                             });

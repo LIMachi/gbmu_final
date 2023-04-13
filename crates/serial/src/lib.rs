@@ -60,8 +60,8 @@ impl Port {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        let data = io.io(IO::SB).value();
-        let ctrl = io.io(IO::SC);
+        let data = io.io_mut(IO::SB).value();
+        let ctrl = io.io_mut(IO::SC);
         if ctrl.dirty() {
             if ctrl.value() & 0x81 == 0x81 {
                 self.cable.send(data);
@@ -73,7 +73,7 @@ impl Port {
                 self.cable.send(data);
             }
             ctrl.reset(7);
-            io.io(IO::SB).direct_write(o);
+            io.io_mut(IO::SB).direct_write(o);
             io.int_set(3);
         }
     }

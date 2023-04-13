@@ -10,10 +10,14 @@ use shared::io::IO;
 use shared::utils::convert::Converter;
 use shared::utils::image::ImageLoader;
 use shared::winit::event::{ElementState, KeyboardInput, WindowEvent};
-use crate::{Bus, Context, Texture};
+use crate::{Context, Debugger, Texture};
 
 mod disassembly;
 mod memory;
+
+pub use disassembly::Disassembly;
+pub use memory::Viewer;
+use shared::emulator::Bus;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Kind {
@@ -164,9 +168,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
         ctx.set_style(style.clone());
         SidePanel::left("left")
             .show(ctx, |ui| {
-                let emu = ext.bus();
-                let bus = emu.bus();
-                self.viewer.render(ui, &bus);
+                self.viewer.render(ui, ext);
             });
         CentralPanel::default()
             .show(ctx, |ui: &mut Ui| {
@@ -212,7 +214,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                         egui::Frame::group(ui.style())
                             .fill(DARK_BLACK)
                             .show(ui, |ui| {
-                                ui.push_id("disassembly", |ui| { self.disassembly.render(&ext, ui, &self.breakpoints); });
+                                ui.push_id("disassembly", |ui| { self.disassembly.render(ext, ui); });
                             });
                     });
                     ui.allocate_ui_with_layout(Vec2::new(340., 364.), Layout::top_down(Align::LEFT), |ui| {
@@ -238,10 +240,10 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         ui.add(text);
                                         if ui.add(egui::Button::new("-")).clicked() { ext.set_speed((sp - 1).max(-15)); }
                                     });
-                                    if ui.add(into.clone()).clicked() { self.step_into(); };
-                                    if ui.add(pause.clone()).clicked() { self.pause(); };
-                                    if ui.add(play).clicked() { self.play(); };
-                                    if ui.add(step).clicked() { self.step() };
+                                    if ui.add(into.clone()).clicked() { ext.step_into(&mut self.disassembly); };
+                                    if ui.add(pause.clone()).clicked() { ext.pause(); };
+                                    if ui.add(play).clicked() { Debugger::<E>::play(ext, &mut self.disassembly); };
+                                    if ui.add(step).clicked() { ext.step(&mut self.disassembly) };
                                     if ui.add(reset).clicked() { ext.reset(); };
                                 });
                                 ui.horizontal(|ui| {
@@ -249,7 +251,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         self.render_data.parse_op();
                                     }
                                     if ui.button("BREAK").clicked() {
-                                        self.schedule(Breakpoint::instruction(self.render_data.ins));
+                                        ext.schedule(Breakpoint::instruction(self.render_data.ins));
                                     }
                                     ui.menu_button(self.render_data.reg.name(), |ui| {
                                         use Reg::*;
@@ -264,7 +266,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         self.render_data.parse();
                                     }
                                     if ui.button("BREAK").clicked() {
-                                        self.schedule(self.render_data.breakpoint());
+                                        ext.schedule(self.render_data.breakpoint());
                                     }
                                 });
                                 egui_extras::TableBuilder::new(ui)
@@ -272,7 +274,9 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     .striped(true)
                                     .cell_layout(Layout::left_to_right(Align::Center))
                                     .body(|mut body| {
-                                        self.breakpoints().drain_filter(|bp| {
+                                        ext.breakpoints()
+                                            .bp_mut()
+                                            .drain_filter(|bp| {
                                             if bp.temp() { return false };
                                             let mut rem = false;
                                             body.row(30.0, |mut row| {
@@ -286,11 +290,10 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                             });
                     });
                 });
-                egui::Frame::group(ui.style())
+                egui::Frame::group(ui.style()) // IOregs
                     .fill(DARK_BLACK)
                     .show(ui, |ui| {
-                        let emu = ext.bus();
-                        let bus = emu.bus();
+                        let bus = ext.bus().as_ref();
                         egui_extras::TableBuilder::new(ui)
                             .columns(Column::exact(200.), 4)
                             .header(32., |mut header| {
@@ -309,8 +312,8 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                                            IO::WaveRam0, IO::WaveRam1, IO::WaveRam2, IO::WaveRam3, IO::WaveRam4, IO::WaveRam5, IO::WaveRam6, IO::WaveRam7,
                                                            IO::WaveRam8, IO::WaveRam9, IO::WaveRamA, IO::WaveRamB, IO::WaveRamC, IO::WaveRamD, IO::WaveRamE, IO::WaveRamF];
                                     const VIDEO: &[IO] = &[IO::LCDC, IO::STAT, IO::SCX, IO::SCY, IO::LY, IO::LYC, IO::DMA, IO::WX, IO::WY, IO::BGP, IO::OBP0, IO::OBP1, IO::BCPS, IO::BCPD, IO::OPRI, IO::OCPS];
-                                    row.col(|ui| { io_table(ui, CPU, bus.as_ref(), "CPU", |_| {}); });
-                                    row.col(|ui| { io_table(ui, MEM, bus.as_ref(), "MEM", |ui: &mut Ui| {
+                                    row.col(|ui| { io_table(ui, CPU, bus, "CPU", |_| {}); });
+                                    row.col(|ui| { io_table(ui, MEM, bus, "MEM", |ui: &mut Ui| {
                                         ui.push_id("BANK_TABLE", |ui| {
                                             egui_extras::TableBuilder::new(ui)
                                                 .columns(Column::exact(100.), 2)
@@ -318,17 +321,17 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                                 .body(|mut body| {
                                                     body.row(16., |mut row| {
                                                         row.col(|ui| { ui.label("ROM"); });
-                                                        row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().rom_bank())); });
+                                                        row.col(|ui| { ui.label(format!("{:#04X}", ext.mbc().rom_bank())); });
                                                     });
                                                     body.row(16., |mut row| {
                                                         row.col(|ui| { ui.label("RAM"); });
-                                                        row.col(|ui| { ui.label(format!("{:#04X}", emu.mbc().ram_bank())); });
+                                                        row.col(|ui| { ui.label(format!("{:#04X}", ext.mbc().ram_bank())); });
                                                     });
                                                 });
                                         });
                                     })});
-                                    row.col(|ui| { io_table(ui, AUDIO, bus.as_ref(), "AUDIO", |_| {}); });
-                                    row.col(|ui| { io_table(ui, VIDEO, bus.as_ref(), "VIDEO", |_| {}); });
+                                    row.col(|ui| { io_table(ui, AUDIO, bus, "AUDIO", |_| {}); });
+                                    row.col(|ui| { io_table(ui, VIDEO, bus, "VIDEO", |_| {}); });
                                 });
                             });
                     });
@@ -351,10 +354,10 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                 self.keys.insert(*input);
                 if let Some(Section::Dbg(key)) = ext.binding(*input) {
                     match key {
-                        Shortcut::Step => self.step(),
-                        Shortcut::Run => self.play(),
-                        Shortcut::Pause => self.pause(),
-                        Shortcut::Reset => self.reset()
+                        Shortcut::Step => ext.step(&mut self.disassembly),
+                        Shortcut::Run => Debugger::<E>::play(ext, &mut self.disassembly),
+                        Shortcut::Pause => ext.pause(),
+                        Shortcut::Reset => ext.reset()
                     }
                 }
             }

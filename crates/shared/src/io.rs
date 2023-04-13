@@ -8,9 +8,6 @@ pub use io_regs::IORegs;
 pub const CGB_MODE: u8 = 0x80;
 pub const DMG_MODE: u8 = 0x04;
 
-#[derive(Debug, Copy, Clone)]
-pub struct LCDC(pub u8);
-
 /// 7	LCD and PPU enable	0=Off, 1=On
 // 6	Window tile map area	0=9800-9BFF, 1=9C00-9FFF
 // 5	Window enable	0=Off, 1=On
@@ -19,40 +16,54 @@ pub struct LCDC(pub u8);
 // 2	OBJ size	0=8x8, 1=8x16
 // 1	OBJ enable	0=Off, 1=On
 // 0	BG and Window enable/priority	0=Off, 1=On
-impl LCDC {
-    pub fn enabled(&self) -> bool {
-        (self.0 & 0x80) != 0
+
+pub trait LCDC {
+    fn enabled(&self) -> bool;
+    fn win_area(&self) -> bool;
+    fn win_enable(&self) -> bool;
+    fn relative_addr(&self) -> bool;
+    fn bg_area(&self) -> bool;
+    fn obj_size(&self) -> u8;
+    fn obj_tall(&self) -> bool;
+    fn obj_enable(&self) -> bool;
+    fn priority(&self) -> bool;
+
+}
+
+impl LCDC for u8 {
+    fn enabled(&self) -> bool {
+        (self & 0x80) != 0
     }
-    pub fn win_area(&self) -> bool {
-        (self.0 & 0x40) != 0
+    fn win_area(&self) -> bool {
+        (self & 0x40) != 0
     }
 
-    pub fn win_enable(&self) -> bool {
-        (self.0 & 0x20) != 0
+    fn win_enable(&self) -> bool {
+        (self & 0x20) != 0
     }
 
-    pub fn relative_addr(&self) -> bool {
-        (self.0 & 0x10) == 0
+    fn relative_addr(&self) -> bool {
+        (self & 0x10) == 0
     }
 
-    pub fn bg_area(&self) -> bool {
-        (self.0 & 0x08) != 0
+    fn bg_area(&self) -> bool {
+        (self & 0x08) != 0
     }
 
-    pub fn obj_size(&self) -> u8 {
-        if (self.0 & 0x4) == 0 { 0x8 } else { 0x10 }
+    fn obj_size(&self) -> u8 {
+        if (self & 0x4) == 0 { 0x8 } else { 0x10 }
     }
 
-    pub fn obj_tall(&self) -> bool {
-        (self.0 & 0x4) != 0
+    fn obj_tall(&self) -> bool {
+        (self & 0x4) != 0
     }
 
-    pub fn obj_enable(&self) -> bool {
-        (self.0 & 0x2) != 0
+    fn obj_enable(&self) -> bool {
+        (self & 0x2) != 0
     }
 
-    pub fn priority(&self) -> bool {
-        (self.0 & 0x1) != 0
+    fn priority(&self) -> bool {
+        (self & 0x1) != 0
     }
 }
 

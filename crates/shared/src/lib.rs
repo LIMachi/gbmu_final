@@ -5,7 +5,6 @@
 
 pub use egui;
 pub use winit;
-use crate::cpu::Opcode;
 
 pub mod events {
     pub use super::winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
@@ -60,9 +59,9 @@ pub trait Ui {
 
     fn new(ctx: &mut <Self as Ui>::Ext) -> Self where Self: Sized;
 
-    fn init(&mut self, ctx: &mut egui::Context, ext: &mut <Self as Ui>::Ext) { }
-    fn draw(&mut self, ctx: &mut egui::Context, ext: &mut <Self as Ui>::Ext) { }
-    fn handle(&mut self, event: &winit::event::Event<Events>, ext: &mut <Self as Ui>::Ext) { }
+    fn init(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) { }
+    fn draw(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) { }
+    fn handle(&mut self, _event: &winit::event::Event<Events>, _ext: &mut <Self as Ui>::Ext) { }
 }
 
 impl Ui for () {

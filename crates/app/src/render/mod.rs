@@ -51,7 +51,7 @@ impl WindowType {
                 .with_min_inner_size(PhysicalSize::new(1200, 860))
                 .with_resizable(false),
             Handle::Game => WindowBuilder::new()
-                .with_title(" ")
+                .with_title("GBMU")
                 .with_min_inner_size(PhysicalSize::new(160, 144))
                 .with_inner_size(PhysicalSize::<u32>::from((640, 576))),
             Handle::Debug => WindowBuilder::new()
@@ -70,7 +70,7 @@ impl WindowType {
             Handle::Main => EguiContext::builder(emu),
             Handle::Game => RawContext::builder(emu),
             Handle::Debug => EguiContext::<Emulator, Ninja<Emulator>>::builder(emu),
-            Handle::Sprites => EguiContext::<Emulator, ppu::render::VramViewer<Emulator>>::builder(emu),
+            Handle::Sprites => EguiContext::<Emulator, ppu::VramViewer<Emulator>>::builder(emu),
             Handle::Settings => EguiContext::builder(emu),
         }
     }

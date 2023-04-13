@@ -144,15 +144,3 @@ impl Hdma {
         tick
     }
 }
-
-impl Device for Hdma {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.stat = bus.io(IO::STAT);
-        self.key0 = bus.io(IO::KEY0);
-        self.src_high = bus.io(IO::HDMA1);
-        self.src_low = bus.io(IO::HDMA2);
-        self.dest_high = bus.io(IO::HDMA3);
-        self.dest_low = bus.io(IO::HDMA4);
-        self.control = bus.io(IO::HDMA5);
-    }
-}

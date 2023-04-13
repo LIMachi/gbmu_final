@@ -96,7 +96,7 @@ impl Bus {
             MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
             st => st
         };
-        let ds = self.io.io(IO::KEY1).bit(7) != 0;
+        let ds = self.io.io_mut(IO::KEY1).bit(7) != 0;
         if clock == 0 || (clock == 2 && ds) { // TODO pull this out of IO
             devices.serial.tick(&mut self.io);
             devices.timer.tick(&mut self.io);
@@ -171,7 +171,7 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn int_reset(&mut self, bit: u8) {
-        self.io.io(IO::IF).reset(bit);
+        self.io.io_mut(IO::IF).reset(bit);
     }
 
     fn int_set(&mut self, bit: u8) {
@@ -179,7 +179,7 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn interrupt(&mut self) -> u8 {
-        (self.io.io(IO::IF).read() & self.ie.read()) & 0x1F
+        (self.io.io_mut(IO::IF).read() & self.ie.read()) & 0x1F
     }
 }
 
@@ -187,7 +187,7 @@ impl IOBus for Bus {
     fn io(&mut self, io: IO) -> &mut IOReg {
         match io {
             IO::IE => &mut self.ie,
-            io => self.io.io(io)
+            io => self.io.io_mut(io)
         }
     }
 
@@ -199,7 +199,7 @@ impl IOBus for Bus {
         self.read(addr)
     }
 
-    fn is_cgb(&mut self) -> bool { self.io.io(IO::CGB).value() != 0 }
+    fn is_cgb(&mut self) -> bool { self.io.io_mut(IO::CGB).value() != 0 }
 
     fn read_with(&self, addr: u16, source: Source) -> u8 {
         match addr {
@@ -249,5 +249,23 @@ impl IOBus for Bus {
 
     fn mbc(&self) -> Box<&dyn MBCController> {
         Box::new(self.mbc.inner())
+    }
+}
+
+impl ppu::VramAccess for Bus {
+    fn vram(&self) -> &Vram {
+        self.vram.inner()
+    }
+
+    fn vram_mut(&mut self) -> &mut Vram {
+        self.vram.inner_mut()
+    }
+
+    fn oam(&self) -> &Oam {
+        self.oam.inner()
+    }
+
+    fn oam_mut(&mut self) -> &mut Oam {
+        self.oam.inner_mut()
     }
 }

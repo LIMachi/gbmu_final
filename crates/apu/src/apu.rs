@@ -80,7 +80,7 @@ impl Apu {
     }
 
     fn power(&mut self, io: &mut IORegs, on: bool) {
-        io.io(IO::NR52).reset_dirty();
+        io.io_mut(IO::NR52).reset_dirty();
         if on != self.on {
             if on {
                 log::info!("APU on");
@@ -105,13 +105,13 @@ impl Apu {
             self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels, regs), *self.settings.volume.as_ref().borrow());
             self.sample -= self.tick;
         }
-        let sound = regs.io(IO::NR52);
+        let sound = regs.io_mut(IO::NR52);
         if sound.dirty() { sound.reset_dirty(); let on = sound.bit(7) != 0; self.power(regs, on); }
         if !self.on { return; }
         for channel in self.channels.iter_mut() {
             channel.clock(regs);
         }
-        if self.fedge.tick(regs.io(IO::DIV).bit(if ds { 5 } else { 4 }) != 0) {
+        if self.fedge.tick(regs.io_mut(IO::DIV).bit(if ds { 5 } else { 4 }) != 0) {
             match self.div_apu {
                 0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length, regs)),
                 2 | 6 => self.channels.iter_mut().for_each(|x| {

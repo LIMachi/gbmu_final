@@ -1,4 +1,4 @@
-use shared::io::{IO, IOReg};
+use shared::io::IO;
 use shared::mem::{Device, IOBus, OAM, Source};
 
 pub struct Dma {

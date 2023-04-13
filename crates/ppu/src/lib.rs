@@ -8,9 +8,9 @@ extern crate core;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use lcd::Lcd;
-use shared::mem::{Device, IOBus, Lock, Mem, PPU};
+use shared::mem::{Device, IOBus, Lock, Mem};
 
-pub mod render;
+mod render;
 mod ppu;
 
 mod dma;
@@ -22,16 +22,19 @@ use mem::{Oam, Vram};
 use shared::emulator::Emulator;
 use shared::io::IORegs;
 
+pub use render::{PpuAccess, VramAccess, VramViewer};
+pub use ppu::Ppu;
+
 pub struct Controller {
-    ppu: ppu::Ppu,
+    ppu: Ppu,
     state: ppu::PpuState,
 }
 
 impl Controller {
     pub fn new() -> Self {
         Self {
-            ppu: ppu::Ppu::new(),
-            state: ppu::Ppu::default_state()
+            ppu: Ppu::new(),
+            state: Ppu::default_state()
         }
     }
 
@@ -40,6 +43,8 @@ impl Controller {
         self.ppu.tick(&mut self.state, io, lcd);
         self.ppu.release();
     }
+
+    pub fn inner(&self) -> &Ppu { &self.ppu }
 }
 
 impl Device for Controller {

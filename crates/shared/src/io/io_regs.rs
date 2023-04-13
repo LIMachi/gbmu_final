@@ -26,22 +26,22 @@ impl IORegs {
     }
 
     pub fn compat_mode(&mut self) {
-        if self.io(IO::KEY0).value() == DMG_MODE {
+        if self.io_mut(IO::KEY0).value() == DMG_MODE {
             log::info!("DMG compatibility mode: enabled");
-            self.io(IO::HDMA5).direct_write(0).set_access(IORegs::DISABLED);
-            self.io(IO::KEY1).direct_write(0).set_access(IORegs::DISABLED);
-            self.io(IO::OCPD).direct_write(0).set_access(IORegs::DISABLED);
-            self.io(IO::BCPD).direct_write(0).set_access(IORegs::DISABLED);
-            self.io(IO::SVBK).direct_write(0).set_access(IORegs::DISABLED);
-            self.io(IO::VBK).direct_write(0).set_access(IORegs::DISABLED);
-            self.io(IO::OPRI).direct_write(0xFF).set_access(IORegs::DISABLED);
+            self.io_mut(IO::HDMA5).direct_write(0).set_access(IORegs::DISABLED);
+            self.io_mut(IO::KEY1).direct_write(0).set_access(IORegs::DISABLED);
+            self.io_mut(IO::OCPD).direct_write(0).set_access(IORegs::DISABLED);
+            self.io_mut(IO::BCPD).direct_write(0).set_access(IORegs::DISABLED);
+            self.io_mut(IO::SVBK).direct_write(0).set_access(IORegs::DISABLED);
+            self.io_mut(IO::VBK).direct_write(0).set_access(IORegs::DISABLED);
+            self.io_mut(IO::OPRI).direct_write(0xFF).set_access(IORegs::DISABLED);
         }
     }
 
     pub fn post(&mut self) {
-        log::info!("compat mode: {:#04X}", self.io(IO::KEY0).value());
-        self.io(IO::POST).set_access(IORegs::DISABLED);
-        self.io(IO::KEY0).set_access(IORegs::DISABLED);
+        log::info!("compat mode: {:#04X}", self.io_mut(IO::KEY0).value());
+        self.io_mut(IO::POST).set_access(IORegs::DISABLED);
+        self.io_mut(IO::KEY0).set_access(IORegs::DISABLED);
     }
 
     pub fn skip_boot(&mut self, console: u8) {
@@ -55,7 +55,12 @@ impl IORegs {
         self.post();
     }
 
-    pub fn io(&mut self, io: IO) -> &mut IOReg {
+    pub fn io(&self, io: IO) -> &IOReg {
+        if io == IO::CGB { return &self.cgb }
+        &self.range[io as u16 as usize - crate::mem::IO as usize]
+    }
+
+    pub fn io_mut(&mut self, io: IO) -> &mut IOReg {
         if io == IO::CGB { return &mut self.cgb }
         &mut self.range[io as u16 as usize - crate::mem::IO as usize]
     }
@@ -65,11 +70,11 @@ impl IORegs {
     }
 
     pub fn int_set(&mut self, bit: u8) {
-        self.io(IO::IF).set(bit);
+        self.io_mut(IO::IF).set(bit);
     }
 
     pub fn int_reset(&mut self, bit: u8) {
-        self.io(IO::IF).reset(bit);
+        self.io_mut(IO::IF).reset(bit);
     }
 
     pub fn writable(&self, io: IO) -> bool {

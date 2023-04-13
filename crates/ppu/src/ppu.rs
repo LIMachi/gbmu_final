@@ -1,23 +1,18 @@
-use std::cell::{Ref, RefCell, RefMut};
-use std::rc::Rc;
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use shared::io::{IO, IORegs, LCDC};
 use shared::mem::{Device, IOBus, *};
-use crate::ppu::registers::Registers;
 
 mod fetcher;
 mod cram;
 mod pixel;
 mod fifo;
-mod registers;
 mod states;
 
 pub(crate) type PpuState = Box<dyn State>;
 
 use states::*;
 use pixel::Pixel;
-use shared::utils::Cell;
 
 pub(crate) struct REdge {
     inner: bool
@@ -48,14 +43,14 @@ pub(crate) struct Scroll {
     pub y: u8
 }
 
-pub(crate) struct Ppu {
+pub struct Ppu {
     pub(crate) dots: usize,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
-    pub(crate) lcdc: LCDC,
+    pub(crate) lcdc: u8,
     pub(crate) oam: Option<&'static mut Lock<Oam>>,
     pub(crate) vram: Option<&'static mut Lock<Vram>>,
 }
@@ -68,7 +63,7 @@ impl Ppu {
             dots: 0,
             cram: cram::CRAM::default(),
             sprites,
-            lcdc: LCDC(0),
+            lcdc: 0,
             win: Default::default(),
             stat: REdge::new(),
             oam: None,
@@ -83,7 +78,7 @@ impl Ppu {
 
     fn set_state(&mut self, regs: &mut IORegs, state: &mut Box<dyn State>, next: Box<dyn State>) {
         let mode = next.mode();
-        let stat = regs.io(IO::STAT);
+        let stat = regs.io_mut(IO::STAT);
         *state = next;
         stat.reset(0);
         stat.reset(1);
@@ -94,7 +89,7 @@ impl Ppu {
         let input = input || (stat.bit(5) != 0 && mode == Mode::Search);
         let input = input || (stat.bit(6) != 0 && stat.bit(2) != 0);
         if self.stat.tick(input) {
-            regs.io(IO::IF).set(1);
+            regs.io_mut(IO::IF).set(1);
         }
 
         match mode {
@@ -118,20 +113,19 @@ impl Ppu {
         self.vram.take();
     }
 
-    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>,
-        io: &mut IORegs, lcd: &mut Lcd) {
+    pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
         self.cram.tick(io);
-        let lcdc = LCDC(io.io(IO::LCDC).read());
+        let lcdc = io.io_mut(IO::LCDC).value();
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
-            io.io(IO::LY).direct_write(0);
+            io.io_mut(IO::LY).direct_write(0);
             self.set_state(io, state, Box::new(HState::last()));
             lcd.disable();
         }
         self.lcdc = lcdc;
         self.dots += 1;
         if self.lcdc.enabled() {
-            if self.regs.ly.read() == self.regs.lyc.read() { self.regs.stat.set(2); } else { self.regs.stat.reset(2); }
+            if io.io(IO::LY).value() == io.io(IO::LYC).value() { io.io(IO::STAT).set(2); } else { io.io(IO::STAT).reset(2); }
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {

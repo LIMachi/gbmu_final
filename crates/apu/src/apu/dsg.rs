@@ -50,7 +50,7 @@ impl DSG {
     }
 
     fn panned(&self, side: Panning, channel: &mut Channel, io: &mut IORegs) -> f32 {
-        let ctrl = io.io(IO::NR51).value();
+        let ctrl = io.io_mut(IO::NR51).value();
         if ctrl & (1 << (side as u8 + channel.channel() as u8)) != 0 {
             channel.output(self.cgb_mode, io)
         } else { 0. }
@@ -70,16 +70,16 @@ impl DSG {
                 }
                 i += 1;
         });
-        if any_dac { self.hpf(io.io(IO::NR50).value()) } else { [0.; 2] }
+        if any_dac { self.hpf(io.io_mut(IO::NR50).value()) } else { [0.; 2] }
     }
 
     pub fn power_on(&mut self, io: &mut IORegs) {
-        io.io(IO::NR51).set_access(IO::NR51.access());
-        io.io(IO::NR50).set_access(IO::NR50.access());
+        io.io_mut(IO::NR51).set_access(IO::NR51.access());
+        io.io_mut(IO::NR50).set_access(IO::NR50.access());
     }
 
     pub fn power_off(&mut self, io: &mut IORegs) {
-        io.io(IO::NR51).direct_write(0).set_access(AccessMode::rdonly());
-        io.io(IO::NR50).direct_write(0).set_access(AccessMode::rdonly());
+        io.io_mut(IO::NR51).direct_write(0).set_access(AccessMode::rdonly());
+        io.io_mut(IO::NR50).direct_write(0).set_access(AccessMode::rdonly());
     }
 }

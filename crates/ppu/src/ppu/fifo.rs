@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
+use shared::io::{IO, IORegs, LCDC};
 use crate::ppu::pixel::Attributes;
 use super::pixel::Pixel;
-use super::Ppu;
 
 pub struct ObjFifo {
     inner: VecDeque<Pixel>,
@@ -60,15 +60,15 @@ impl BgFifo {
         self.disable();
     }
 
-    pub(crate) fn mix(&mut self, oam: &mut ObjFifo, ppu: &mut Ppu) -> Option<Pixel> {
+    pub(crate) fn mix(&mut self, oam: &mut ObjFifo, io: &mut IORegs) -> Option<Pixel> {
         if self.enabled {
-            let cgb = ppu.regs.cgb.read() != 0;
+            let cgb = io.io(IO::CGB).value() != 0;
             let res = match (oam.pop(), self.inner.pop_front()) {
                 (None, Some(bg)) => Some(bg),
                 (Some(oam), Some(bg)) => Some({
                     if oam.color == 0x0 { bg }
                     else if !cgb && oam.attrs.priority() && bg.color != 0 { bg }
-                    else if cgb && ppu.lcdc.priority() && bg.color != 0 && (oam.attrs.priority() || bg.attrs.priority()) { bg }
+                    else if cgb && io.io(IO::LCDC).value().priority() && bg.color != 0 && (oam.attrs.priority() || bg.attrs.priority()) { bg }
                     else { oam }
                 }),
                 (_, None) => unreachable!()

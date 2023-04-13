@@ -1,7 +1,5 @@
-use std::cell::{RefCell};
 use std::collections::HashSet;
 use std::hash::Hash;
-use std::rc::Rc;
 use super::{Mem, Device, IOBus};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

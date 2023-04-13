@@ -1,6 +1,4 @@
-use std::borrow::{Borrow};
 use std::net::Ipv4Addr;
-use std::ops::DerefMut;
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use apu::Controller;

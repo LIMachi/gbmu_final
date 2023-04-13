@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::ops::Range;
 use egui_extras::{Column, TableBuilder};
-use shared::breakpoints::{Breakpoint, Breakpoints};
+use shared::breakpoints::Breakpoint;
 use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
 use shared::egui::{Align, Color32, Rounding, Ui, Vec2};
 use shared::mem::*;
-use crate::Emulator;
+use crate::{Debugger, Emulator};
 
 #[derive(Clone)]
 pub struct Op {
@@ -36,10 +36,6 @@ impl Op {
             range[0..sz].to_vec()
         })
     }
-
-    // pub fn is_call(&self) -> bool {
-    //     self.instruction.contains("CALL") || self.instruction.contains("RST")
-    // }
 
     pub fn is_jmp(&self) -> bool {
         self.instruction.contains("JR") || self.instruction.contains("JP") || self.instruction.contains("RET")
@@ -230,7 +226,7 @@ impl<E: Emulator> Disassembly<E> {
         self.ranges.iter_mut().for_each(|x| x.reload());
     }
 
-    pub fn render(&mut self, emu: &E, ui: &mut Ui, breakpoints: &Breakpoints) {
+    pub fn render(&mut self, emu: &mut E, ui: &mut Ui) {
         let pc = emu.cpu_register(Reg::PC).u16();
         self.ranges.iter_mut().for_each(|x| { x.update(emu); });
         let cursor = match self.cursor {
@@ -297,8 +293,7 @@ impl<E: Emulator> Disassembly<E> {
                         ui.label(egui::RichText::new(code));
                     }).1).context_menu(|ui| {
                         if ui.button("Run to cursor").clicked() {
-                            breakpoints.schedule(Breakpoint::address(addr + op.offset).once());
-                            emu.play();
+                            emu.run_to(self, addr + op.offset);
                         }
                     }).hovered() {
                         hover = Some(index);

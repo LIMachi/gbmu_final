@@ -126,36 +126,36 @@ impl Channel {
     pub fn noise() -> Self { Self::new(NoiseChannel::new()) }
 
     pub fn power_on(&mut self, io: &mut IORegs) {
-        io.io(self.nr1).set_access(self.nr1.access());
-        io.io(self.nr2).set_access(self.nr2.access());
-        io.io(self.nr3).set_access(self.nr3.access());
-        io.io(self.nr4).set_access(self.nr4.access());
+        io.io_mut(self.nr1).set_access(self.nr1.access());
+        io.io_mut(self.nr2).set_access(self.nr2.access());
+        io.io_mut(self.nr3).set_access(self.nr3.access());
+        io.io_mut(self.nr4).set_access(self.nr4.access());
         self.inner.power_on(io);
     }
 
     pub fn power_off(&mut self, io: &mut IORegs) {
-       io.io(self.nr1).direct_write(0).set_access(AccessMode::rdonly()); //FIXME: DMG allow length modification!
-       io.io(self.nr2).direct_write(0).set_access(AccessMode::rdonly());
-       io.io(self.nr3).direct_write(0).set_access(AccessMode::rdonly());
-       io.io(self.nr4).direct_write(0).set_access(AccessMode::rdonly());
+       io.io_mut(self.nr1).direct_write(0).set_access(AccessMode::rdonly()); //FIXME: DMG allow length modification!
+       io.io_mut(self.nr2).direct_write(0).set_access(AccessMode::rdonly());
+       io.io_mut(self.nr3).direct_write(0).set_access(AccessMode::rdonly());
+       io.io_mut(self.nr4).direct_write(0).set_access(AccessMode::rdonly());
         self.inner.power_off(io);
     }
 
     pub fn enable(&mut self, io: &mut IORegs) {
         self.enabled = true;
-        io.io(IO::NR52).set(self.inner.channel() as u8);
+        io.io_mut(IO::NR52).set(self.inner.channel() as u8);
         self.inner.on_enable(io);
     }
 
     pub fn disable(&mut self, io: &mut IORegs) {
         self.enabled = false;
-        io.io(IO::NR52).reset(self.inner.channel() as u8);
+        io.io_mut(IO::NR52).reset(self.inner.channel() as u8);
         self.inner.on_disable(io);
     }
 
     pub fn event(&mut self, event: Event, io: &mut IORegs) {
         match event {
-            Event::Length if io.io(self.nr4).bit(6) != 0 && self.length_timer != 0 => {
+            Event::Length if io.io_mut(self.nr4).bit(6) != 0 && self.length_timer != 0 => {
                 self.length_timer -= 1;
                 if self.length_timer == 0 { self.enabled = false; }
             },
@@ -174,9 +174,9 @@ impl Channel {
         let out = if self.enabled { self.inner.output(io) } else { 0 };
         if cgb {
             let n = (self.inner.channel() as u8) & 1;
-            let t = io.io(self.pcm).value() & (0xF0 >> (4 * n));
+            let t = io.io_mut(self.pcm).value() & (0xF0 >> (4 * n));
             let p = t | ((out & 0xF) << (4 * n));
-            io.io(self.pcm).direct_write(p);
+            io.io_mut(self.pcm).direct_write(p);
         }
         self.dac.tick(if self.dac_enabled(io) { Some(1. - out as f32 / 7.5) } else { None })
     }
@@ -187,12 +187,12 @@ impl Channel {
     }
 
     pub fn clock(&mut self, io: &mut IORegs) {
-        let nr4 = io.io(self.nr4);
+        let nr4 = io.io_mut(self.nr4);
         if nr4.dirty() {
             nr4.reset_dirty();
             if nr4.bit(7) != 0 { self.trigger(io); }
         }
-        let nr1 = io.io(self.nr1);
+        let nr1 = io.io_mut(self.nr1);
         if nr1.dirty() {
             nr1.reset_dirty();
             self.reload_length(nr1.value());
@@ -204,7 +204,7 @@ impl Channel {
     pub fn trigger(&mut self, io: &mut IORegs) -> bool {
         self.enable(io);
         if self.inner.trigger(io) { self.disable(io); }
-        self.reload_length(io.io(self.nr1).value());
+        self.reload_length(io.io_mut(self.nr1).value());
         false
     }
 }

@@ -1,25 +1,23 @@
-use std::cell::{RefCell, RefMut};
 use std::fmt::Formatter;
-use std::rc::Rc;
 use serde::{Serialize, Deserialize};
 use crate::{
     value,
     cpu::{Cpu, Op, Opcode, Reg},
-    utils::{Cell, convert::Converter}
+    utils::{convert::Converter}
 };
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Breakpoints {
-    breakpoints: Rc<RefCell<Vec<Breakpoint>>>
+    breakpoints: Vec<Breakpoint>
 }
 
 impl Breakpoints {
     pub fn new(breaks: Vec<Breakpoint>) -> Self {
-        Self { breakpoints: breaks.cell() }
+        Self { breakpoints: breaks }
     }
 
-    pub fn take(&self) -> Vec<Breakpoint> {
-        self.breakpoints.as_ref().take()
+    pub fn take(&mut self) -> Vec<Breakpoint> {
+        std::mem::take(&mut self.breakpoints)
     }
 }
 
@@ -214,10 +212,9 @@ impl Breakpoint {
 }
 
 impl Breakpoints {
-    pub fn tick(&self, cpu: &impl Cpu, last: Option<Op>) -> bool {
-        let mut breakpoints = self.breakpoints.as_ref().borrow_mut();
+    pub fn tick(&mut self, cpu: &impl Cpu, last: Option<Op>) -> bool {
         let mut stop = false;
-        breakpoints.drain_filter(|bp| {
+        self.breakpoints.drain_filter(|bp| {
             let (once, res) = bp.tick(cpu, last);
             stop |= res;
             once && res
@@ -225,19 +222,16 @@ impl Breakpoints {
         !stop
     }
 
-    pub fn bp_mut(&self) -> RefMut<Vec<Breakpoint>> {
-        self.breakpoints.as_ref().borrow_mut()
+    pub fn bp_mut(&mut self) -> &mut Vec<Breakpoint> { &mut self.breakpoints }
+
+    pub fn pause(&mut self) {
+        self.breakpoints.push(Breakpoint::pause());
+    }
+    pub fn step(&mut self) {
+        self.breakpoints.push(Breakpoint::step());
     }
 
-    pub fn pause(&self) {
-        self.breakpoints.as_ref().borrow_mut().push(Breakpoint::pause());
-    }
-    pub fn step(&self) {
-        self.breakpoints.as_ref().borrow_mut().push(Breakpoint::step());
-    }
-
-    pub fn schedule(&self, bp: Breakpoint) {
-        self.breakpoints.as_ref().borrow_mut().push(bp);
+    pub fn schedule(&mut self, bp: Breakpoint) {
+        self.breakpoints.push(bp);
     }
 }
-use crate::utils::convert;

@@ -16,12 +16,12 @@ impl<E: ReadAccess + Schedule> Emulator for E { }
 impl<B: cpu::Bus + IOBus> Bus for B { }
 
 pub trait Schedule {
-    fn breakpoints(&self) -> Breakpoints;
-    fn play(&self);
+    fn breakpoints(&mut self) -> &mut Breakpoints;
+    fn play(&mut self);
     fn reset(&self);
 
     fn speed(&self) -> i32;
-    fn set_speed(&self, speed: i32);
+    fn set_speed(&mut self, speed: i32);
 }
 
 pub trait ReadAccess {

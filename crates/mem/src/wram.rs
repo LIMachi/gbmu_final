@@ -1,4 +1,3 @@
-use shared::io::{IO, IOReg};
 use shared::mem::*;
 
 const BANK_SIZE: usize = 0x1000;

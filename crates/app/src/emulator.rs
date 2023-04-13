@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use serde::{Deserialize, Serialize};
@@ -166,7 +165,13 @@ impl Render for Screen {
 
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator) {
         match event {
-            Event::UserEvent(Events::Play(rom)) => { self.insert(rom.clone(), true); },
+            Event::UserEvent(Events::Play(rom)) => {
+                self.insert(rom.clone(), true);
+                if let Some(raw) = &rom.raw {
+                    window.set_window_icon(raw.icon());
+                }
+                window.set_title(self.emu.as_ref().borrow().name());
+            },
             Event::UserEvent(Events::Reload) => { Render::init(self, window); },
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
                 if event == &WindowEvent::CloseRequested { self.stop(); }
@@ -202,12 +207,14 @@ impl dbg::ReadAccess for Emulator {
 }
 
 impl dbg::Schedule for Emulator {
-    fn breakpoints(&self) -> Breakpoints {
-        self.breakpoints.clone()
-    }
+    fn breakpoints(&mut self) -> &mut Breakpoints { &mut self.breakpoints }
 
     fn play(&mut self) {
         self.console.running = true;
+    }
+
+    fn pause(&mut self) {
+        self.breakpoints().pause();
     }
 
     fn reset(&self) {
@@ -258,6 +265,10 @@ impl Console {
         if !self.running { return }
         self.bus.tick(&mut self.gb, clock, bp);
     }
+
+    pub fn name(&self) -> &str {
+        self.rom.as_ref().map(|x| x.header.title.as_ref()).unwrap_or("GBMU")
+    }
 }
 
 impl BusWrapper for Console {
@@ -265,9 +276,9 @@ impl BusWrapper for Console {
     fn mbc(&self) -> Box<&dyn MBCController> { self.bus.mbc() }
 }
 
-impl ppu::render::MemAccess for Emulator {
+impl ppu::VramAccess for Emulator {
     fn vram(&self) -> &Vram {
-        self.console.bus.
+        self.console.bus
     }
 
     fn vram_mut(&mut self) -> &mut Vram {
@@ -280,5 +291,11 @@ impl ppu::render::MemAccess for Emulator {
 
     fn oam_mut(&mut self) -> &mut Oam {
         todo!()
+    }
+}
+
+impl ppu::PpuAccess for Emulator {
+    fn ppu(&self) -> &ppu::Ppu {
+        self.console.gb.ppu.inner()
     }
 }
