@@ -1,5 +1,4 @@
-use shared::io::{IO, IOReg, IORegs};
-use shared::mem::{Device, IOBus};
+use shared::io::{IO, IORegs};
 use shared::utils::FEdge;
 
 #[derive(Default)]
@@ -39,26 +38,17 @@ impl Timer {
             _ => unreachable!()
         } & 0x1) !=0;
         let (mut tima, mut c) = self.tima_inner.overflowing_add(self.tima_fedge.tick(edge) as u8);
+        let tma = io.io(IO::TMA).value();
         let io_tima = io.io_mut(IO::TIMA);
         if io_tima.dirty() {
             c = false;
             tima = io_tima.value();
             io_tima.reset_dirty();
         }
-        if self.tima_overflow { tima = io.io_mut(IO::TMA).value() };
+        if self.tima_overflow { tima = tma };
         io_tima.direct_write(tima);
-        if self.tima_overflow { io.io_mut(IO::IF).set(2); }
+        if self.tima_overflow { io.int_set(2); }
         self.tima_overflow = c;
         self.tima_inner = tima;
-    }
-}
-
-impl Device for Timer {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        // self.div = bus.io(IO::DIV);
-        // self.tma = bus.io(IO::TMA);
-        // self.tima = bus.io(IO::TIMA);
-        // self.tac = bus.io(IO::TAC);
-        // self.int_flags = bus.io(IO::IF);
     }
 }

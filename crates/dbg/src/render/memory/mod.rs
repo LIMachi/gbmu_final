@@ -120,7 +120,7 @@ impl Viewer {
             .max(ui.text_style_height(&self.options.text_style))
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, emu: &dyn Emulator) {
+    pub fn render(&mut self, ui: &mut egui::Ui, emu: &mut dyn Emulator) {
         egui::Frame::group(ui.style())
             .fill(DARK_BLACK)
             .show(ui, |ui| {

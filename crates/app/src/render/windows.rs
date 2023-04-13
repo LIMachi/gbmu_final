@@ -41,9 +41,9 @@ impl Windows {
         self.handles.contains_key(&handle)
     }
 
-    pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow) {
+    pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow, emu: &mut Emulator) {
         for (_, win) in &mut self.windows {
-            win.handle(event);
+            win.handle(event, emu);
         }
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, window_id }  => {
@@ -58,10 +58,10 @@ impl Windows {
                 }
             },
             Event::WindowEvent { event: WindowEvent::Resized(sz), window_id } => {
-                self.windows.get_mut(&window_id).unwrap().resize(*sz);
+                self.windows.get_mut(&window_id).unwrap().resize(*sz, emu);
             },
             Event::RedrawRequested(id) => {
-                self.windows.get_mut(&id).unwrap().redraw();
+                self.windows.get_mut(&id).unwrap().redraw(emu);
             },
             _ => {}
         }

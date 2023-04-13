@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Vec2, Widget};
 use shared::rom::Rom;
 use shared::utils::image::ImageLoader;
@@ -13,6 +13,7 @@ use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoint;
 use shared::input::Keybindings;
+use crate::emulator::Emulator;
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
@@ -68,22 +69,18 @@ impl AppConfig {
 }
 
 pub struct Menu {
-    proxy: Proxy,
     textures: HashMap<Texture, TextureHandle>,
     roms: HashMap<String, Rom>,
-    conf: Rc<RefCell<RomConfig>>,
     sender: Sender<(String, Rom)>,
     receiver: Receiver<(String, Rom)>
 }
 
-impl Clone for Menu {
-    fn clone(&self) -> Self {
-        let (sender, receiver) = std::sync::mpsc::channel();
+impl Default for Menu {
+    fn default() -> Self {
+        let (sender, receiver) = channel();
         Self {
-            proxy: self.proxy.clone(),
-            textures: self.textures.clone(),
-            roms: self.roms.clone(),
-            conf: self.conf.clone(),
+            textures: HashMap::with_capacity(512),
+            roms: HashMap::with_capacity(512),
             sender,
             receiver
         }
@@ -91,7 +88,6 @@ impl Clone for Menu {
 }
 
 impl Menu {
-
     fn search(&self, path: &String) {
         let sender = self.sender.clone();
         let walk = walkdir::WalkDir::new(path);
@@ -116,22 +112,8 @@ impl Menu {
         });
     }
 
-    // TODO take conf as param (let App do the conf loading)
-    pub fn new(conf: Rc<RefCell<RomConfig>>, proxy: Proxy) -> Self {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        Self {
-            proxy,
-            textures: Default::default(),
-            roms: Default::default(),
-            conf,
-            sender,
-            receiver
-        }
-    }
-
-    pub fn add_path<P: AsRef<Path>>(&mut self, path: P) {
+    pub fn add_path<P: AsRef<Path>>(&mut self, conf: &mut RomConfig, path: P) {
         if let Some(path) = path.as_ref().to_str().map(|x| x.to_string()) {
-            let mut conf = self.conf.as_ref().borrow_mut();
             if conf.paths.contains(&path) { return }
             self.search(&path);
             conf.paths.push(path);
@@ -214,18 +196,20 @@ impl<'a> RomView<'a> {
 }
 
 impl shared::Ui for Menu {
-    fn init(&mut self, ctx: &mut Context) {
+    type Ext = Emulator;
+
+    fn init(&mut self, ctx: &mut Context, emu: &mut Emulator) {
         self.textures.insert(Texture::Add, ctx.load_svg::<40, 40>("add", "assets/icons/add.svg"));
         self.textures.insert(Texture::Debug, ctx.load_svg::<40, 40>("debug", "assets/icons/debug.svg"));
         self.textures.insert(Texture::Settings, ctx.load_svg::<40, 40>("settings", "assets/icons/settings.svg"));
         self.textures.insert(Texture::Spritesheet, ctx.load_svg::<40, 40>("spritesheet", "assets/icons/palette.svg"));
-        for path in &self.conf.as_ref().borrow().paths {
+        for path in &emu.roms.paths {
             self.search(path);
             println!("looking at path {path}");
         }
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
+    fn draw(&mut self, ctx: &mut Context, emu: &mut Emulator) {
         while let Ok((path, mut rom)) = self.receiver.try_recv() {
             println!("found rom {:?} at {}", rom.header, path);
             if !self.roms.contains_key(&path) {
@@ -250,14 +234,14 @@ impl shared::Ui for Menu {
                     l.with_layout(Layout::default(), |ui| {
                         if ui.add(add).clicked() {
                             if let Some(file) = rfd::FileDialog::new().set_directory("/").pick_folder() {
-                                self.add_path(file);
+                                self.add_path(&mut emu.roms, file);
                             }
                         }
                     });
                     r.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        if ui.add(debug).clicked() { self.proxy.send_event(Events::Open(Handle::Debug)).ok(); };
-                        if ui.add(spritesheet).clicked() { self.proxy.send_event(Events::Open(Handle::Sprites)).ok(); };
-                        if ui.add(setting).clicked() { self.proxy.send_event(Events::Open(Handle::Settings)).ok(); };
+                        if ui.add(debug).clicked() { emu.proxy.send_event(Events::Open(Handle::Debug)).ok(); };
+                        if ui.add(spritesheet).clicked() { emu.proxy.send_event(Events::Open(Handle::Sprites)).ok(); };
+                        if ui.add(setting).clicked() { emu.proxy.send_event(Events::Open(Handle::Settings)).ok(); };
                     });
                 })
             });
@@ -273,7 +257,7 @@ impl shared::Ui for Menu {
                                 if n as f32 * (ROM_GRID + ui.spacing().item_spacing.x * 2.) + ui.spacing().scroll_bar_width + ui.spacing().scroll_bar_outer_margin > w { ui.end_row(); n = 1; }
                                 if ui.add(RomView::new(rom, &self.textures)).clicked() {
                                     // TODO defer full loading of rom to this point and just lazily fill the header during rom discovery
-                                    self.proxy.send_event(Events::Play(rom.clone())).ok();
+                                    emu.proxy.send_event(Events::Play(rom.clone())).ok();
                                 }
                                 n += 1;
                             }

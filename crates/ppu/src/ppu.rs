@@ -1,7 +1,7 @@
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use shared::io::{IO, IORegs, LCDC};
-use shared::mem::{Device, IOBus, *};
+use shared::mem::*;
 
 mod fetcher;
 mod cram;
@@ -71,10 +71,10 @@ impl Ppu {
         }
     }
 
-    pub(crate) fn oam(&self) -> &Lock<Oam> { self.oam.unwrap() }
-    pub(crate) fn vram(&self) -> &Lock<Vram> { self.vram.unwrap() }
-    pub(crate) fn oam_mut(&self) -> &mut Lock<Oam> { self.oam.unwrap() }
-    pub(crate) fn vram_mut(&self) -> &mut Lock<Vram> { self.vram.unwrap() }
+    pub(crate) fn oam(&self) -> &Lock<Oam> { self.oam.as_ref().unwrap() }
+    pub(crate) fn vram(&self) -> &Lock<Vram> { self.vram.as_ref().unwrap() }
+    pub(crate) fn oam_mut(&mut self) -> &mut Lock<Oam> { self.oam.as_mut().unwrap() }
+    pub(crate) fn vram_mut(&mut self) -> &mut Lock<Vram> { self.vram.as_mut().unwrap() }
 
     fn set_state(&mut self, regs: &mut IORegs, state: &mut Box<dyn State>, next: Box<dyn State>) {
         let mode = next.mode();
@@ -103,11 +103,15 @@ impl Ppu {
         };
     }
 
-    pub(crate) fn claim(&mut self, oam: &mut Lock<Oam>, vram: &mut Lock<Vram>) {
+    /// safety guarantee: we will never hold oam/ vram longer than 'a
+    pub(crate) fn claim<'a>(&mut self, oam: &'a mut Lock<Oam>, vram: &'a mut Lock<Vram>) {
+        let oam = unsafe { std::mem::transmute::<&'a mut Lock<Oam>, &'static mut Lock<Oam>>(oam) };
+        let vram = unsafe { std::mem::transmute::<&'a mut Lock<Vram>, &'static mut Lock<Vram>>(vram) };
         self.oam = Some(oam);
         self.vram = Some(vram);
     }
 
+    /// safety guarantee: after self.claim<'a>, you must call this before exiting 'a scope.
     pub(crate) fn release(&mut self) {
         self.oam.take();
         self.vram.take();
@@ -125,7 +129,11 @@ impl Ppu {
         self.lcdc = lcdc;
         self.dots += 1;
         if self.lcdc.enabled() {
-            if io.io(IO::LY).value() == io.io(IO::LYC).value() { io.io(IO::STAT).set(2); } else { io.io(IO::STAT).reset(2); }
+            if io.io(IO::LY).value() == io.io(IO::LYC).value() {
+                io.io_mut(IO::STAT).set(2);
+            } else {
+                io.io_mut(IO::STAT).reset(2);
+            }
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
@@ -147,11 +155,5 @@ impl Ppu {
         lcd.set(lx, ly, self.cram.color(pixel, io));
     }
 
-    pub fn default_state() -> PpuState { VState::new().boxed() }
-}
-
-impl Device for Ppu {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.cram.configure(bus);
-    }
+    pub(crate) fn default_state() -> PpuState { VState::new().boxed() }
 }

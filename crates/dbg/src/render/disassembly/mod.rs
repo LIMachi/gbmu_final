@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Range;
 use egui_extras::{Column, TableBuilder};
-use shared::breakpoints::Breakpoint;
 use shared::cpu::{dbg, Opcode, Reg};
 use shared::egui;
 use shared::egui::{Align, Color32, Rounding, Ui, Vec2};
@@ -244,63 +243,67 @@ impl<E: Emulator> Disassembly<E> {
             table = table.scroll_to_row(row, Some(Align::Center));
         }
         table.header(20., |mut header| {
-                header.col(|ui| {
-                    ui.strong(egui::RichText::new("Address").color(Color32::GOLD));
-                });
-                header.col(|ui| {
-                    ui.strong(egui::RichText::new("Instruction").color(Color32::GOLD));
-                });
-                header.col(|ui| {
-                    ui.strong(egui::RichText::new("Parameters").color(Color32::GOLD));
-                });
-            })
-            .body(|body| {
-            let lines = self.lines();
-            let mut hover = None;
-            body.rows(30., lines, |index, mut row| {
-                let mut st = index;
-                if let Some(current) = self.ranges.iter_mut()
-                    .fold(None, |res, current| {
-                        match res {
-                            None if st < current.count() => Some(current),
-                            None => {
-                                st -= current.count();
-                                None
-                            },
-                            v => v
-                        }
-                    }) {
-                    let addr = current.range().start;
-                    let op = &current.ops().ops[st];
-                    if (row.col(|ui| {
-                        let rect = ui.available_rect_before_wrap().expand2(Vec2::new(8., 0.));
-                        if Some(index) == self.hover {  ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::from_white_alpha(20)) }
-                        else if index == cursor { ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::DARK_GREEN); }
-                        ui.label(egui::RichText::new(format!("{:#06X}", addr + op.offset)));
-                    }).1 | row.col(|ui| {
-                        let mut rect = ui.available_rect_before_wrap();
-                        rect.max.x += 8.;
-                        if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
-                        else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
-                        ui.label(egui::RichText::new(&op.instruction));
-                    }).1 | row.col(|ui| {
-                        let mut rect = ui.available_rect_before_wrap();
-                        rect.max.x += 8.;
-                        if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
-                        else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
-                        let mut code = String::new();
-                        for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
-                        ui.label(egui::RichText::new(code));
-                    }).1).context_menu(|ui| {
-                        if ui.button("Run to cursor").clicked() {
-                            emu.run_to(self, addr + op.offset);
-                        }
-                    }).hovered() {
-                        hover = Some(index);
-                    };
-                }
+            header.col(|ui| {
+                ui.strong(egui::RichText::new("Address").color(Color32::GOLD));
             });
-            self.hover = hover;
-        });
+            header.col(|ui| {
+                ui.strong(egui::RichText::new("Instruction").color(Color32::GOLD));
+            });
+            header.col(|ui| {
+                ui.strong(egui::RichText::new("Parameters").color(Color32::GOLD));
+            });
+        })
+            .body(|body| {
+                let lines = self.lines();
+                let mut hover = None;
+                let mut run_to = None;
+                body.rows(30., lines, |index, mut row| {
+                    let mut st = index;
+                    if let Some(current) = self.ranges.iter_mut()
+                        .fold(None, |res, current| {
+                            match res {
+                                None if st < current.count() => Some(current),
+                                None => {
+                                    st -= current.count();
+                                    None
+                                },
+                                v => v
+                            }
+                        }) {
+                        let addr = current.range().start;
+                        let op = &current.ops().ops[st];
+                        if (row.col(|ui| {
+                            let rect = ui.available_rect_before_wrap().expand2(Vec2::new(8., 0.));
+                            if Some(index) == self.hover {  ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::from_white_alpha(20)) }
+                            else if index == cursor { ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::DARK_GREEN); }
+                            ui.label(egui::RichText::new(format!("{:#06X}", addr + op.offset)));
+                        }).1 | row.col(|ui| {
+                            let mut rect = ui.available_rect_before_wrap();
+                            rect.max.x += 8.;
+                            if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
+                            else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
+                            ui.label(egui::RichText::new(&op.instruction));
+                        }).1 | row.col(|ui| {
+                            let mut rect = ui.available_rect_before_wrap();
+                            rect.max.x += 8.;
+                            if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
+                            else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
+                            let mut code = String::new();
+                            for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
+                            ui.label(egui::RichText::new(code));
+                        }).1).context_menu(|ui| {
+                            if ui.button("Run to cursor").clicked() {
+                                run_to = Some(addr + op.offset);
+                            }
+                        }).hovered() {
+                            hover = Some(index);
+                        };
+                    }
+                });
+                if let Some(addr) = run_to {
+                    emu.run_to(self, addr);
+                }
+                self.hover = hover;
+            });
     }
 }

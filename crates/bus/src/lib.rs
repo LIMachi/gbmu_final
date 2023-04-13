@@ -4,7 +4,6 @@ use mem::{Hram, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::breakpoints::Breakpoints;
 use shared::io::{IO, IOReg, IORegs};
-use shared::utils::Cell;
 
 mod timer;
 mod devices;
@@ -46,9 +45,9 @@ impl Bus {
         }
     }
 
-    pub fn with_mbc<C: MBCController + 'static>(mut self, mut controller: C) -> Self {
+    pub fn with_mbc(mut self, mut controller: mem::mbc::Controller) -> Self {
         controller.configure(&mut self);
-        self.mbc = controller;
+        self.mbc = controller.locked();
         self
     }
 
@@ -78,13 +77,13 @@ impl Bus {
         self.last.take()
     }
 
-    pub fn tick(&mut self, devices: &mut devices::Devices, clock: u8, bp: &Breakpoints) -> bool {
+    pub fn tick(&mut self, devices: &mut devices::Devices, clock: u8, bp: &mut Breakpoints) -> bool {
         if self.clock == 127 {
-            self.mbc.as_ref().borrow_mut().tick();
+            self.mbc.inner_mut().tick();
             self.clock = 0;
         } else { self.clock += 1; }
         devices.joy.tick(&mut self.io);
-        let tick = devices.hdma.tick(&mut self);
+        let tick = devices.hdma.tick(self);
 
         self.last = None;
         self.status = match self.status {
@@ -100,13 +99,13 @@ impl Bus {
         if clock == 0 || (clock == 2 && ds) { // TODO pull this out of IO
             devices.serial.tick(&mut self.io);
             devices.timer.tick(&mut self.io);
-            devices.dma.tick(&mut self);
-            if !tick { devices.cpu.cycle(&mut self); }
+            devices.dma.tick(self);
+            if !tick { devices.cpu.cycle(self); }
         }
-        devices.ppu.tick(&mut self.io, &mut self.vram, &mut self.oam, &mut devices.lcd);
+        devices.ppu.tick(&mut self.io, &mut self.oam, &mut self.vram, &mut devices.lcd);
         devices.apu.tick(&mut self.io, ds);
         let bp = bp.tick(&devices.cpu, self.last());
-        self.cpu.reset_finished();
+        devices.cpu.reset_finished();
         bp
     }
 }
@@ -149,7 +148,7 @@ impl shared::cpu::Bus for Bus {
         };
         match addr {
             0xFF50 if self.io.writable(IO::POST) => {
-                self.mbc.post();
+                self.mbc.inner_mut().post();
                 self.io.post();
             },
             0xFF4C if self.io.writable(IO::KEY0) => {
@@ -175,7 +174,7 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn int_set(&mut self, bit: u8) {
-        sef.io.int_set(bit);
+        self.io.int_set(bit);
     }
 
     fn interrupt(&mut self) -> u8 {
@@ -184,10 +183,17 @@ impl shared::cpu::Bus for Bus {
 }
 
 impl IOBus for Bus {
-    fn io(&mut self, io: IO) -> &mut IOReg {
+    fn io_mut(&mut self, io: IO) -> &mut IOReg {
         match io {
             IO::IE => &mut self.ie,
             io => self.io.io_mut(io)
+        }
+    }
+
+    fn io(&self, io: IO) -> &IOReg {
+        match io {
+            IO::IE => &self.ie,
+            io => self.io.io(io)
         }
     }
 
@@ -199,7 +205,7 @@ impl IOBus for Bus {
         self.read(addr)
     }
 
-    fn is_cgb(&mut self) -> bool { self.io.io_mut(IO::CGB).value() != 0 }
+    fn is_cgb(&self) -> bool { self.io.io(IO::CGB).value() != 0 }
 
     fn read_with(&self, addr: u16, source: Source) -> u8 {
         match addr {
@@ -219,10 +225,10 @@ impl IOBus for Bus {
 
     fn write_with(&mut self, addr: u16, value: u8, source: Source) {
         match addr {
-            ROM..=ROM_END => self.rom.write_with(addr - ROM, value, addr, source),
-            SROM..=SROM_END => self.srom.write_with(addr - SROM, value, addr, source),
+            ROM..=ROM_END => self.mbc.write_with(addr - ROM, value, addr, source),
+            SROM..=SROM_END => self.mbc.write_with(addr - SROM, value, addr, source),
             VRAM..=VRAM_END => self.vram.write_with(addr - VRAM, value, addr, source),
-            SRAM..=SRAM_END => self.sram.write_with(addr - SRAM, value, addr, source),
+            SRAM..=SRAM_END => self.mbc.write_with(addr - SRAM, value, addr, source),
             RAM..=RAM_END => self.ram.write_with(addr - RAM, value, addr, source),
             ECHO..=ECHO_END => self.ram.write_with(addr - ECHO, value, addr, source),
             OAM..=OAM_END => self.oam.write_with(addr - OAM, value, addr, source),

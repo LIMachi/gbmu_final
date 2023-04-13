@@ -1,32 +1,15 @@
 use shared::io::{CGB_MODE, IO, IORegs};
-use shared::mem::{Device, IOBus};
 
 pub struct CRAM {
-    // obp0: IOReg,
-    // obp1: IOReg,
-    // bgp: IOReg,
-    // bcps: IOReg,
-    // bcpd: IOReg,
-    // ocps: IOReg,
-    // ocpd: IOReg,
     bgdata: [u8; 64],
     objdata: [u8; 64],
-    // pub key0: IOReg,
 }
 
 impl Default for CRAM {
     fn default() -> Self {
         Self {
-            // obp0: Default::default(),
-            // obp1: Default::default(),
-            // bgp: Default::default(),
-            // bcps: Default::default(),
-            // bcpd: Default::default(),
-            // ocps: Default::default(),
-            // ocpd: Default::default(),
             bgdata: [0xFF; 64],
             objdata: [0; 64],
-            // key0: Default::default()
         }
     }
 }
@@ -75,33 +58,22 @@ impl CRAM {
         let bcpd = io.io_mut(IO::BCPD);
         if bcpd.dirty() {
             bcpd.reset_dirty();
+            let color = bcpd.value();
             let bcps = io.io_mut(IO::BCPS);
             let inc = bcps.bit(7) != 0;
             let addr = bcps.value() & 0x3F;
             if inc { bcps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
-            self.bgdata[addr as usize] = bcpd.value();
+            self.bgdata[addr as usize] = color;
         }
         let ocpd = io.io_mut(IO::OCPD);
         if ocpd.dirty() {
             ocpd.reset_dirty();
+            let color = ocpd.value();
             let ocps = io.io_mut(IO::OCPS);
             let inc = ocps.bit(7) != 0;
             let addr = ocps.value() & 0x3F;
             if inc { ocps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
-            self.objdata[addr as usize] = ocpd.value();
+            self.objdata[addr as usize] = color;
         }
-    }
-}
-
-impl Device for CRAM {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        // self.obp0 = bus.io(IO::OBP0);
-        // self.obp1 = bus.io(IO::OBP1);
-        // self.bgp = bus.io(IO::BGP);
-        // self.bcps = bus.io(IO::BCPS);
-        // self.bcpd = bus.io(IO::BCPD);
-        // self.ocps = bus.io(IO::OCPS);
-        // self.ocpd = bus.io(IO::OCPD);
-        // self.key0 = bus.io(IO::KEY0);
     }
 }

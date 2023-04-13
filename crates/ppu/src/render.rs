@@ -18,6 +18,18 @@ pub struct VramViewer<E> {
     emu: PhantomData<E>
 }
 
+impl<E> Default for VramViewer<E> {
+    fn default() -> Self {
+        VramViewer {
+            tab: Tabs::Oam,
+            storage: Default::default(),
+            init: false,
+            emu: Default::default(),
+            bg_data: None
+        }
+    }
+}
+
 pub trait VramAccess {
     fn vram(&self) -> &Vram;
     fn vram_mut(&mut self) -> &mut Vram;
@@ -33,7 +45,7 @@ pub trait PpuAccess: VramAccess {
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-enum Textures {
+pub(crate) enum Textures {
     None,
     Blank,
     Placeholder,
@@ -98,33 +110,23 @@ impl tabs::Tab for Tabs {
 
 impl<E: Emulator> VramViewer<E> {
 
-    pub fn get(&self, tile: usize) -> TextureHandle {
+    pub(crate) fn get(&self, tile: usize) -> TextureHandle {
         self.storage.get(&Textures::Tile(tile))
             .or(self.storage.get(&Textures::Blank))
             .cloned().unwrap()
     }
 
-    pub fn insert(&mut self, tile: Textures, tex: TextureHandle) {
+    pub(crate) fn insert(&mut self, tile: Textures, tex: TextureHandle) {
         self.storage.insert(tile, tex);
     }
 
-    pub fn tex(&self, tex: Textures) -> Option<TextureHandle> {
+    pub(crate) fn tex(&self, tex: Textures) -> Option<TextureHandle> {
         self.storage.get(&tex).cloned()
     }
 }
 
 impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
     type Ext = E;
-
-    fn new(ctx: &mut E) -> Self where Self: Sized {
-        VramViewer {
-            tab: Tabs::Oam,
-            storage: Default::default(),
-            init: false,
-            emu: Default::default(),
-            bg_data: None
-        }
-    }
 
     fn init(&mut self, ctx: &mut Context, emu: &mut E) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));

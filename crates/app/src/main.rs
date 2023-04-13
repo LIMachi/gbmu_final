@@ -1,7 +1,5 @@
 #![feature(hash_drain_filter)]
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use winit::{
     event_loop::{ControlFlow, EventLoopWindowTarget}
 };
@@ -13,23 +11,14 @@ mod settings;
 mod emulator;
 pub mod app;
 
-use app::Menu;
-use apu::SoundConfig;
-use dbg::{Ninja, Schedule};
 use render::{windows::Windows, WindowType};
 use shared::{Events, Handle};
-use shared::audio_settings::AudioSettings;
-use shared::input::Keybindings;
 use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
-use crate::app::{AppConfig, DbgConfig, RomConfig};
+use crate::app::{AppConfig, DbgConfig};
 use crate::render::{Event, EventLoop, Proxy};
 
 pub struct App {
-    sound_device: SoundConfig,
-    audio_settings: AudioSettings,
-    bindings: Keybindings,
-    roms: Rc<RefCell<RomConfig>>,
     emu: emulator::Emulator,
     event_loop: Option<EventLoop>,
     pub windows: Windows
@@ -41,14 +30,8 @@ impl App {
             .build();
         let proxy = e.create_proxy();
         let conf = AppConfig::load();
-        let bindings = conf.keys.clone();
-        let emu = emulator::Emulator::new(proxy.clone(), bindings.clone(), &conf);
-        let roms = conf.roms.cell();
+        let emu = emulator::Emulator::new(proxy.clone(), conf);
         Self {
-            sound_device: conf.sound_device,
-            audio_settings: conf.audio_settings,
-            roms,
-            bindings,
             event_loop: Some(e),
             windows: Windows::new(proxy),
             emu,
@@ -60,10 +43,6 @@ impl App {
     pub fn open<'a>(&mut self, handle: Handle, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
         self.windows.create(handle, &mut self.emu, event_loop);
         self
-    }
-
-    pub fn menu(&self) -> Menu {
-        Menu::new(self.roms.clone(), self.proxy())
     }
 
     pub fn create(mut self, handle: Handle) -> Self {
@@ -86,7 +65,7 @@ impl App {
             },
             _ => {}
         }
-        self.windows.handle_events(event, flow);
+        self.windows.handle_events(event, flow, &mut self.emu);
     }
 
     pub fn run<F: 'static + FnMut(&mut App)>(mut self, mut handler: F) -> ! {
@@ -101,16 +80,16 @@ impl App {
                 },
                 Event::UserEvent(Events::Close) => {
                     let conf = AppConfig {
-                        sound_device: self.sound_device.clone(),
-                        audio_settings: self.audio_settings.clone(),
-                        roms: self.roms.as_ref().take(),
+                        sound_device: self.emu.audio_device.clone(),
+                        audio_settings: self.emu.audio_settings.clone(),
+                        roms: self.emu.roms.clone(),
                         debug: DbgConfig {
-                            breaks: self.emu.breakpoints().take().into_iter()
+                            breaks: self.emu.breakpoints.take().into_iter()
                                 .filter(|x| !x.temp())
                                 .collect()
                         },
-                        emu: self.emu.settings.take(),
-                        keys: self.bindings.clone(),
+                        emu: self.emu.settings.clone(),
+                        keys: self.emu.bindings.clone(),
                         mode: self.emu.mode(),
                         bios: self.emu.enabled_boot(),
                     };
@@ -131,14 +110,13 @@ impl App {
 fn main() {
     log::init();
     let app = App::new();
-    let menu = WindowType::Main(app.menu());
     let mut st = Chrono::new();
     let mut current = std::time::Instant::now();
     let mut acc = 0.0;
     let mut cycles = 0;
     let mut clock = Clock::new(4);
     let mut run = false;
-    app.create(menu)
+    app.create(Handle::Main)
         .run(move |app| {
             if app.emu.is_running() {
                 if st.paused() { st.start(); }

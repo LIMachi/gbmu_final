@@ -8,7 +8,7 @@ extern crate core;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use lcd::Lcd;
-use shared::mem::{Device, IOBus, Lock, Mem};
+use shared::mem::Lock;
 
 mod render;
 mod ppu;
@@ -38,17 +38,11 @@ impl Controller {
         }
     }
 
-    pub fn tick(&mut self, io: &mut IORegs, oam: &mut Lock<Oam>, vram: &mut Lock<Vram>, lcd: &mut Lcd) {
-        self.ppu.claim(oam, vram);
+    pub fn tick<'a>(&mut self, io: &mut IORegs, oam: &'a mut Lock<Oam>, vram: &'a mut Lock<Vram>, lcd: &mut Lcd) {
+        self.ppu.claim::<'a>(oam, vram);
         self.ppu.tick(&mut self.state, io, lcd);
         self.ppu.release();
     }
 
     pub fn inner(&self) -> &Ppu { &self.ppu }
-}
-
-impl Device for Controller {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.ppu.configure(bus);
-    }
 }

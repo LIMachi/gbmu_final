@@ -36,7 +36,9 @@ pub trait Render {
 pub use egui_context::EguiContext;
 pub use raw_context::RawContext;
 use shared::{Events, Handle};
-use crate::emulator::Emulator;
+use crate::app::Menu;
+use crate::emulator::{Emulator, Screen};
+use crate::settings::Settings;
 
 pub struct WindowType(Handle);
 
@@ -65,13 +67,13 @@ impl WindowType {
         }.build(evt).unwrap()
     }
 
-    pub fn builder(self, emu: &mut Emulator) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Emulator>>> {
+    pub fn builder(self, emu: &mut Emulator) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Emulator>> + '_> {
         match self.0 {
-            Handle::Main => EguiContext::builder(emu),
-            Handle::Game => RawContext::builder(emu),
+            Handle::Main => EguiContext::<Emulator, Menu>::builder(emu),
+            Handle::Game => RawContext::<Screen>::builder(emu),
             Handle::Debug => EguiContext::<Emulator, Ninja<Emulator>>::builder(emu),
             Handle::Sprites => EguiContext::<Emulator, ppu::VramViewer<Emulator>>::builder(emu),
-            Handle::Settings => EguiContext::builder(emu),
+            Handle::Settings => EguiContext::<Emulator, Settings>::builder(emu),
         }
     }
 }

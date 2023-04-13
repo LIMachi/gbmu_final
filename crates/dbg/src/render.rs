@@ -133,18 +133,20 @@ fn io_table(ui: &mut Ui, ios: &[IO], bus: &&dyn Bus, source: &'static str, extra
         });
 }
 
-impl<E: Emulator> shared::Ui for Ninja<E> {
-    type Ext = E;
-
-    fn new(ctx: &mut E) -> Self where Self: Sized {
-        Self {
+impl<E: Emulator> Default for Ninja<E> {
+    fn default() -> Self {
+        Ninja {
             render_data: Data::default(),
-            disassembly: disassembly::Disassembly::new(),
-            viewer: memory::Viewer::default(),
+            disassembly: Disassembly::new(),
+            viewer: Viewer::default(),
             textures: Default::default(),
             keys: Default::default(),
         }
     }
+}
+
+impl<E: Emulator> shared::Ui for Ninja<E> {
+    type Ext = E;
 
     fn init(&mut self, ctx: &mut Context, _ext: &mut E) {
         self.textures.insert(Texture::Play, ctx.load_svg::<40, 40>("play", "assets/icons/play.svg"));
@@ -293,7 +295,8 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                 egui::Frame::group(ui.style()) // IOregs
                     .fill(DARK_BLACK)
                     .show(ui, |ui| {
-                        let bus = ext.bus().as_ref();
+                        let boxed_bus = ext.bus();
+                        let bus = boxed_bus.as_ref();
                         egui_extras::TableBuilder::new(ui)
                             .columns(Column::exact(200.), 4)
                             .header(32., |mut header| {

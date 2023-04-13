@@ -1,27 +1,24 @@
 use std::net::Ipv4Addr;
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use apu::Controller;
+
 use shared::{egui, Events};
 use shared::egui::{Align, Button, CentralPanel, Context, Response, TextEdit, Ui, Vec2};
 use shared::input::Section;
 use crate::emulator::Emulator;
 
 pub struct Settings {
-    emu: Emulator,
     devices: Vec<String>,
     key: Option<Section>,
 }
 
-impl Settings {
-    pub fn new(emu: Emulator) -> Self {
+impl Default for Settings {
+    fn default() -> Self {
         Self {
-            devices: Controller::devices().collect(),
-            emu,
+            devices: apu::Controller::devices().collect(),
             key: None
         }
     }
-
 }
 
 // TODO mode auto ?
@@ -53,11 +50,11 @@ struct Keybind<'a> {
 }
 
 impl<'a> Keybind<'a> {
-    pub fn new(key: Section, settings: &'a mut Settings) -> Self {
+    pub fn new(key: Section, settings: &'a mut Settings, emu: &'a mut Emulator) -> Self {
         Self {
-            bind: settings.emu.bindings.has(key),
+            bind: emu.bindings.has(key),
             key,
-            value: &mut settings.key
+            value: &mut settings.key,
         }
     }
 }
@@ -82,13 +79,15 @@ impl <'a>egui::Widget for Keybind<'a> {
 
 struct KeybindSection<'s, I: IntoIterator<Item = Section>> {
     settings: &'s mut Settings,
+    emu: &'s mut Emulator,
     iter: I
 }
 
 impl<'s, I: IntoIterator<Item = Section>> KeybindSection<'s, I> {
-    fn new(settings: &'s mut Settings, iter: I) -> Self {
+    fn new(settings: &'s mut Settings, emu: &'s mut Emulator, iter: I) -> Self {
         Self {
             settings,
+            emu,
             iter
         }
     }
@@ -98,95 +97,81 @@ impl <'s, I: IntoIterator<Item = Section>>egui::Widget for KeybindSection<'s, I>
     fn ui(self, ui: &mut Ui) -> Response {
         ui.vertical(|ui| {
             for section in self.iter {
-                ui.add(Keybind::new(section, self.settings));
+                ui.add(Keybind::new(section, self.settings, self.emu));
             }
         }).response
     }
 }
 
 impl shared::Ui for Settings {
-    fn init(&mut self, _ctx: &mut Context) {
-    }
+    type Ext = Emulator;
+
+    fn init(&mut self, _ctx: &mut Context, _ext: &mut Emulator) {}
 
     //TODO bouger les keybinds
-    fn draw(&mut self, ctx: &mut Context) {
+    fn draw(&mut self, ctx: &mut Context, emu: &mut Emulator) {
         CentralPanel::default()
             .show(ctx, |ui: &mut Ui| {
-                let mut model = *self.emu.cgb.as_ref().borrow();
-                let mut bios = *self.emu.bios.as_ref().borrow();
-                let mut global_volume = *self.emu.audio_settings.volume.as_ref().borrow();
-                let mut chan1 = *self.emu.audio_settings.channels[0].as_ref().borrow();
-                let mut chan2 = *self.emu.audio_settings.channels[1].as_ref().borrow();
-                let mut chan3 = *self.emu.audio_settings.channels[2].as_ref().borrow();
-                let mut chan4 = *self.emu.audio_settings.channels[3].as_ref().borrow();
-                let mut device = &self.emu.audio.device();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("JOYPAD");
                 });
-                ui.add(KeybindSection::new(self, Section::joypad()));
+                ui.add(KeybindSection::new(self, emu, Section::joypad()));
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("DEBUG");
                 });
-                ui.add(KeybindSection::new(self, Section::shortcuts()));
+                ui.add(KeybindSection::new(self, emu,Section::shortcuts()));
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("MODEL");
                 });
-                ui.radio_value(&mut model, Mode::Dmg, format!("{:?}", Mode::Dmg));
-                ui.radio_value(&mut model, Mode::Cgb, format!("{:?}", Mode::Cgb));
-                self.emu.cgb.replace(model);
-                ui.checkbox(&mut bios, "enable boot rom");
-                self.emu.bios.replace(bios);
+                let model = &mut emu.cgb;
+                ui.radio_value(model, Mode::Dmg, format!("{:?}", Mode::Dmg));
+                ui.radio_value(model, Mode::Cgb, format!("{:?}", Mode::Cgb));
+                ui.checkbox( &mut emu.bios, "enable boot rom");
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("SOUNDS");
                 });
-                ui.add(egui::Slider::new(&mut global_volume, 0f32..=1f32).text("Volume"));
-                self.emu.audio_settings.volume.replace(global_volume);
-                ui.checkbox(&mut chan1, "Channel 1 - Sweep");
-                ui.checkbox(&mut chan2, "Channel 2 - Square");
-                ui.checkbox(&mut chan3, "Channel 3 - Wave");
-                ui.checkbox(&mut chan4, "Channel 4 - Noise");
-                self.emu.audio_settings.channels[0].replace(chan1);
-                self.emu.audio_settings.channels[1].replace(chan2);
-                self.emu.audio_settings.channels[2].replace(chan3);
-                self.emu.audio_settings.channels[3].replace(chan4);
+                ui.add(egui::Slider::new(&mut emu.audio_settings.volume, 0f32..=1f32).text("Volume"));
+                ui.checkbox(&mut emu.audio_settings.channels[0], "Channel 1 - Sweep");
+                ui.checkbox(&mut emu.audio_settings.channels[1], "Channel 2 - Square");
+                ui.checkbox(&mut emu.audio_settings.channels[2], "Channel 3 - Wave");
+                ui.checkbox(&mut emu.audio_settings.channels[3], "Channel 4 - Noise");
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("AUDIO OUTPUT");
                 });
+                let mut device = emu.audio.device();
                 self.devices.iter().for_each(|dev| {
                     ui.radio_value(&mut device, dev, dev);
                 });
-                if *device != self.emu.audio.device() {
-                    self.emu.audio.switch(device);
+                if device != emu.audio.device() {
+                    let device = device.clone();
+                    emu.audio.switch(device);
                 }
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
-                    ui.label(if self.emu.link_do(|x| x.connected()) { "SERIAL - (Connected)" } else { "SERIAL" });
+                    ui.label(if emu.link_do(|x| x.connected()) { "SERIAL - (Connected)" } else { "SERIAL" });
                 });
-                ui.label(format!("server listening on port {}", self.emu.link_port));
+                ui.label(format!("server listening on port {}", emu.link_port));
 
-                let mut emu_settings = self.emu.settings.as_ref().borrow_mut();
                 ui.horizontal(|ui| {
-                    let host = &mut emu_settings.host;
-                    let host = TextEdit::singleline(host).desired_width(120.);
+                    let host = TextEdit::singleline(&mut emu.settings.host).desired_width(120.);
                     ui.label("Host: ");
                     ui.add(host);
                 });
                 ui.horizontal(|ui| {
-                    let port = &mut emu_settings.port;
-                    let port = TextEdit::singleline(port).desired_width(48.);
+                    let port = TextEdit::singleline(&mut emu.settings.port).desired_width(48.);
                     ui.label(" Port: ");
                     ui.add(port);
                 });
                 if ui.button("Connect").clicked() {
-                    match (emu_settings.host.parse(), emu_settings.port.parse()) {
+                    match (emu.settings.host.parse(), emu.settings.port.parse()) {
                         (Ok(addr), Ok(port)) => {
                             let addr: Ipv4Addr = addr;
                             let port: u16 = port;
-                            self.emu.link_do(|link| link.connect(addr, port));
+                            emu.link_do(|link| link.connect(addr, port));
                         },
                         (a, p) => {
                             log::warn!("failed to parse: {a:?}, {p:?}");
@@ -196,13 +181,13 @@ impl shared::Ui for Settings {
             });
     }
 
-    fn handle(&mut self, event: &Event<Events>) {
+    fn handle(&mut self, event: &Event<Events>, emu: &mut Emulator) {
       match event {
           Event::WindowEvent { event: WindowEvent::KeyboardInput {
               input: KeyboardInput { virtual_keycode: Some(input), .. }, ..
           }, .. } => {
               if let Some(key) = self.key.take() {
-                  self.emu.bindings.set(key,*input);
+                  emu.bindings.set(key,*input);
               }
           }
           _ => {}

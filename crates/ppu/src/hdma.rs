@@ -1,5 +1,5 @@
-use shared::io::{CGB_MODE, IO, IOReg};
-use shared::mem::{Device, IOBus, Source};
+use shared::io::{CGB_MODE, IOReg};
+use shared::mem::{IOBus, Source};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Mode {

@@ -18,7 +18,7 @@ impl<B: cpu::Bus + IOBus> Bus for B { }
 pub trait Schedule {
     fn breakpoints(&mut self) -> &mut Breakpoints;
     fn play(&mut self);
-    fn reset(&self);
+    fn reset(&mut self);
 
     fn speed(&self) -> i32;
     fn set_speed(&mut self, speed: i32);

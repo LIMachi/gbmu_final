@@ -102,7 +102,7 @@ impl Apu {
     pub fn tick(&mut self, regs: &mut IORegs, ds: bool) {
         self.sample += 1.;
         if self.sample >= self.tick {
-            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels, regs), *self.settings.volume.as_ref().borrow());
+            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels, regs), self.settings.volume);
             self.sample -= self.tick;
         }
         let sound = regs.io_mut(IO::NR52);

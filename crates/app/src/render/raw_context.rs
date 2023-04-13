@@ -6,10 +6,11 @@ pub struct RawContext<Data: 'static + Render> {
     window: Window
 }
 
-impl<Data: 'static + Render> RawContext<Data> {
-    pub fn builder(mut data: Data) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Emulator>>> {
+impl<Data: 'static + Render + Default> RawContext<Data> {
+    pub fn builder(ctx: &mut Emulator) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Emulator>> + '_> {
         Box::new(move |_instance, window, _proxy| {
-            data.init(&window);
+            let mut data = Data::default();
+            data.init(&window, ctx);
             Box::new(Self { inner: data, window })
         })
     }

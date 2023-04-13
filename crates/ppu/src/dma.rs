@@ -14,7 +14,7 @@ impl Default for Dma {
 
 impl Dma {
     pub fn tick(&mut self, bus: &mut dyn IOBus) {
-        let reg = bus.io(IO::DMA);
+        let reg = bus.io_mut(IO::DMA);
         if reg.dirty() {
             reg.reset_dirty();
             self.p = 0;

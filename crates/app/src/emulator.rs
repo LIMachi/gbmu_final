@@ -2,18 +2,19 @@ use std::rc::Rc;
 use std::cell::{Ref, RefCell};
 use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
+use apu::SoundConfig;
 use bus::Devices;
-use dbg::BusWrapper;
 use mem::{Oam, Vram};
 use serial::com::Serial;
 use serial::Link;
 use shared::breakpoints::Breakpoints;
 use shared::rom::Rom;
-use shared::{Events, Ui, egui::Context};
+use shared::{Events, Ui};
 use shared::cpu::Bus;
 use shared::winit::window::Window;
-use shared::mem::{IOBus, MBCController, MemoryBus};
+use shared::mem::{IOBus, MBCController};
 use shared::utils::{ToBox, Cell};
+use shared::emulator::{ReadAccess, Schedule};
 
 use crate::{AppConfig, Proxy};
 use crate::render::{Event, Render};
@@ -21,6 +22,7 @@ use crate::render::{Event, Render};
 use shared::audio_settings::AudioSettings;
 use shared::emulator::BusWrapper;
 use shared::input::{Keybindings, Section};
+use crate::app::RomConfig;
 use crate::settings::{Settings, Mode};
 
 pub struct Console {
@@ -36,7 +38,7 @@ impl Default for Console {
         Self {
             speed: Default::default(),
             rom: None,
-            bus,
+            bus: bus::Bus::new(false),
             running: false,
             gb: Devices::builder().build()
         }
@@ -58,48 +60,45 @@ impl Default for EmuSettings {
     }
 }
 
-#[derive(Clone)]
 pub struct Emulator {
+    pub roms: RomConfig,
     pub proxy: Proxy,
     pub audio: apu::Controller,
-    pub settings: Rc<RefCell<EmuSettings>>,
+    pub settings: EmuSettings,
     pub audio_settings: AudioSettings,
+    pub audio_device: SoundConfig,
     pub bindings: Keybindings,
-    breakpoints: Breakpoints,
+    pub(crate) breakpoints: Breakpoints,
     pub console: Console,
     pub cgb: Mode,
     pub bios: bool,
-    pub link: Rc<RefCell<Link>>,
+    pub link: Link,
     pub link_port: u16,
 }
 
 impl Emulator {
 
-    pub fn new(proxy: Proxy, bindings: Keybindings, conf: &AppConfig) -> Self {
+    pub fn new(proxy: Proxy, conf: AppConfig) -> Self {
         let link = Link::new();
         let port = link.port;
         Self {
-            link: link.cell(),
+            link,
             link_port: port,
             proxy,
-            bindings,
-            settings: conf.emu.clone().cell(),
+            bindings: conf.keys,
+            roms: conf.roms,
+            settings: conf.emu,
             console: Console::default(),
-            audio_settings: conf.audio_settings.clone(),
+            audio_settings: conf.audio_settings,
             audio: apu::Controller::new(&conf.sound_device),
-            breakpoints: Breakpoints::new(conf.debug.breaks.clone()),
+            audio_device: conf.sound_device,
+            breakpoints: Breakpoints::new(conf.debug.breaks),
             cgb: conf.mode,
             bios: conf.bios,
         }
     }
 
-    pub fn settings(&self) -> Settings {
-        Settings::new(self.clone())
-    }
-
-    pub fn mode(&self) -> Mode {
-        *self.cgb
-    }
+    pub fn mode(&self) -> Mode { self.cgb }
 
     pub fn link_do<R, F: Fn(&mut Serial) -> R>(&mut self, f: F) -> R {
         self.link.as_mut()
@@ -109,21 +108,19 @@ impl Emulator {
             })
     }
 
-    pub fn enabled_boot(&self) -> bool {
-        *self.bios
+    pub fn enabled_boot(&self) -> bool { self.bios }
+
+    pub fn serial_port(&mut self) -> serial::com::Serial {
+        self.link.port()
     }
 
-    pub fn serial_port(&self) -> serial::com::Serial {
-        RefCell::borrow_mut(&self.link).port()
-    }
-
-    pub fn cycle(&mut self, clock: u8) { self.console.cycle(clock, &self.breakpoints); }
+    pub fn cycle(&mut self, clock: u8) { self.console.cycle(clock, &mut self.breakpoints); }
 
     pub fn is_running(&self) -> bool { self.console.running }
 
     pub fn stop(&mut self) {
         // TODO drop serial first ?
-        self.console.replace(Console::default());
+        self.console = Console::default();
     }
 
     pub fn cycle_time(&self) -> f64 {
@@ -135,48 +132,47 @@ impl Emulator {
         }
     }
 
-    fn insert(&self, rom: Rom, running: bool) {
+    fn insert(&mut self, rom: Rom, running: bool) {
         {
-            let mut link = RefCell::borrow_mut(&self.link);
-            if link.borrowed() {
-                link.store(self.console.take().gb.serial.disconnect());
+            if self.link.borrowed() {
+                self.link.store(self.console.gb.serial.disconnect());
             }
         }
-        let emu = Console::new(&self, rom, running);
-        self.console.replace(emu);
+        self.console = Console::new(self, rom, running);
         self.proxy.send_event(Events::Reload).ok();
     }
 }
 
+#[derive(Default)]
 pub struct Screen;
 
 impl Render for Screen {
     fn init(&mut self, window: &Window, emu: &mut Emulator) {
         log::info!("init LCD");
-        self.console.lcd.init(window);
+        emu.console.gb.lcd.init(window);
     }
     fn render(&mut self, emu: &mut Emulator) {
-        self.console.gb.lcd.render();
+         emu.console.gb.lcd.render();
     }
 
     fn resize(&mut self, w: u32, h: u32, emu: &mut Emulator) {
-        self.console.gb.lcd.resize(w, h);
+         emu.console.gb.lcd.resize(w, h);
     }
 
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator) {
         match event {
             Event::UserEvent(Events::Play(rom)) => {
-                self.insert(rom.clone(), true);
+                emu.insert(rom.clone(), true);
                 if let Some(raw) = &rom.raw {
                     window.set_window_icon(raw.icon());
                 }
-                window.set_title(self.emu.as_ref().borrow().name());
+                window.set_title(emu.console.name());
             },
-            Event::UserEvent(Events::Reload) => { Render::init(self, window); },
+            Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); },
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
-                if event == &WindowEvent::CloseRequested { self.stop(); }
+                if event == &WindowEvent::CloseRequested { emu.stop(); }
                 if let WindowEvent::KeyboardInput { input, .. } = event {
-                    self.console.gb.joy.handle(*input);
+                    emu.console.gb.joy.handle(*input);
                 }
             },
             _ => {}
@@ -184,7 +180,7 @@ impl Render for Screen {
     }
 }
 
-impl dbg::ReadAccess for Emulator {
+impl ReadAccess for Emulator {
     fn cpu_register(&self, reg: shared::cpu::Reg) -> shared::cpu::Value {
         self.console.gb.cpu.registers().read(reg)
     }
@@ -193,8 +189,8 @@ impl dbg::ReadAccess for Emulator {
         self.console.bus.get_range(st, len)
     }
 
-    fn bus(&self) -> Box<&dyn BusWrapper> {
-        self.console.bus.boxed()
+    fn bus(&self) -> Box<&dyn shared::emulator::Bus> {
+        Box::<&dyn shared::emulator::Bus>::new(&self.console.bus)
     }
 
     fn mbc(&self) -> Box<&dyn MBCController> {
@@ -206,18 +202,14 @@ impl dbg::ReadAccess for Emulator {
     }
 }
 
-impl dbg::Schedule for Emulator {
+impl Schedule for Emulator {
     fn breakpoints(&mut self) -> &mut Breakpoints { &mut self.breakpoints }
 
     fn play(&mut self) {
         self.console.running = true;
     }
 
-    fn pause(&mut self) {
-        self.breakpoints().pause();
-    }
-
-    fn reset(&self) {
+    fn reset(&mut self) {
         let Some(rom) = self.console.rom.clone() else { return };
         self.insert(rom, false);
     }
@@ -235,10 +227,10 @@ impl Console {
 
     pub const CYCLE_TIME: f64 = 1.0 / Console::CLOCK_PER_SECOND as f64;
 
-    pub fn new(controller: &Emulator, rom: Rom, running: bool) -> Self {
+    pub fn new(controller: &mut Emulator, rom: Rom, running: bool) -> Self {
         let cgb = controller.mode().is_cgb();
         let skip = !controller.enabled_boot();
-        let mut gb = Console::builder()
+        let mut gb = Devices::builder()
             .skip_boot(skip)
             .set_cgb(cgb)
             .with_link(controller.serial_port())
@@ -249,8 +241,7 @@ impl Console {
         let mbc = if skip { mbc.skip_boot() } else { mbc };
         let bus = bus::Bus::new(cgb);
         let mut bus = if skip { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
-            .with_mbc(mbc)
-            .with_ppu(&mut gb.ppu);
+            .with_mbc(mbc);
         log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
         Self {
             speed: Default::default(),
@@ -261,7 +252,7 @@ impl Console {
         }
     }
 
-    pub fn cycle(&mut self, clock: u8, bp: &Breakpoints) {
+    pub fn cycle(&mut self, clock: u8, bp: &mut Breakpoints) {
         if !self.running { return }
         self.bus.tick(&mut self.gb, clock, bp);
     }
@@ -272,25 +263,21 @@ impl Console {
 }
 
 impl BusWrapper for Console {
-    fn bus(&self) -> Box<&dyn dbg::Bus> { Box::new(&self.bus) }
+    fn bus(&self) -> Box<&dyn shared::emulator::Bus> { Box::new(&self.bus) }
     fn mbc(&self) -> Box<&dyn MBCController> { self.bus.mbc() }
 }
 
 impl ppu::VramAccess for Emulator {
-    fn vram(&self) -> &Vram {
-        self.console.bus
-    }
+    fn vram(&self) -> &Vram { self.console.bus.vram() }
 
-    fn vram_mut(&mut self) -> &mut Vram {
-        todo!()
-    }
+    fn vram_mut(&mut self) -> &mut Vram { self.console.bus.vram_mut() }
 
     fn oam(&self) -> &Oam {
-        todo!()
+        self.console.bus.oam()
     }
 
     fn oam_mut(&mut self) -> &mut Oam {
-        todo!()
+        self.console.bus.oam_mut()
     }
 }
 

@@ -7,7 +7,6 @@ use shared::{egui::Context, cpu::{Reg, Value}, emulator::Emulator, breakpoints::
 mod render;
 
 use render::{Disassembly, Viewer};
-use shared::breakpoints::Breakpoints;
 use shared::egui::{TextureHandle, TextureId};
 use shared::winit::event::VirtualKeyCode;
 
@@ -64,12 +63,11 @@ impl<E: Emulator> Debugger<E> for E {
 }
 
 impl<E: Emulator> Ninja<E> {
-    pub fn tex(&self, tex: Texture) -> TextureId {
+    pub(crate) fn tex(&self, tex: Texture) -> TextureId {
         self.textures.get(&tex).unwrap().id()
     }
 }
 
-#[derive(Clone)]
 pub struct Ninja<E: Emulator> {
     render_data: render::Data,
     disassembly: Disassembly<E>,

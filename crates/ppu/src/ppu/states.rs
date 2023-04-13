@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 use lcd::Lcd;
 use mem::oam::Sprite;
 use shared::io::{IO, IORegs, LCDC};
-use shared::mem::{IO, Source};
+use shared::mem::Source;
 
 use super::{
     Ppu, fifo::{BgFifo, ObjFifo}, Scroll, fetcher::{self, Fetcher}
@@ -114,8 +114,9 @@ impl State for TransferState {
         if self.scx == 0 && ppu.lcdc.obj_enable() && self.bg.enabled() && !self.fetcher.fetching_sprite() {
             let idx = if let Some(sprite) = self.sprite { sprite + 1 } else { 0 };
             for i in idx..ppu.sprites.len() {
+                let idx = ppu.sprites[i];
                 let sprite = ppu.oam_mut().get_mut(Source::Ppu)
-                    .map(|x| x.sprites[ppu.sprites[i]])
+                    .map(|x| x.sprites[idx])
                     .unwrap_or_else(|| Sprite::unavailable());
                 if sprite.screen_x() == self.lx || (sprite.x != 0 && sprite.x < 8 && self.lx == 0) {
                     self.sprite = Some(i);
@@ -164,13 +165,15 @@ impl State for VState {
             ppu.win.y = 0;
             io.int_set(0);
         }
+        let ly = io.io_mut(IO::LY);
         if self.dots == 0 {
-            io.io_mut(IO::LY).direct_write(0);
-        }
-        self.dots = self.dots.saturating_sub(1);
-        if self.dots % 456 == 0 {
-            let ly = (ppu.regs.ly.read() + 1) % 154;
-            io.io_mut(IO::LY).direct_write(ly);
+            ly.direct_write(0);
+        } else {
+            self.dots = self.dots.saturating_sub(1);
+            if self.dots % 456 == 0 {
+                let v = (ly.value() + 1) % 154;
+                ly.direct_write(v);
+            }
         }
         if self.dots == 0 {
             Some(OamState::new().boxed())

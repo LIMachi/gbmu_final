@@ -92,7 +92,8 @@ impl Mem for () { }
 pub trait IOBus {
     fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
 
-    fn io(&self, io: IO) -> &mut IOReg;
+    fn io_mut(&mut self, io: IO) -> &mut IOReg;
+    fn io(&self, io: IO) -> &IOReg;
     fn io_addr(&mut self, io: u16) -> Option<&mut IOReg>;
 
     fn read(&self, addr: u16) -> u8;

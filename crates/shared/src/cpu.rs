@@ -20,7 +20,7 @@ pub trait Bus {
     fn direct_read(&self, offset: u16) -> u8;
     fn int_reset(&mut self, bit: u8);
     fn int_set(&mut self, bit: u8);
-    fn interrupt(&self) -> u8;
+    fn interrupt(&mut self) -> u8;
 }
 
 #[derive(Copy, Debug, Clone, Eq, PartialEq)]

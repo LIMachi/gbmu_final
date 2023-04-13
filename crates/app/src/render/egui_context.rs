@@ -8,7 +8,7 @@ use shared::{Ui, egui};
 
 pub use super::*;
 
-pub struct EguiContext<Ctx, U: Ui<Ext= Ctx>> {
+pub struct EguiContext<Ctx, U: Ui<Ext= Ctx> + Default> {
     data: U,
     window: Window,
     surface: wgpu::Surface,
@@ -21,7 +21,7 @@ pub struct EguiContext<Ctx, U: Ui<Ext= Ctx>> {
     queue: Queue
 }
 
-impl<Ctx, U: 'static + Ui<Ext= Ctx>> EguiContext<Ctx, U> {
+impl<Ctx: 'static, U: 'static + Ui<Ext= Ctx> + Default> EguiContext<Ctx, U> {
     pub fn new(instance: &Instance, window: Window, mut data: U, ctx: &mut Ctx) -> Self {
         let surface = unsafe { instance.create_surface(&window) };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -76,13 +76,13 @@ impl<Ctx, U: 'static + Ui<Ext= Ctx>> EguiContext<Ctx, U> {
         }
     }
 
-    pub fn builder(ctx: &mut Ctx) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Ctx>>> {
+    pub fn builder(ctx: &mut Ctx) -> Box<dyn FnOnce(&Instance, Window, Proxy) -> Box<dyn Context<Ctx>> + '_> {
         Box::new(move |instance, window, _|
-            Box::new(Self::new(instance, window, Ui::new(ctx), ctx)))
+            Box::new(Self::new(instance, window, U::default(), ctx)))
     }
 }
 
-impl<Ctx, U: 'static + Ui<Ext = Ctx>> Context<Ctx> for EguiContext<Ctx, U> {
+impl<Ctx, U: 'static + Ui<Ext = Ctx> + Default> Context<Ctx> for EguiContext<Ctx, U> {
     fn inner(&mut self) -> &mut Window {
         &mut self.window
     }

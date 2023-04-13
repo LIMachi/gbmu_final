@@ -57,8 +57,6 @@ pub enum Target {
 pub trait Ui {
     type Ext;
 
-    fn new(ctx: &mut <Self as Ui>::Ext) -> Self where Self: Sized;
-
     fn init(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) { }
     fn draw(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) { }
     fn handle(&mut self, _event: &winit::event::Event<Events>, _ext: &mut <Self as Ui>::Ext) { }
@@ -66,8 +64,4 @@ pub trait Ui {
 
 impl Ui for () {
     type Ext = ();
-
-    fn new(_: &mut Self::Ext) -> Self where Self: Sized {
-        ()
-    }
 }
