@@ -11,9 +11,8 @@ mod settings;
 mod emulator;
 pub mod app;
 
-use render::{windows::Windows, WindowType};
+use render::windows::Windows;
 use shared::{Events, Handle};
-use shared::utils::Cell;
 use shared::utils::clock::{Chrono, Clock};
 use crate::app::{AppConfig, DbgConfig};
 use crate::render::{Event, EventLoop, Proxy};

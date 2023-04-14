@@ -39,7 +39,7 @@ impl Controller {
     }
 
     pub fn tick<'a>(&mut self, io: &mut IORegs, oam: &'a mut Lock<Oam>, vram: &'a mut Lock<Vram>, lcd: &mut Lcd) {
-        self.ppu.claim::<'a>(oam, vram);
+        self.ppu.claim(oam, vram);
         self.ppu.tick(&mut self.state, io, lcd);
         self.ppu.release();
     }

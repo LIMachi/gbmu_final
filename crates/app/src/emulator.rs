@@ -1,5 +1,3 @@
-use std::rc::Rc;
-use std::cell::{Ref, RefCell};
 use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
 use apu::SoundConfig;
@@ -9,11 +7,10 @@ use serial::com::Serial;
 use serial::Link;
 use shared::breakpoints::Breakpoints;
 use shared::rom::Rom;
-use shared::{Events, Ui};
+use shared::Events;
 use shared::cpu::Bus;
 use shared::winit::window::Window;
 use shared::mem::{IOBus, MBCController};
-use shared::utils::{ToBox, Cell};
 use shared::emulator::{ReadAccess, Schedule};
 
 use crate::{AppConfig, Proxy};
@@ -23,7 +20,7 @@ use shared::audio_settings::AudioSettings;
 use shared::emulator::BusWrapper;
 use shared::input::{Keybindings, Section};
 use crate::app::RomConfig;
-use crate::settings::{Settings, Mode};
+use crate::settings::Mode;
 
 pub struct Console {
     speed: i32,
@@ -230,7 +227,7 @@ impl Console {
     pub fn new(controller: &mut Emulator, rom: Rom, running: bool) -> Self {
         let cgb = controller.mode().is_cgb();
         let skip = !controller.enabled_boot();
-        let mut gb = Devices::builder()
+        let gb = Devices::builder()
             .skip_boot(skip)
             .set_cgb(cgb)
             .with_link(controller.serial_port())
@@ -240,7 +237,7 @@ impl Console {
         let mbc = mem::mbc::Controller::new(&rom);
         let mbc = if skip { mbc.skip_boot() } else { mbc };
         let bus = bus::Bus::new(cgb);
-        let mut bus = if skip { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
+        let bus = if skip { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
             .with_mbc(mbc);
         log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
         Self {

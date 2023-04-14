@@ -1,12 +1,9 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Vec2, Widget};
 use shared::rom::Rom;
 use shared::utils::image::ImageLoader;
-use crate::render::Proxy;
 
 use shared::serde::{Serialize, Deserialize};
 use shared::{Events, Handle};

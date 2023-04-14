@@ -142,20 +142,22 @@ impl shared::cpu::Bus for Bus {
             ECHO..=ECHO_END => self.ram.write(addr - ECHO, value, addr),
             OAM..=OAM_END => self.oam.write(addr - OAM, value, addr),
             UN_1..=UN_1_END => self.un_1.write(addr - UN_1, value, addr),
-            IO..=IO_END => self.io.write(addr - IO, value, addr),
+            IO..=IO_END => {
+                self.io.write(addr - IO, value, addr);
+                match addr {
+                    0xFF50 if self.io.writable(IO::POST) => {
+                        self.mbc.inner_mut().post();
+                        self.io.post();
+                    },
+                    0xFF4C if self.io.writable(IO::KEY0) => {
+                        self.io.compat_mode();
+                    }
+                    _ => {}
+                }
+            },
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
         };
-        match addr {
-            0xFF50 if self.io.writable(IO::POST) => {
-                self.mbc.inner_mut().post();
-                self.io.post();
-            },
-            0xFF4C if self.io.writable(IO::KEY0) => {
-                self.io.compat_mode();
-            }
-            _ => {}
-        }
     }
     fn status(&self) -> MemStatus {
         self.status

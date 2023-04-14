@@ -618,12 +618,12 @@ impl Default for IOReg {
 impl Mem for IOReg {
     fn read(&self, addr: u16, _: u16) -> u8 {
         if addr != 0 { panic!("IO reg is only 1 byte") }
-        self.v | self.rmask
+        self.read()
     }
 
     fn value(&self, addr: u16, _: u16) -> u8 {
         if addr != 0 { panic!("IO reg is only 1 byte") }
-        self.v
+        self.value()
     }
 
     fn write(&mut self, addr: u16, value: u8, _absolute: u16) {
@@ -668,7 +668,9 @@ impl IOReg {
         (self.value() >> bit) & 0x1
     }
 
-    pub fn read(&self) -> u8 { Mem::read(self, 0, 0) }
+    pub fn read(&self) -> u8 {
+        self.v | self.rmask
+    }
 
     pub fn dirty(&self) -> bool { self.dirty }
 
