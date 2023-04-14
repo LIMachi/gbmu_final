@@ -5,7 +5,7 @@ const BANK_SIZE: usize = 0x2000;
 
 enum Storage {
     DMG([u8; BANK_SIZE]),
-    CGB([u8; 2 * BANK_SIZE], usize)
+    CGB([[u8; BANK_SIZE]; 2], usize)
 }
 
 impl Storage {
@@ -20,7 +20,7 @@ impl Storage {
         match self {
             Storage::DMG(_) if bank == 1 => 0,
             Storage::DMG(bank) => bank[addr as usize],
-            Storage::CGB(banks, _) => banks[addr as usize + (bank & 0x1) * BANK_SIZE]
+            Storage::CGB(banks, _) => banks[bank][addr as usize]
         }
     }
 }
@@ -30,7 +30,7 @@ impl Mem for Storage {
         use Storage::*;
         match self {
             DMG(mem) => mem[addr as usize],
-            CGB(mem, bank) => mem[addr as usize + *bank * BANK_SIZE]
+            CGB(mem, bank) => mem[*bank][addr as usize]
         }
     }
 
@@ -38,7 +38,7 @@ impl Mem for Storage {
         use Storage::*;
         match self {
             DMG(mem) => mem[addr as usize] = value,
-            CGB(mem, bank) => mem[addr as usize + *bank * BANK_SIZE] = value
+            CGB(mem, bank) => mem[*bank][addr as usize] = value
         }
     }
 
@@ -46,7 +46,7 @@ impl Mem for Storage {
         use Storage::*;
         match self {
             DMG(mem) => mem[..].to_vec(),
-            CGB(mem, bank) => mem[*bank * BANK_SIZE..(*bank + 1) * BANK_SIZE].to_vec(),
+            CGB(mem, _) => [&mem[0][..], &mem[1][..]].concat(),
         }
     }
 }
@@ -95,7 +95,7 @@ impl Vram {
         Self {
             tile_cache: HashSet::with_capacity(728),
             mem: if cgb {
-                Storage::CGB([0; 2 * BANK_SIZE], 0)
+                Storage::CGB([[0; BANK_SIZE]; 2], 0)
             } else {
                 Storage::DMG([0; BANK_SIZE])
             },
@@ -104,5 +104,11 @@ impl Vram {
 
     pub fn read_bank(&self, addr: u16, bank: usize) -> u8 {
         self.mem.read_bank(addr, bank)
+    }
+
+    pub fn switch_bank(&mut self, new: u8) {
+        if let Storage::CGB(_, bank) = &mut self.mem {
+            *bank = (new & 1) as usize;
+        }
     }
 }

@@ -142,13 +142,14 @@ impl shared::Ui for Settings {
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("AUDIO OUTPUT");
                 });
-                let mut device = emu.audio.device();
-                self.devices.iter().for_each(|dev| {
-                    ui.radio_value(&mut device, dev, dev);
+                let mut device = &emu.audio.device();
+                let devices: Vec<&String> = self.devices.iter().collect();
+                devices.iter().for_each(|dev| {
+                    ui.radio_value(&mut device, dev, *dev);
                 });
-                if device != emu.audio.device() {
-                    let device = device.clone();
-                    emu.audio.switch(device);
+                if device != &emu.audio.device() {
+                    let device = device.clone().clone();
+                    emu.audio.switch(device, &mut emu.console.gb.apu);
                 }
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {

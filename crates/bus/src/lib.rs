@@ -2,7 +2,6 @@
 
 use mem::{Hram, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
-use shared::breakpoints::Breakpoints;
 use shared::io::{IO, IOReg, IORegs};
 
 mod timer;
@@ -10,6 +9,8 @@ mod devices;
 
 pub use timer::Timer;
 pub use devices::Devices;
+
+pub use devices::Settings;
 
 pub struct Empty {}
 impl Mem for Empty {}
@@ -77,7 +78,7 @@ impl Bus {
         self.last.take()
     }
 
-    pub fn tick(&mut self, devices: &mut devices::Devices, clock: u8, bp: &mut Breakpoints) -> bool {
+    pub fn tick(&mut self, devices: &mut Devices, clock: u8, settings: Settings) -> bool {
         if self.clock == 127 {
             self.mbc.inner_mut().tick();
             self.clock = 0;
@@ -103,15 +104,21 @@ impl Bus {
             if !tick { devices.cpu.cycle(self); }
         }
         devices.ppu.tick(&mut self.io, &mut self.oam, &mut self.vram, &mut devices.lcd);
-        devices.apu.tick(&mut self.io, ds);
-        let bp = bp.tick(&devices.cpu, self.last());
+        devices.apu.tick(&mut self.io, ds, settings.sound);
+        let bp = settings.breakpoints.tick(&devices.cpu, self.last());
         devices.cpu.reset_finished();
         bp
     }
 }
 
 impl shared::cpu::Bus for Bus {
+    fn status(&self) -> MemStatus {
+        self.status
+    }
 
+    fn update(&mut self, status: MemStatus) {
+        self.status = status;
+    }
     /// Debug function
     /// will return a range starting from start and up to len bytes long, if possible.
     /// Will end early if the underlying memory range is smaller.
@@ -151,20 +158,19 @@ impl shared::cpu::Bus for Bus {
                     },
                     0xFF4C if self.io.writable(IO::KEY0) => {
                         self.io.compat_mode();
-                    }
+                    },
+                    0xFF70 if self.io.writable(IO::SVBK) => {
+                        self.ram.inner_mut().switch_bank(value);
+                    },
+                    0xFF4F if self.io.writable(IO::VBK) => {
+                        self.vram.inner_mut().switch_bank(value);
+                    },
                     _ => {}
                 }
             },
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
         };
-    }
-    fn status(&self) -> MemStatus {
-        self.status
-    }
-
-    fn update(&mut self, status: MemStatus) {
-        self.status = status;
     }
 
     fn direct_read(&self, offset: u16) -> u8 {

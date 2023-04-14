@@ -19,8 +19,7 @@ pub struct Apu {
     input: Input,
     dsg: dsg::DSG,
     channels: Vec<Channel>,
-    on: bool,
-    settings: AudioSettings
+    on: bool
 }
 
 impl Default for Apu {
@@ -35,8 +34,7 @@ impl Default for Apu {
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
             channels: vec![],
-            on: false,
-            settings: Default::default(),
+            on: false
         }
     }
 }
@@ -47,7 +45,7 @@ impl Apu {
         0.999958f32.powf(TICK_RATE as f32 / self.sample_rate as f32)
     }
 
-    pub(crate) fn new(sample_rate: u32, input: Input, settings: AudioSettings) -> Self {
+    pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
         #[cfg(feature = "debug")]
         let channels = vec![];
         #[cfg(not(feature = "debug"))]
@@ -66,16 +64,15 @@ impl Apu {
             input,
             dsg: dsg::DSG::new(1.),
             channels,
-            on: false,
-            settings
+            on: false
         }
     }
 
-    // TODO call this on Events::AudioDevice
-    pub fn update_sample_rate(&mut self, sample_rate: u32) {
+    pub(crate) fn switch(&mut self, new_rate: u32, input: Input) {
+        self.input = input;
         self.sample = 0.;
-        self.tick = TICK_RATE / sample_rate as f64;
-        self.sample_rate = sample_rate;
+        self.tick = TICK_RATE / (new_rate as f64);
+        self.sample_rate = new_rate;
         self.dsg.set_charge_factor(self.charge_factor());
     }
 
@@ -99,10 +96,10 @@ impl Apu {
         self.on = on;
     }
 
-    pub fn tick(&mut self, regs: &mut IORegs, ds: bool) {
+    pub fn tick(&mut self, regs: &mut IORegs, ds: bool, settings: &mut AudioSettings) {
         self.sample += 1.;
         if self.sample >= self.tick {
-            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels, regs), self.settings.volume);
+            self.input.write_sample(self.dsg.tick(&mut self.channels, &settings.channels, regs), settings.volume);
             self.sample -= self.tick;
         }
         let sound = regs.io_mut(IO::NR52);

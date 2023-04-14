@@ -111,7 +111,10 @@ impl Emulator {
         self.link.port()
     }
 
-    pub fn cycle(&mut self, clock: u8) { self.console.cycle(clock, &mut self.breakpoints); }
+    pub fn cycle(&mut self, clock: u8) { self.console.cycle(clock, bus::Settings {
+        breakpoints: &mut self.breakpoints,
+        sound: &mut self.audio_settings,
+    }); }
 
     pub fn is_running(&self) -> bool { self.console.running }
 
@@ -212,7 +215,11 @@ impl Schedule for Emulator {
     }
 
     fn speed(&self) -> i32 { self.console.speed }
-    fn set_speed(&mut self, speed: i32) { self.console.speed = speed; }
+    fn set_speed(&mut self, speed: i32) {
+        self.console.speed = speed;
+        let time = self.cycle_time();
+        log::info!("CY: {time} / CPS: {}", 1f64 / time);
+    }
 }
 
 impl Console {
@@ -231,7 +238,7 @@ impl Console {
             .skip_boot(skip)
             .set_cgb(cgb)
             .with_link(controller.serial_port())
-            .with_apu(controller.audio.apu(controller.audio_settings.clone()))
+            .with_apu(controller.audio.apu())
             .with_keybinds(controller.bindings.clone())
             .build();
         let mbc = mem::mbc::Controller::new(&rom);
@@ -249,9 +256,9 @@ impl Console {
         }
     }
 
-    pub fn cycle(&mut self, clock: u8, bp: &mut Breakpoints) {
+    pub fn cycle(&mut self, clock: u8, settings: bus::Settings) {
         if !self.running { return }
-        self.bus.tick(&mut self.gb, clock, bp);
+        self.bus.tick(&mut self.gb, clock, settings);
     }
 
     pub fn name(&self) -> &str {

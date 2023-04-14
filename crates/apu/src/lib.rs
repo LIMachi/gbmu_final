@@ -24,7 +24,6 @@ impl Default for SoundConfig {
 }
 
 pub struct Controller {
-    input: Input,
     driver: Audio
 }
 
@@ -37,20 +36,19 @@ impl Controller {
         self.driver.device()
     }
 
-    pub fn switch<S: Into<String>>(&mut self, name: S) {
-        self.driver
-            .switch(name)
-            .map(|x| x.bind(&mut self.input)).ok();
+    pub fn switch<S: Into<String>>(&mut self, name: S, apu: &mut Apu) {
+        match self.driver.switch(name) {
+            Ok(x) => apu.switch(x.sample_rate(), x.bind()),
+            Err(e) => log::warn!("failed to switch device: {e:?}")
+        }
     }
 
     pub fn new(config: &SoundConfig) -> Self {
         let audio = Audio::new(config);
-        let mut input = Input::default();
-        audio.bind(&mut input);
-        Self { input, driver: audio }
+        Self { driver: audio }
     }
 
-    pub fn apu(&self, settings: AudioSettings) -> Apu {
-        Apu::new(self.driver.sample_rate(), self.input.clone(), settings)
+    pub fn apu(&mut self) -> Apu {
+        Apu::new(self.driver.sample_rate(), self.driver.bind())
     }
 }

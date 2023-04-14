@@ -130,21 +130,23 @@ fn main() {
                     }
                 }
                 if st.elapsed().as_secs() != 0 {
+                    let t = cycles as f64 / st.elapsed().as_secs_f64();
+                    st.stop();
+                    st.start();
                     if !run {
                         run = true;
                         current = std::time::Instant::now();
+                        return ;
                     }
-                    let t = cycles as f64 / st.elapsed().as_secs_f64();
                     let p = (t / 4194304.) * 100.;
                     log::debug!("cycles: {:.0} ({:0.2} %)", t, p);
-                    st.stop();
-                    st.start();
                     cycles = 0;
                 }
             } else {
                 st.stop();
                 cycles = 0;
                 run = false;
+                acc = 0.;
             }
         });
 }

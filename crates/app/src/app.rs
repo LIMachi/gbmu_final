@@ -39,7 +39,7 @@ pub struct DbgConfig {
     pub breaks: Vec<Breakpoint>
 }
 
-#[derive(Default, Serialize, Deserialize, Clone)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
     pub roms: RomConfig,
@@ -263,14 +263,3 @@ impl shared::Ui for Menu {
             });
     }
 }
-
-//
-// when loading files and directories:
-//  -> extensions recommended: gb, gbc
-//  -> when loading directories:
-//    -> recursive search
-//    -> if we find a file with extension .gb / .gbc, look for {filename}.{png/jpg/jpeg}.
-//    -> if we find a single file in a directory, look for cover.{png/jpg/jpeg}
-//  -> use image as cover, else blank.
-//
-//

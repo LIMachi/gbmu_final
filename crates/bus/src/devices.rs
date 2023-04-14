@@ -1,4 +1,6 @@
 use apu::Apu;
+use shared::audio_settings::AudioSettings;
+use shared::breakpoints::Breakpoints;
 use shared::input::Keybindings;
 use crate::Timer;
 
@@ -70,4 +72,9 @@ impl Devices {
     pub fn builder() -> ConsoleBuilder {
         ConsoleBuilder::default()
     }
+}
+
+pub struct Settings<'a> {
+    pub breakpoints: &'a mut Breakpoints,
+    pub sound: &'a mut AudioSettings,
 }

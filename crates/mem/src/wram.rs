@@ -12,7 +12,7 @@ impl Storage {
     fn bank(&self) -> usize {
         match self {
             Storage::Dmg(_) => 0,
-            Storage::Cgb(bank, _) => { (*bank).clamp(1, 7) as usize }
+            Storage::Cgb(bank, _) => *bank
         }
     }
 }
@@ -88,7 +88,13 @@ impl Mem for Wram {
 impl Wram {
     pub fn new(cgb: bool) -> Self {
         Self {
-            storage: if cgb { Storage::Cgb(Default::default(), [[0; BANK_SIZE]; 8]) } else { Storage::Dmg([0; WRAM_SIZE]) }
+            storage: if cgb { Storage::Cgb(1, [[0; BANK_SIZE]; 8]) } else { Storage::Dmg([0; WRAM_SIZE]) }
+        }
+    }
+
+    pub fn switch_bank(&mut self, new: u8) {
+        if let Storage::Cgb(bank, _) = &mut self.storage {
+            *bank = new.clamp(1, 7) as usize;
         }
     }
 }

@@ -46,6 +46,7 @@ pub enum Events {
     Load(String),
     Loaded,
     Open(Handle),
+    AudioSwitch,
     Close
 }
 
