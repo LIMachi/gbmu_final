@@ -4,6 +4,7 @@ use shared::winit as winit;
 #[derive(Default)]
 pub struct Lcd {
     enabled: bool,
+    refresh: bool,
     pixels: Option<Pixels>
 }
 
@@ -35,6 +36,10 @@ impl LCD for Lcd {
             }
         }
     }
+
+    fn vblank(&mut self) {
+        self.refresh = true;
+    }
 }
 
 impl Lcd {
@@ -53,6 +58,12 @@ impl Lcd {
         }
     }
 
+    pub fn request(&mut self) -> bool {
+        let req = self.refresh;
+        self.refresh = false;
+        req
+    }
+
     pub fn render(&mut self) {
         if let Some(pixels) = self.pixels.as_mut() {
             pixels.render().ok();
@@ -64,4 +75,5 @@ pub trait LCD {
     fn set(&mut self, x: usize, y: usize, pixel: [u8; 3]);
     fn enable(&mut self);
     fn disable(&mut self);
+    fn vblank(&mut self);
 }

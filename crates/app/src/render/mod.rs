@@ -17,7 +17,7 @@ pub type EventLoop = winit::event_loop::EventLoop<Events>;
 pub trait Context<Ctx> {
     fn inner(&mut self) -> &mut Window;
     fn redraw(&mut self, ctx: &mut Ctx);
-    fn request_redraw(&mut self);
+    fn request_redraw(&mut self, ctx: &mut Ctx);
 
     fn resize(&mut self, physical: PhysicalSize<u32>, emu: &mut Ctx);
     fn data(&mut self) -> Box<&mut dyn std::any::Any>;
@@ -31,6 +31,7 @@ pub trait Render {
     fn render(&mut self, emu: &mut Emulator);
     fn resize(&mut self, w: u32, h: u32, emu: &mut Emulator);
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator);
+    fn should_redraw(&self, _: &mut Emulator) -> bool { true }
 }
 
 pub use egui_context::EguiContext;

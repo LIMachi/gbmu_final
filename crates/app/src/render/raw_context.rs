@@ -25,8 +25,10 @@ impl<Data: 'static + Render> Context<Emulator> for RawContext<Data> {
         self.inner.render(emu);
     }
 
-    fn request_redraw(&mut self) {
-        self.window.request_redraw();
+    fn request_redraw(&mut self, emu: &mut Emulator) {
+        if self.inner.should_redraw(emu) {
+            self.window.request_redraw();
+        }
     }
 
     fn resize(&mut self, physical: PhysicalSize<u32>, emu: &mut Emulator) {

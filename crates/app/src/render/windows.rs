@@ -67,9 +67,9 @@ impl Windows {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, emu: &mut Emulator) {
         for window in self.windows.values_mut() {
-            window.request_redraw();
+            window.request_redraw(emu);
         }
     }
 

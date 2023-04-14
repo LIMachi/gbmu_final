@@ -105,9 +105,6 @@ impl Server {
 
     pub fn run(mut self) {
         loop {
-            std::thread::sleep(Duration::from_secs(10));
-        }
-        loop {
             match self.socket.accept() {
                 Ok((stream, addr)) => self.connect(stream, addr),
                 Err(e) if e.kind() != ErrorKind::WouldBlock => log::warn!("connection refused {e:?}"),

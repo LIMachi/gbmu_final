@@ -84,24 +84,26 @@ impl Bus {
             self.clock = 0;
         } else { self.clock += 1; }
         devices.joy.tick(&mut self.io);
-        let tick = devices.hdma.tick(self);
 
-        self.last = None;
-        self.status = match self.status {
-            MemStatus::ReqRead(addr) => {
-                let v = self.read(addr);
-                self.last = Some(Op::Read(addr, v));
-                MemStatus::Read(v)
-            },
-            MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
-            st => st
-        };
         let ds = self.io.io_mut(IO::KEY1).bit(7) != 0;
-        if clock == 0 || (clock == 2 && ds) { // TODO pull this out of IO
-            devices.serial.tick(&mut self.io);
-            devices.timer.tick(&mut self.io);
-            devices.dma.tick(self);
-            if !tick { devices.cpu.cycle(self); }
+        if clock == 0 || clock == 2 {
+            let tick = devices.hdma.tick(self);
+            if clock == 0 || ds {
+                self.last = None;
+                self.status = match self.status {
+                    MemStatus::ReqRead(addr) => {
+                        let v = self.read(addr);
+                        self.last = Some(Op::Read(addr, v));
+                        MemStatus::Read(v)
+                    },
+                    MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
+                    st => st
+                };
+                devices.serial.tick(&mut self.io);
+                devices.timer.tick(&mut self.io);
+                devices.dma.tick(self);
+                if !tick { devices.cpu.cycle(self); }
+            }
         }
         devices.ppu.tick(&mut self.io, &mut self.oam, &mut self.vram, &mut devices.lcd);
         devices.apu.tick(&mut self.io, ds, settings.sound);

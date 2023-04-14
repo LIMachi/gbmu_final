@@ -138,6 +138,7 @@ impl Ppu {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     self.dots = 0;
+                    lcd.vblank();
                     lcd.enable();
                 }
                 self.set_state(io, state, next);

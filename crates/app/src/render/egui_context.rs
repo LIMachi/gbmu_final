@@ -118,7 +118,7 @@ impl<Ctx, U: 'static + Ui<Ext = Ctx> + Default> Context<Ctx> for EguiContext<Ctx
         self.rpass.remove_textures(delta).expect("gpu crashed. oh well.");
     }
 
-    fn request_redraw(&mut self) {
+    fn request_redraw(&mut self, _: &mut Ctx) {
         self.window.request_redraw();
     }
 

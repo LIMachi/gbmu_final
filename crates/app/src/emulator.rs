@@ -159,6 +159,10 @@ impl Render for Screen {
          emu.console.gb.lcd.resize(w, h);
     }
 
+    fn should_redraw(&self, emu: &mut Emulator) -> bool {
+        emu.console.gb.lcd.request()
+    }
+
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator) {
         match event {
             Event::UserEvent(Events::Play(rom)) => {

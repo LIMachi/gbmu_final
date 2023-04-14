@@ -75,7 +75,7 @@ impl App {
             match event {
                 Event::MainEventsCleared => {
                     handler(&mut self);
-                    self.windows.update();
+                    self.windows.update(&mut self.emu);
                 },
                 Event::UserEvent(Events::Close) => {
                     let conf = AppConfig {
@@ -96,9 +96,6 @@ impl App {
                         log::warn!("error while saving config {e:?}");
                     }
                     flow.set_exit();
-                }
-                Event::RedrawEventsCleared => {
-                    //TODO wait, so GPU does not burn
                 },
                 _ => {}
             }
