@@ -10,3 +10,6 @@ tests/
 gbmu.conf
 gbmu.ron
 roms/lsdj9_3_9.gb
+
+perf.data*
+flamegraph*

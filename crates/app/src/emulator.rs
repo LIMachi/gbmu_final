@@ -166,7 +166,7 @@ impl Render for Screen {
                 if let Some(raw) = &rom.raw {
                     window.set_window_icon(raw.icon());
                 }
-                window.set_title(emu.console.name());
+                window.set_title("GBMU");
             },
             Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); },
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {

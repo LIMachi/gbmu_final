@@ -148,9 +148,11 @@ impl Channel {
     }
 
     pub fn disable(&mut self, io: &mut IORegs) {
-        self.enabled = false;
-        io.io_mut(IO::NR52).reset(self.inner.channel() as u8);
-        self.inner.on_disable(io);
+        if !self.enabled {
+            self.enabled = false;
+            io.io_mut(IO::NR52).reset(self.inner.channel() as u8);
+            self.inner.on_disable(io);
+        }
     }
 
     pub fn event(&mut self, event: Event, io: &mut IORegs) {
