@@ -1,19 +1,18 @@
 use std::collections::HashSet;
-use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus, Mem};
+use shared::mem::Mem;
 
-const BANK_SIZE: u16 = 0x2000;
+const BANK_SIZE: usize = 0x2000;
 
 enum Storage {
-    DMG([u8; BANK_SIZE as usize]),
-    CGB([u8; 2 * BANK_SIZE as usize])
+    DMG([u8; BANK_SIZE]),
+    CGB([[u8; BANK_SIZE]; 2], usize)
 }
 
 impl Storage {
     fn cgb(&self) -> bool {
         match self {
             Storage::DMG(_) => false,
-            Storage::CGB(_) => true
+            Storage::CGB(..) => true
         }
     }
 
@@ -21,7 +20,7 @@ impl Storage {
         match self {
             Storage::DMG(_) if bank == 1 => 0,
             Storage::DMG(bank) => bank[addr as usize],
-            Storage::CGB(banks) => banks[addr as usize + (bank & 0x1) * BANK_SIZE as usize]
+            Storage::CGB(banks, _) => banks[bank][addr as usize]
         }
     }
 }
@@ -31,7 +30,7 @@ impl Mem for Storage {
         use Storage::*;
         match self {
             DMG(mem) => mem[addr as usize],
-            CGB(mem) => mem[addr as usize]
+            CGB(mem, bank) => mem[*bank][addr as usize]
         }
     }
 
@@ -39,7 +38,7 @@ impl Mem for Storage {
         use Storage::*;
         match self {
             DMG(mem) => mem[addr as usize] = value,
-            CGB(mem) => mem[addr as usize] = value
+            CGB(mem, bank) => mem[*bank][addr as usize] = value
         }
     }
 
@@ -47,7 +46,7 @@ impl Mem for Storage {
         use Storage::*;
         match self {
             DMG(mem) => mem[..].to_vec(),
-            CGB(mem) => mem[..].to_vec(),
+            CGB(mem, _) => [&mem[0][..], &mem[1][..]].concat(),
         }
     }
 }
@@ -74,14 +73,15 @@ impl Vram {
 
 impl Mem for Vram {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
-        let addr = addr + if self.mem.cgb() { (self.bank.read() & 0x1) as u16 * BANK_SIZE } else { 0 };
         self.mem.read(addr, absolute)
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        let bank = if self.mem.cgb() { (self.bank.read() & 0x1) as u16 } else { 0 };
-        if addr < 0x1800 { self.tile_cache.insert(addr as usize / 16 + bank as usize * 384); }
-        let addr = addr + bank * BANK_SIZE;
+        let bank = match &self.mem {
+            Storage::CGB(_, 1) => 384usize,
+            _ => 0
+        };
+        if addr < 0x1800 { self.tile_cache.insert(addr as usize / 16 + bank); }
         self.mem.write(addr, value, absolute);
     }
 
@@ -91,23 +91,24 @@ impl Mem for Vram {
 }
 
 impl Vram {
-    pub fn new() -> Self {
+    pub fn new(cgb: bool) -> Self {
         Self {
             tile_cache: HashSet::with_capacity(728),
-            mem: Storage::DMG([0; BANK_SIZE as usize]),
-            bank: IOReg::unset()
+            mem: if cgb {
+                Storage::CGB([[0; BANK_SIZE]; 2], 0)
+            } else {
+                Storage::DMG([0; BANK_SIZE])
+            },
         }
     }
 
     pub fn read_bank(&self, addr: u16, bank: usize) -> u8 {
         self.mem.read_bank(addr, bank)
     }
-}
 
-impl Device for Vram {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        if bus.is_cgb() {
-            self.mem = Storage::CGB([0; BANK_SIZE as usize * 2]);
+    pub fn switch_bank(&mut self, new: u8) {
+        if let Storage::CGB(_, bank) = &mut self.mem {
+            *bank = (new & 1) as usize;
         }
     }
 }

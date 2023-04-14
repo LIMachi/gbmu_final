@@ -1,4 +1,4 @@
-use shared::io::{AccessMode, IO, IOReg, IORegs};
+use shared::io::{AccessMode, IO, IORegs};
 use shared::mem::{Device, IOBus};
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
@@ -10,13 +10,11 @@ const DUTY_CYCLES: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
-#[derive(Default)]
 struct Registers {
-    sweep: IOReg,
-    length: IOReg,
-    volume: IOReg,
-    wave1: IOReg,
-    wave2: IOReg,
+    length: IO,
+    volume: IO,
+    wave1: IO,
+    wave2: IO,
 }
 
 #[derive(Default)]
@@ -56,7 +54,7 @@ impl Sweep {
         if self.negate { self.shadow.wrapping_sub(f) } else { self.shadow + f }
     }
 
-    pub fn tick(&mut self, wave1: &mut IOReg, wave2: &mut IOReg) -> bool {
+    pub fn tick(&mut self, io: &mut IORegs, wave1: IO, wave2: IO) -> bool {
         if !self.enabled { return false }
         self.timer -= 1;
         if self.timer == 0 {
@@ -65,7 +63,8 @@ impl Sweep {
             if self.enabled && self.pace != 0 {
                 let f = self.calc();
                 if f <= 2047 && self.shift != 0 {
-                    wave1.direct_write(f as u8);
+                    io.io_mut(wave1).direct_write(f as u8);
+                    let wave2 = io.io_mut(wave2);
                     wave2.direct_write((wave2.value() & 0x40) | ((f & 0x7FF) >> 8) as u8);
                     self.shadow = f;
                 }
@@ -96,32 +95,42 @@ impl Channel {
             envelope: Envelope::default(),
             has_sweep: sweep,
             sweep: Sweep::default(),
-            registers: Registers::default(),
+            registers: if sweep {
+                Registers {
+                    length: IO::NR11,
+                    volume: IO::NR12,
+                    wave1: IO::NR13,
+                    wave2: IO::NR14
+                }
+            } else {
+                Registers {
+                    length: IO::NR21,
+                    volume: IO::NR22,
+                    wave1: IO::NR23,
+                    wave2: IO::NR24
+                }
+            },
         }
     }
 
     fn frequency(&self, io: &mut IORegs) -> u16 {
-        if self.has_sweep {
-            io.io(IO::NR13).value() as u16 | ((io.io(IO::NR14).value() as u16 & 0x7) << 8)
-        } else {
-            io.io(IO::NR23).value() as u16 | ((io.io(IO::NR24).value() as u16 & 0x7) << 8)
-        }
+        io.io_mut(self.registers.wave1).value() as u16 | ((io.io_mut(self.registers.wave2).value() as u16 & 0x7) << 8)
     }
 
-    fn update_sweep(&mut self) {
-        self.registers.sweep.reset_dirty();
-        self.sweep.update(self.registers.sweep.value());
+    fn update_sweep(&mut self, io: &mut IORegs) {
+        io.io_mut(IO::NR10).reset_dirty();
+        self.sweep.update(io.io_mut(IO::NR10).value());
     }
 
-    fn update_envelope(&mut self) {
-        self.envelope.update(self.registers.volume.value());
-        self.registers.volume.reset_dirty();
+    fn update_envelope(&mut self, io: &mut IORegs) {
+        self.envelope.update(io.io_mut(self.registers.volume).value());
+        io.io_mut(self.registers.volume).reset_dirty();
     }
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> u8 {
-        let waveform = self.registers.length.value() >> 6;
+    fn output(&self, io: &mut IORegs) -> u8 {
+        let waveform = io.io_mut(self.registers.length).value() >> 6;
         DUTY_CYCLES[waveform as usize][self.cycle] * self.envelope.volume()
     }
 
@@ -129,31 +138,31 @@ impl SoundChannel for Channel {
         if self.has_sweep { Channels::Sweep } else { Channels::Pulse }
     }
 
-    fn dac_enabled(&self) -> bool {
-        self.registers.volume.value() & 0xF8 != 0
+    fn dac_enabled(&self, io: &mut IORegs) -> bool {
+        io.io_mut(self.registers.volume).value() & 0xF8 != 0
     }
 
-    fn clock(&mut self) {
-        if self.registers.volume.dirty() { self.update_envelope(); }
-        if self.registers.sweep.dirty() { self.update_sweep(); }
+    fn clock(&mut self, io: &mut IORegs) {
+        if io.io_mut(self.registers.volume).dirty() { self.update_envelope(io); }
+        if self.has_sweep && io.io_mut(IO::NR10).dirty() { self.update_sweep(io); }
         if !self.triggered { return }
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x7;
-            self.freq_timer = 4 * (0x7FF - self.frequency());
+            self.freq_timer = 4 * (0x7FF - self.frequency(io));
         } else {
             self.freq_timer -= 1;
         }
     }
 
-    fn trigger(&mut self) -> bool {
+    fn trigger(&mut self, io: &mut IORegs) -> bool {
         self.triggered = true;
         self.envelope.trigger();
-        self.freq_timer = 4 * (0x7FF - self.frequency()) | (self.freq_timer & 0x3);
-        self.sweep.trigger(self.frequency()) > 2047
+        self.freq_timer = 4 * (0x7FF - self.frequency(io)) | (self.freq_timer & 0x3);
+        self.sweep.trigger(self.frequency(io)) > 2047
     }
 
-    fn sweep(&mut self) -> bool {
-        if self.has_sweep { self.sweep.tick(&mut self.registers.wave1, &mut self.registers.wave2) }
+    fn sweep(&mut self, io: &mut IORegs) -> bool {
+        if self.has_sweep { self.sweep.tick(io, self.registers.wave1, self.registers.wave2) }
         else { false }
     }
 
@@ -163,28 +172,32 @@ impl SoundChannel for Channel {
 
     fn length(&self) -> u8 { 0x3F }
 
-    fn power_on(&mut self) {
-        self.registers.sweep.set_access(IO::NR10.access());
+    fn power_on(&mut self, io: &mut IORegs) {
+        if self.has_sweep {
+            io.io_mut(IO::NR10).set_access(IO::NR10.access());
+        }
     }
 
-    fn power_off(&mut self) {
-        self.registers.sweep.set_access(AccessMode::rdonly()).direct_write(0);
+    fn power_off(&mut self, io: &mut IORegs) {
+        if self.has_sweep {
+            io.io_mut(IO::NR10).direct_write(0).set_access(AccessMode::rdonly());
+        }
     }
 }
 
 impl Device for Channel {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        if self.has_sweep {
-            self.registers.sweep = bus.io(IO::NR10);
-            self.registers.length = bus.io(IO::NR11);
-            self.registers.volume = bus.io(IO::NR12);
-            self.registers.wave1 = bus.io(IO::NR13);
-            self.registers.wave2 = bus.io(IO::NR14);
-        } else {
-            self.registers.length = bus.io(IO::NR21);
-            self.registers.volume = bus.io(IO::NR22);
-            self.registers.wave1 = bus.io(IO::NR23);
-            self.registers.wave2 = bus.io(IO::NR24);
-        }
+    fn configure(&mut self, _bus: &dyn IOBus) {
+        // if self.has_sweep {
+        //     self.registers.sweep = bus.io(IO::NR10);
+        //     self.registers.length = bus.io(IO::NR11);
+        //     self.registers.volume = bus.io(IO::NR12);
+        //     self.registers.wave1 = bus.io(IO::NR13);
+        //     self.registers.wave2 = bus.io(IO::NR14);
+        // } else {
+        //     self.registers.length = bus.io(IO::NR21);
+        //     self.registers.volume = bus.io(IO::NR22);
+        //     self.registers.wave1 = bus.io(IO::NR23);
+        //     self.registers.wave2 = bus.io(IO::NR24);
+        // }
     }
 }

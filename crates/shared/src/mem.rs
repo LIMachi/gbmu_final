@@ -89,16 +89,11 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
 
 impl Mem for () { }
 
-pub trait MemoryBus {
-    fn with_mbc<C: MBCController + 'static>(self, controller: C) -> Self;
-    fn with_ppu<P: PPU>(self, ppu: &mut P) -> Self;
-    fn with_wram<R: Device + Mem + 'static>(self, ram: R) -> Self;
-}
-
 pub trait IOBus {
     fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
 
-    fn io(&self, io: IO) -> &mut IOReg;
+    fn io_mut(&mut self, io: IO) -> &mut IOReg;
+    fn io(&self, io: IO) -> &IOReg;
     fn io_addr(&mut self, io: u16) -> Option<&mut IOReg>;
 
     fn read(&self, addr: u16) -> u8;
@@ -111,7 +106,7 @@ pub trait IOBus {
     fn lock(&mut self);
     fn unlock(&mut self);
 
-    fn mbc(&self) -> std::cell::Ref<dyn MBCController>;
+    fn mbc(&self) -> Box<&dyn MBCController>;
 }
 
 pub trait Device {
@@ -120,12 +115,6 @@ pub trait Device {
 }
 
 impl Device for () { }
-
-
-pub trait PPU: Device {
-    fn vram(&self) -> Rc<RefCell<dyn Mem>>;
-    fn oam(&self) -> Rc<RefCell<dyn Mem>>;
-}
 
 pub trait MBCController: Device + Mem {
     fn rom_bank(&self) -> usize;

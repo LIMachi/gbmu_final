@@ -1,11 +1,12 @@
 use apu::Apu;
 use shared::audio_settings::AudioSettings;
+use shared::breakpoints::Breakpoints;
 use shared::input::Keybindings;
 use crate::Timer;
 
 #[derive(Default)]
-struct ConsoleBuilder {
-    apu: Option<apu::Apu>,
+pub struct ConsoleBuilder {
+    apu: Option<Apu>,
     serial: Option<serial::Port>,
     joypad: Option<joy::Joypad>,
     skip: bool,
@@ -34,14 +35,14 @@ impl ConsoleBuilder {
         self.cgb = cgb; self
     }
 
-    pub fn build(mut self) -> Console {
+    pub fn build(self) -> Devices {
         let mut cpu = cpu::Cpu::default();
 
-        let lcd = lcd::Lcd::new();
+        let lcd = lcd::Lcd::default();
         let ppu = ppu::Controller::new();
         if self.skip { cpu.skip_boot(self.cgb); }
 
-        Console {
+        Devices {
             cpu: cpu::Cpu::default(),
             ppu,
             lcd,
@@ -55,8 +56,7 @@ impl ConsoleBuilder {
     }
 }
 
-#[derive(Default)]
-pub struct Console {
+pub struct Devices {
     pub cpu: cpu::Cpu,
     pub ppu: ppu::Controller,
     pub joy: joy::Joypad,
@@ -64,19 +64,17 @@ pub struct Console {
     pub dma: ppu::Dma,
     pub hdma: ppu::Hdma,
     pub timer: Timer,
-    pub apu: apu::Apu,
+    pub apu: Apu,
     pub serial: serial::Port,
 }
 
-impl Console {
+impl Devices {
     pub fn builder() -> ConsoleBuilder {
         ConsoleBuilder::default()
     }
+}
 
-    pub fn skip_boot(&mut self, skip: bool, cgb: bool) {
-        if skip {
-            self.cpu.skip_boot(cgb);
-            bus.io(shared::io::IO::DIV).direct_write(0xAC)
-        }
-    }
+pub struct Settings<'a> {
+    pub breakpoints: &'a mut Breakpoints,
+    pub sound: &'a mut AudioSettings,
 }

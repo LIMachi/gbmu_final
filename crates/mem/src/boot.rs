@@ -71,9 +71,9 @@ impl<MBC: Mbc> Mem for Boot<MBC> {
 
     fn value(&self, addr: u16, absolute: u16) -> u8 {
         if self.boot.contains(absolute) {
-            self.boot.read(addr, absolute)
+            self.boot.value(addr, absolute)
         } else {
-            self.inner.as_ref().unwrap().read(addr, absolute)
+            self.inner.as_ref().unwrap().value(addr, absolute)
         }
     }
 

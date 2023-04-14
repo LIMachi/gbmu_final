@@ -3,7 +3,7 @@ use super::Input;
 
 mod dsg;
 
-use shared::io::{IO, IOReg, IORegs};
+use shared::io::{IO, IORegs};
 use dsg::{Channel, Event};
 use shared::audio_settings::AudioSettings;
 use shared::utils::FEdge;
@@ -19,8 +19,7 @@ pub struct Apu {
     input: Input,
     dsg: dsg::DSG,
     channels: Vec<Channel>,
-    on: bool,
-    settings: AudioSettings
+    on: bool
 }
 
 impl Default for Apu {
@@ -35,8 +34,7 @@ impl Default for Apu {
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
             channels: vec![],
-            on: false,
-            settings: Default::default(),
+            on: false
         }
     }
 }
@@ -47,7 +45,7 @@ impl Apu {
         0.999958f32.powf(TICK_RATE as f32 / self.sample_rate as f32)
     }
 
-    pub(crate) fn new(sample_rate: u32, input: Input, settings: AudioSettings) -> Self {
+    pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
         #[cfg(feature = "debug")]
         let channels = vec![];
         #[cfg(not(feature = "debug"))]
@@ -66,21 +64,20 @@ impl Apu {
             input,
             dsg: dsg::DSG::new(1.),
             channels,
-            on: false,
-            settings
+            on: false
         }
     }
 
-    // TODO call this on Events::AudioDevice
-    pub fn update_sample_rate(&mut self, sample_rate: u32) {
+    pub(crate) fn switch(&mut self, new_rate: u32, input: Input) {
+        self.input = input;
         self.sample = 0.;
-        self.tick = TICK_RATE / sample_rate as f64;
-        self.sample_rate = sample_rate;
+        self.tick = TICK_RATE / (new_rate as f64);
+        self.sample_rate = new_rate;
         self.dsg.set_charge_factor(self.charge_factor());
     }
 
     fn power(&mut self, io: &mut IORegs, on: bool) {
-        self.sound.reset_dirty();
+        io.io_mut(IO::NR52).reset_dirty();
         if on != self.on {
             if on {
                 log::info!("APU on");
@@ -99,26 +96,26 @@ impl Apu {
         self.on = on;
     }
 
-    pub fn tick(&mut self, regs: &mut IORegs, ds: bool) {
+    pub fn tick(&mut self, regs: &mut IORegs, ds: bool, settings: &mut AudioSettings) {
         self.sample += 1.;
         if self.sample >= self.tick {
-            self.input.write_sample(self.dsg.tick(&mut self.channels, &self.settings.channels), *self.settings.volume.as_ref().borrow());
+            self.input.write_sample(self.dsg.tick(&mut self.channels, &settings.channels, regs), settings.volume);
             self.sample -= self.tick;
         }
-        let sound = regs.io(IO::NR52);
+        let sound = regs.io_mut(IO::NR52);
         if sound.dirty() { sound.reset_dirty(); let on = sound.bit(7) != 0; self.power(regs, on); }
         if !self.on { return; }
         for channel in self.channels.iter_mut() {
             channel.clock(regs);
         }
-        if self.fedge.tick(self.div.bit(if ds { 5 } else { 4 }) != 0) {
+        if self.fedge.tick(regs.io_mut(IO::DIV).bit(if ds { 5 } else { 4 }) != 0) {
             match self.div_apu {
-                0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length)),
+                0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length, regs)),
                 2 | 6 => self.channels.iter_mut().for_each(|x| {
-                    x.event(Event::Sweep);
-                    x.event(Event::Length);
+                    x.event(Event::Sweep, regs);
+                    x.event(Event::Length, regs);
                 }),
-                7 => self.channels.iter_mut().for_each(|x| x.event(Event::Envelope)),
+                7 => self.channels.iter_mut().for_each(|x| x.event(Event::Envelope, regs)),
                 _ => {}
             }
             self.div_apu += 1;
@@ -128,13 +125,13 @@ impl Apu {
 }
 
 impl shared::mem::Device for Apu {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.channels.iter_mut().for_each(|x| {
-            x.configure(bus);
-        });
-        self.sound = bus.io(IO::NR52);
-        self.dsg.configure(bus);
+    fn configure(&mut self, _bus: &dyn IOBus) {
+        // self.channels.iter_mut().for_each(|x| {
+        //     x.configure(bus);
+        // });
+        // self.sound = bus.io(IO::NR52);
+        // self.dsg.configure(bus);
         self.dsg.set_charge_factor(self.charge_factor());
-        self.div = bus.io(IO::DIV);
+        // self.div = bus.io(IO::DIV);
     }
 }

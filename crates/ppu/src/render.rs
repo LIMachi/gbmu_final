@@ -2,19 +2,50 @@ use shared::egui::*;
 use shared::egui::epaint::ImageDelta;
 
 use super::*;
-use ppu::Ppu;
 
 mod tabs;
 mod tilemap;
 mod oam;
 mod bgmap;
 
-pub(crate) use bgmap::TileData;
+use crate::ppu::Ppu;
+
+pub struct VramViewer<E> {
+    tab: Tabs,
+    storage: HashMap<Textures, TextureHandle>,
+    bg_data: Option<bgmap::TileData>,
+    init: bool,
+    emu: PhantomData<E>
+}
+
+impl<E> Default for VramViewer<E> {
+    fn default() -> Self {
+        VramViewer {
+            tab: Tabs::Oam,
+            storage: Default::default(),
+            init: false,
+            emu: Default::default(),
+            bg_data: None
+        }
+    }
+}
+
+pub trait VramAccess {
+    fn vram(&self) -> &Vram;
+    fn vram_mut(&mut self) -> &mut Vram;
+
+    fn oam(&self) -> &Oam;
+    fn oam_mut(&mut self) -> &mut Oam;
+}
+
+pub trait PpuAccess: VramAccess {
+    fn ppu(&self) -> &Ppu;
+}
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum Textures {
+pub(crate) enum Textures {
     None,
     Blank,
     Placeholder,
@@ -22,7 +53,7 @@ pub enum Textures {
     Miniature
 }
 
-pub struct PixelBuffer<const W: usize, const H: usize> where [(); W * H]: Sized {
+struct PixelBuffer<const W: usize, const H: usize> where [(); W * H]: Sized {
     pixels: [u8; W * H]
 }
 
@@ -65,7 +96,7 @@ impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized 
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-pub enum Tabs {
+enum Tabs {
     Oam,
     Tiledata,
     Tilemap
@@ -77,41 +108,61 @@ impl tabs::Tab for Tabs {
     }
 }
 
-impl shared::Ui for Controller {
-    fn init(&mut self, ctx: &mut Context) {
+impl<E: Emulator> VramViewer<E> {
+
+    pub(crate) fn get(&self, tile: usize) -> TextureHandle {
+        self.storage.get(&Textures::Tile(tile))
+            .or(self.storage.get(&Textures::Blank))
+            .cloned().unwrap()
+    }
+
+    pub(crate) fn insert(&mut self, tile: Textures, tex: TextureHandle) {
+        self.storage.insert(tile, tex);
+    }
+
+    pub(crate) fn tex(&self, tex: Textures) -> Option<TextureHandle> {
+        self.storage.get(&tex).cloned()
+    }
+}
+
+impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
+    type Ext = E;
+
+    fn init(&mut self, ctx: &mut Context, emu: &mut E) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
-        let count = if self.ppu.regs.cgb.value() != 0 { 768 } else { 384 };
+        let count = if emu.bus().is_cgb() { 768 } else { 384 };
         for n in 0..count {
             let s = Textures::Tile(n);
-            self.ui.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
+            self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
         }
-        self.ui.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
-        self.ui.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
-        self.ui.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
-        self.ui.insert(Textures::Miniature, ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.storage.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
+        self.storage.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.storage.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
+        self.storage.insert(Textures::Miniature,ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.init = true;
     }
 
-    fn draw(&mut self, ctx: &mut Context) {
+    fn draw(&mut self, ctx: &mut Context, emu: &mut E) {
         if !self.init {
-            self.init(ctx);
+            self.init(ctx, emu);
             self.init = true;
         }
-        let tiles: Vec<usize> = { self.ppu.vram_mut().inner_mut().tile_cache.drain().collect() };
+        let tiles: Vec<usize> = emu.vram_mut().tile_cache.drain().take(5).collect();
+        let vram = emu.vram();
         for n in tiles {
-            let buf = PixelBuffer::<8, 8>::new(self.ppu.vram().inner().tile_data(n % 384, n / 384)).image::<64, 64>();
-            let id = self.ui.tex(Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id();
+            let buf = PixelBuffer::<8, 8>::new(vram.tile_data(n % 384, n / 384)).image::<64, 64>();
+            let id = self.tex(Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id();
             ctx.tex_manager().write().set(id, ImageDelta::full(buf, TextureOptions::NEAREST));
         }
         CentralPanel::default()
             .show(ctx, |ui|
                 tabs::Tabs::new(&mut self.tab, ui,&[Tabs::Oam, Tabs::Tiledata, Tabs::Tilemap])
-                    .with_tab(Tabs::Oam, oam::Oam(&mut self.ui, &self.ppu))
-                    .with_tab(Tabs::Tiledata, bgmap::BgMap(&mut self.ui, &self.ppu, ctx))
-                    .with_tab(Tabs::Tilemap, tilemap::Tilemap(&mut self.ui))
+                    .with_tab(Tabs::Oam, oam::Oam(self, emu))
+                    .with_tab(Tabs::Tiledata, bgmap::BgMap(self, emu, ctx))
+                    .with_tab(Tabs::Tilemap, tilemap::Tilemap(self))
                     .response());
     }
 
-    fn handle(&mut self, _event: &shared::Event) {
+    fn handle(&mut self, _event: &shared::Event, _emu: &mut E) {
     }
 }

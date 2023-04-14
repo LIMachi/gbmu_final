@@ -6,14 +6,14 @@ pub trait Tab {
     fn name(&self) -> String;
 }
 
-pub struct Tabs<'a, 'ui, E: PartialEq + Eq + Clone + Hash + Tab> {
-    current: &'a mut E,
+pub struct Tabs<'ui, E: PartialEq + Eq + Copy + Clone + Hash + Tab> {
+    current: E,
     ui: &'ui mut egui::Ui,
     res: Option<Response>
 }
 
-impl<'a, 'ui, E: PartialEq + Eq + Hash + Clone + Tab> Tabs<'a, 'ui, E> {
-    pub fn new(current: &'a mut E, ui: &'ui mut Ui, values: &[E]) -> Self {
+impl<'ui, E: PartialEq + Eq + Hash + Copy + Clone + Tab> Tabs<'ui, E> {
+    pub fn new(current: &mut E, ui: &'ui mut Ui, values: &[E]) -> Self {
         egui::Frame::group(ui.style())
             .fill(super::DARK_BLACK)
             .show(ui, |ui| {
@@ -28,11 +28,11 @@ impl<'a, 'ui, E: PartialEq + Eq + Hash + Clone + Tab> Tabs<'a, 'ui, E> {
                     }
                 });
             });
-        Self { current, ui, res: None }
+        Self { current: *current, ui, res: None }
     }
 
     pub fn with_tab<W: Widget>(mut self, name: E, tab: W) -> Self {
-        if &name == self.current {
+        if name == self.current {
             self.res = Some(egui::Frame::none()
                 .outer_margin(Margin::symmetric(0., 8.))
                 .show(self.ui, |ui| ui.add(tab)).response);

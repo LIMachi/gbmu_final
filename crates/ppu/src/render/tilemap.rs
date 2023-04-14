@@ -1,7 +1,9 @@
 use shared::egui::{Image, Response, TextureId, Ui, Widget};
+use shared::emulator::Emulator;
 use crate::render::Textures;
+use crate::VramViewer;
 
-pub struct Tilemap<'a>(pub(crate) &'a mut crate::UiData);
+pub struct Tilemap<'a, E: Emulator>(pub(crate) &'a mut VramViewer<E>);
 struct Tile(Image, u8, bool);
 
 impl Widget for Tile {
@@ -19,7 +21,7 @@ impl Tile {
 }
 
 
-impl Widget for Tilemap<'_> {
+impl<E: Emulator> Widget for Tilemap<'_, E> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.spacing_mut().item_spacing.x = 1.;
         ui.spacing_mut().item_spacing.y = 1.;

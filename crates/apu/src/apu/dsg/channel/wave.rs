@@ -1,6 +1,25 @@
-use shared::io::{AccessMode, IO, IOReg, IORegs};
-use shared::mem::{Device, IOBus};
+use shared::io::{AccessMode, IO, IORegs};
+use shared::mem::Device;
 use super::{SoundChannel, Channels};
+
+const PATTERN_REG: [IO; 16] = [
+    IO::WaveRam0,
+    IO::WaveRam1,
+    IO::WaveRam2,
+    IO::WaveRam3,
+    IO::WaveRam4,
+    IO::WaveRam5,
+    IO::WaveRam6,
+    IO::WaveRam7,
+    IO::WaveRam8,
+    IO::WaveRam9,
+    IO::WaveRamA,
+    IO::WaveRamB,
+    IO::WaveRamC,
+    IO::WaveRamD,
+    IO::WaveRamE,
+    IO::WaveRamF
+];
 
 pub struct Channel {
     cycle: usize,
@@ -16,7 +35,7 @@ impl Channel {
     }
 
     fn frequency(&self, io: &mut IORegs) -> u16 {
-        io.io(IO::NR33).value() as u16 | ((io.io(IO::NR34).value() as u16 & 0x7) << 8)
+        io.io_mut(IO::NR33).value() as u16 | ((io.io_mut(IO::NR34).value() as u16 & 0x7) << 8)
     }
 }
 
@@ -47,22 +66,22 @@ impl Device for Channel {
 }
 
 impl SoundChannel for Channel {
-    fn output(&self) -> u8 {
-        let v = (self.registers.volume.value() >> 5) & 0x3;
+    fn output(&self, io: &mut IORegs) -> u8 {
+        let v = (io.io_mut(IO::NR32).value() >> 5) & 0x3;
         if v == 0 { return 0 }
-        ((self.registers.pattern[self.cycle / 2].value() >> ((self.cycle & 1) * 4)) & 0xF) >> (v - 1)
+        ((io.io_mut(PATTERN_REG[self.cycle / 2]).value() >> ((self.cycle & 1) * 4)) & 0xF) >> (v - 1)
     }
 
     fn channel(&self) -> Channels { Channels::Wave }
 
-    fn dac_enabled(&self) -> bool {
-        self.registers.dac_enable.bit(7) != 0
+    fn dac_enabled(&self, io: &mut IORegs) -> bool {
+        io.io_mut(IO::NR30).bit(7) != 0
     }
 
-    fn clock(&mut self) {
+    fn clock(&mut self, io: &mut IORegs) {
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x1F;
-            self.freq_timer = 2 * (0x7FF - self.frequency());
+            self.freq_timer = 2 * (0x7FF - self.frequency(io));
         } else {
             self.freq_timer -= 1;
         }
@@ -70,35 +89,35 @@ impl SoundChannel for Channel {
 
     fn trigger(&mut self, io: &mut IORegs) -> bool {
         self.cycle = 1;
-        self.freq_timer = 2 * (0x7FF - self.frequency()) | (self.freq_timer & 0x3);
+        self.freq_timer = 2 * (0x7FF - self.frequency(io)) | (self.freq_timer & 0x3);
         false //FIXME: handle special cases/obscure behaviors
     }
 
     fn length(&self) -> u8 { 0xFF }
 
-    fn on_enable(&mut self) {
-        for w in self.registers.pattern.iter() {
-            w.set_access(AccessMode::unused());
+    fn on_enable(&mut self, io: &mut IORegs) {
+        for pr in PATTERN_REG {
+            io.io_mut(pr).set_access(AccessMode::unused());
         }
     }
 
-    fn on_disable(&mut self) {
-        for w in self.registers.pattern.iter() {
-            w.set_access(AccessMode::rw());
+    fn on_disable(&mut self, io: &mut IORegs) {
+        for pr in PATTERN_REG {
+            io.io_mut(pr).set_access(AccessMode::rw());
         }
     }
 
-    fn power_on(&mut self) {
-        self.registers.dac_enable.set_access(IO::NR30.access());
-        for wave in &self.registers.pattern {
-            wave.set_access(IO::WaveRam0.access());
+    fn power_on(&mut self, io: &mut IORegs) {
+        io.io_mut(IO::NR30).set_access(IO::NR30.access());
+        for pr in PATTERN_REG {
+            io.io_mut(pr).set_access(AccessMode::rw());
         }
     }
 
-    fn power_off(&mut self) {
-        self.registers.dac_enable.set_access(AccessMode::rdonly()).direct_write(0);
-        for wave in &self.registers.pattern {
-            wave.set_access(AccessMode::rdonly()).direct_write(0);
+    fn power_off(&mut self, io: &mut IORegs) {
+        io.io_mut(IO::NR30).direct_write(0).set_access(AccessMode::rdonly());
+        for pr in PATTERN_REG {
+            io.io_mut(pr).direct_write(0).set_access(AccessMode::rdonly());
         }
     }
 }

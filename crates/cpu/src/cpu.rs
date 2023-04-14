@@ -1,7 +1,6 @@
 use crate::Bus;
 use shared::{cpu::{Reg, Value, Opcode}};
-use shared::io::{IO, IOReg};
-use shared::mem::{Device, IOBus};
+use shared::mem::Device;
 use super::{ops::*, State, Registers, decode::decode};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -22,7 +21,7 @@ pub struct Cpu {
     ime: bool
 }
 
-impl shared::Cpu for Cpu {
+impl shared::cpu::Cpu for Cpu {
     fn done(&self) -> bool { self.finished }
     fn previous(&self) -> Opcode { self.prev }
     fn register(&self, reg: Reg) -> Value { self.regs.read(reg) }
