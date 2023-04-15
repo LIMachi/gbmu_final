@@ -148,7 +148,7 @@ impl Channel {
     }
 
     pub fn disable(&mut self, io: &mut IORegs) {
-        if !self.enabled {
+        if self.enabled {
             self.enabled = false;
             io.io_mut(IO::NR52).reset(self.inner.channel() as u8);
             self.inner.on_disable(io);
@@ -199,8 +199,12 @@ impl Channel {
             nr1.reset_dirty();
             self.reload_length(nr1.value());
         }
-        if !self.inner.dac_enabled(io) { self.disable(io); }
-        if self.enabled { self.inner.clock(io); }
+        if !self.inner.dac_enabled(io) {
+            self.disable(io);
+        }
+        if self.enabled {
+            self.inner.clock(io);
+        }
     }
 
     pub fn trigger(&mut self, io: &mut IORegs) -> bool {
