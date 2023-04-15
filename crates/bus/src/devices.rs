@@ -7,6 +7,7 @@ use crate::Timer;
 #[derive(Default)]
 pub struct ConsoleBuilder {
     apu: Option<Apu>,
+    #[cfg(feature = "serial")]
     serial: Option<serial::Port>,
     joypad: Option<joy::Joypad>,
     skip: bool,
@@ -15,10 +16,12 @@ pub struct ConsoleBuilder {
 
 impl ConsoleBuilder {
 
+    #[cfg(feature = "serial")]
     pub fn with_link(mut self, cable: serial::com::Serial) -> Self {
         self.serial = Some(serial::Port::new(cable)); self
     }
 
+    #[cfg(feature = "audio")]
     pub fn with_apu(mut self, apu: Apu) -> Self {
         self.apu = Some(apu); self
     }
@@ -46,9 +49,11 @@ impl ConsoleBuilder {
             cpu: cpu::Cpu::default(),
             ppu,
             lcd,
+            #[cfg(feature = "audio")]
             apu: self.apu.unwrap_or_default(),
             dma: ppu::Dma::default(),
             hdma: ppu::Hdma::default(),
+            #[cfg(feature = "serial")]
             serial: self.serial.unwrap_or_default(),
             timer: Timer::default(),
             joy: self.joypad.unwrap_or_default(),
@@ -64,7 +69,9 @@ pub struct Devices {
     pub dma: ppu::Dma,
     pub hdma: ppu::Hdma,
     pub timer: Timer,
+    #[cfg(feature = "audio")]
     pub apu: Apu,
+    #[cfg(feature = "serial")]
     pub serial: serial::Port,
 }
 
@@ -76,5 +83,6 @@ impl Devices {
 
 pub struct Settings<'a> {
     pub breakpoints: &'a mut Breakpoints,
+    #[cfg(feature = "audio")]
     pub sound: &'a mut AudioSettings,
 }

@@ -60,43 +60,58 @@ impl Default for EmuSettings {
 pub struct Emulator {
     pub roms: RomConfig,
     pub proxy: Proxy,
+    #[cfg(feature = "audio")]
     pub audio: apu::Controller,
     pub settings: EmuSettings,
+    #[cfg(feature = "audio")]
     pub audio_settings: AudioSettings,
+    #[cfg(feature = "audio")]
     pub audio_device: SoundConfig,
     pub bindings: Keybindings,
     pub(crate) breakpoints: Breakpoints,
     pub console: Console,
     pub cgb: Mode,
+    #[cfg(feature = "boot")]
     pub bios: bool,
+    #[cfg(feature = "serial")]
     pub link: Link,
+    #[cfg(feature = "serial")]
     pub link_port: u16,
 }
 
 impl Emulator {
 
     pub fn new(proxy: Proxy, conf: AppConfig) -> Self {
+        #[cfg(feature = "serial")]
         let link = Link::new();
+        #[cfg(feature = "serial")]
         let port = link.port;
         Self {
+            #[cfg(feature = "serial")]
             link,
+            #[cfg(feature = "serial")]
             link_port: port,
             proxy,
             bindings: conf.keys,
             roms: conf.roms,
             settings: conf.emu,
             console: Console::default(),
+            #[cfg(feature = "audio")]
             audio_settings: conf.audio_settings,
+            #[cfg(feature = "audio")]
             audio: apu::Controller::new(&conf.sound_device),
+            #[cfg(feature = "audio")]
             audio_device: conf.sound_device,
             breakpoints: Breakpoints::new(conf.debug.breaks),
             cgb: conf.mode,
+            #[cfg(feature = "boot")]
             bios: conf.bios,
         }
     }
 
     pub fn mode(&self) -> Mode { self.cgb }
 
+    #[cfg(feature = "serial")]
     pub fn link_do<R, F: Fn(&mut Serial) -> R>(&mut self, f: F) -> R {
         self.link.as_mut()
             .map(|x| f(x))
@@ -105,16 +120,29 @@ impl Emulator {
             })
     }
 
-    pub fn enabled_boot(&self) -> bool { self.bios }
+    pub fn enabled_boot(&self) -> bool {
+        #[cfg(feature = "boot")]
+        {
+            self.bios
+        }
+        #[cfg(not(feature = "boot"))]
+        {
+            false
+        }
+    }
 
+    #[cfg(feature = "serial")]
     pub fn serial_port(&mut self) -> serial::com::Serial {
         self.link.port()
     }
 
-    pub fn cycle(&mut self, clock: u8) { self.console.cycle(clock, bus::Settings {
-        breakpoints: &mut self.breakpoints,
-        sound: &mut self.audio_settings,
-    }); }
+    pub fn cycle(&mut self, clock: u8) {
+        self.console.cycle(clock, bus::Settings {
+            breakpoints: &mut self.breakpoints,
+            #[cfg(feature = "audio")]
+            sound: &mut self.audio_settings,
+        });
+    }
 
     pub fn is_running(&self) -> bool { self.console.running }
 
@@ -133,10 +161,9 @@ impl Emulator {
     }
 
     fn insert(&mut self, rom: Rom, running: bool) {
-        {
-            if self.link.borrowed() {
-                self.link.store(self.console.gb.serial.disconnect());
-            }
+        #[cfg(feature = "serial")]
+        if self.link.borrowed() {
+            self.link.store(self.console.gb.serial.disconnect());
         }
         self.console = Console::new(self, rom, running);
         self.proxy.send_event(Events::Reload).ok();
@@ -241,10 +268,12 @@ impl Console {
         let gb = Devices::builder()
             .skip_boot(skip)
             .set_cgb(cgb)
-            .with_link(controller.serial_port())
-            .with_apu(controller.audio.apu())
-            .with_keybinds(controller.bindings.clone())
-            .build();
+            .with_keybinds(controller.bindings.clone());
+        #[cfg(feature = "audio")]
+        let gb = gb.with_apu(controller.audio.apu());
+        #[cfg(feature = "serial")]
+        let gb = gb.with_link(controller.serial_port());
+        let gb = gb.build();
         let mbc = mem::mbc::Controller::new(&rom);
         let mbc = if skip { mbc.skip_boot() } else { mbc };
         let bus = bus::Bus::new(cgb);

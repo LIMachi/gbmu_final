@@ -5,6 +5,16 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.release]
+debug = 1
+
+[features]
+debug = ["apu/debug"]
+serial = ["bus/serial"]
+audio = ["bus/audio"]
+boot = []
+file_log = []
+
 [dependencies]
 log = "0.4.17"
 anyhow = "1.0.69"
@@ -29,10 +39,6 @@ features = ["serde"]
 [dependencies.serde]
 version = "1.0.152"
 features = ["derive"]
-
-[features]
-debug = []
-file_log = []
 
 [dependencies.dbg]
 path = "../dbg"
