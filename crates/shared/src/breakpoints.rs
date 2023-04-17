@@ -216,7 +216,6 @@ impl Breakpoints {
         let mut stop = false;
         self.breakpoints.drain_filter(|bp| {
             let (once, res) = bp.tick(cpu, last);
-            log::info!("{bp:?} {res}");
             stop |= res;
             once && res
         });
