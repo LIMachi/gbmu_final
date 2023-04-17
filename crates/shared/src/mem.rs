@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::io::{IO, IOReg};
+use crate::io::{IO, IOReg, IORegs};
 
 pub mod lock;
 pub use lock::*;
@@ -90,11 +90,10 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
 impl Mem for () { }
 
 pub trait IOBus {
-    fn configure<Dev: 'static + Device>(self, dev: &mut Dev) -> Self where Self: 'static + Sized { dev.configure(&self); self }
-
     fn io_mut(&mut self, io: IO) -> &mut IOReg;
     fn io(&self, io: IO) -> &IOReg;
     fn io_addr(&mut self, io: u16) -> Option<&mut IOReg>;
+    fn io_regs(&mut self) -> &mut IORegs;
 
     fn read(&self, addr: u16) -> u8;
     fn is_cgb(&self) -> bool;
@@ -109,14 +108,7 @@ pub trait IOBus {
     fn mbc(&self) -> Box<&dyn MBCController>;
 }
 
-pub trait Device {
-    fn configure(&mut self, _bus: &dyn IOBus) { }
-    fn latch(&mut self, _bus: &dyn IOBus) { }
-}
-
-impl Device for () { }
-
-pub trait MBCController: Device + Mem {
+pub trait MBCController: Mem {
     fn rom_bank(&self) -> usize;
     fn ram_bank(&self) -> usize;
     fn tick(&mut self);

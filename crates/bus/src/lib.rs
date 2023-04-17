@@ -47,14 +47,15 @@ impl Bus {
     }
 
     pub fn with_mbc(mut self, mut controller: mem::mbc::Controller) -> Self {
-        controller.configure(&mut self);
         self.mbc = controller.locked();
         self
     }
 
-    pub fn skip_boot(mut self, console: u8) -> Self {
-        self.status = MemStatus::ReqRead(0x100);
-        self.io.skip_boot(console);
+    pub fn skip_boot(mut self, skip: bool, console: u8) -> Self {
+        if skip {
+            self.status = MemStatus::ReqRead(0x100);
+            self.io.skip_boot(console);
+        }
         self
     }
 
@@ -102,7 +103,14 @@ impl Bus {
                 devices.serial.tick(&mut self.io);
                 devices.timer.tick(&mut self.io);
                 devices.dma.tick(self);
-                if !tick { devices.cpu.cycle(self); }
+                if !tick {
+                    devices.cpu.cycle(self);
+                    if let Some(Op::Write(addr, v)) = self.last {
+                        if matches!(addr, IO..=IO_END) {
+                            devices.io_write(addr, v, self);
+                        }
+                    }
+                }
             }
         }
         devices.ppu.tick(&mut self.io, &mut self.oam, &mut self.vram, &mut devices.lcd);
@@ -155,7 +163,6 @@ impl shared::cpu::Bus for Bus {
                 self.io.write(addr - IO, value, addr);
                 match addr {
                     0xFF50 if self.io.writable(IO::POST) => {
-                        self.mbc.inner_mut().post();
                         self.io.post();
                     },
                     0xFF4C if self.io.writable(IO::KEY0) => {
@@ -211,6 +218,8 @@ impl IOBus for Bus {
         self.io.io_addr(io)
     }
 
+    fn io_regs(&mut self) -> &mut IORegs { &mut self.io }
+
     fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
@@ -235,17 +244,9 @@ impl IOBus for Bus {
 
     fn write_with(&mut self, addr: u16, value: u8, source: Source) {
         match addr {
-            ROM..=ROM_END => self.mbc.write_with(addr - ROM, value, addr, source),
-            SROM..=SROM_END => self.mbc.write_with(addr - SROM, value, addr, source),
             VRAM..=VRAM_END => self.vram.write_with(addr - VRAM, value, addr, source),
-            SRAM..=SRAM_END => self.mbc.write_with(addr - SRAM, value, addr, source),
-            RAM..=RAM_END => self.ram.write_with(addr - RAM, value, addr, source),
-            ECHO..=ECHO_END => self.ram.write_with(addr - ECHO, value, addr, source),
             OAM..=OAM_END => self.oam.write_with(addr - OAM, value, addr, source),
-            UN_1..=UN_1_END => self.un_1.write_with(addr - UN_1, value, addr, source),
-            IO..=IO_END => self.io.write_with(addr - IO, value, addr, source),
-            HRAM..=HRAM_END => self.hram.write_with(addr - HRAM, value, addr, source),
-            END => { self.ie.write_with(0, value, addr, source) }
+            _ => unreachable!()
         }
     }
 

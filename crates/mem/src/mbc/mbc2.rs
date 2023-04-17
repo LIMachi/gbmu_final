@@ -95,5 +95,4 @@ impl super::MemoryController for Mbc2 {
     fn rom_bank(&self) -> usize { self.rom_bank }
 }
 
-impl Device for Mbc2 { }
 impl Mbc for Mbc2 { }

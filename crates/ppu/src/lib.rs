@@ -8,7 +8,7 @@ extern crate core;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use lcd::Lcd;
-use shared::mem::Lock;
+use shared::mem::{IOBus, Lock};
 
 mod render;
 mod ppu;
@@ -20,7 +20,7 @@ pub use dma::Dma;
 pub use hdma::Hdma;
 use mem::{Oam, Vram};
 use shared::emulator::Emulator;
-use shared::io::IORegs;
+use shared::io::{IO, IODevice, IORegs};
 
 pub use render::{PpuAccess, VramAccess, VramViewer};
 pub use ppu::Ppu;
@@ -45,4 +45,10 @@ impl Controller {
     }
 
     pub fn inner(&self) -> &Ppu { &self.ppu }
+}
+
+impl IODevice for Controller {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        IODevice::write(&mut self.ppu, io, v, bus);
+    }
 }

@@ -139,7 +139,7 @@ fn main() {
                         return ;
                     }
                     let p = (t / 4194304.) * 100.;
-                    let n = 100. / dt.as_secs_f64();
+                    let n = dt.as_secs_f64() * 100.;
                     log::debug!("cycles: {:.0} ({:0.2} %) | took {dt:?} ({n:0.2}% capacity)", t, p);
                     dt = Duration::from_secs(0);
                     cycles = 0;

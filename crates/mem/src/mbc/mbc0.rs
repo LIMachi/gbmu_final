@@ -39,5 +39,4 @@ impl super::MemoryController for Mbc0 {
     }
 }
 
-impl Device for Mbc0 { }
 impl Mbc for Mbc0 { }

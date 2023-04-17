@@ -3,7 +3,7 @@ use super::Input;
 
 mod dsg;
 
-use shared::io::{IO, IORegs};
+use shared::io::{IO, IODevice, IORegs};
 use dsg::{Channel, Event};
 use shared::audio_settings::AudioSettings;
 use shared::utils::FEdge;
@@ -55,7 +55,7 @@ impl Apu {
             Channel::wave(),
             Channel::noise(),
         ];
-        Self {
+        let mut apu = Self {
             fedge: FEdge::default(),
             div_apu: 0,
             sample: 0.,
@@ -65,7 +65,9 @@ impl Apu {
             dsg: dsg::DSG::new(1.),
             channels,
             on: false
-        }
+        };
+        apu.dsg.set_charge_factor(apu.charge_factor());
+        apu
     }
 
     pub(crate) fn switch(&mut self, new_rate: u32, input: Input) {
@@ -77,7 +79,6 @@ impl Apu {
     }
 
     fn power(&mut self, io: &mut IORegs, on: bool) {
-        io.io_mut(IO::NR52).reset_dirty();
         if on != self.on {
             if on {
                 log::info!("APU on");
@@ -102,8 +103,6 @@ impl Apu {
             self.input.write_sample(self.dsg.tick(&mut self.channels, &settings.channels, regs), settings.volume);
             self.sample -= self.tick;
         }
-        let sound = regs.io_mut(IO::NR52);
-        if sound.dirty() { sound.reset_dirty(); let on = sound.bit(7) != 0; self.power(regs, on); }
         if !self.on { return; }
         for channel in self.channels.iter_mut() {
             channel.clock(regs);
@@ -124,14 +123,15 @@ impl Apu {
     }
 }
 
-impl shared::mem::Device for Apu {
-    fn configure(&mut self, _bus: &dyn IOBus) {
-        // self.channels.iter_mut().for_each(|x| {
-        //     x.configure(bus);
-        // });
-        // self.sound = bus.io(IO::NR52);
-        // self.dsg.configure(bus);
-        self.dsg.set_charge_factor(self.charge_factor());
-        // self.div = bus.io(IO::DIV);
+impl IODevice for Apu {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        match io {
+            IO::NR52 => self.power(bus.io_regs(), v & 0x80 != 0),
+            IO::NR10 | IO::NR11 | IO::NR12 | IO::NR13 | IO::NR14 => self.channels[0].write(io, v, bus),
+            IO::NR21 | IO::NR22 | IO::NR23 | IO::NR24 => self.channels[1].write(io, v, bus),
+            IO::NR30 | IO::NR31 | IO::NR32 | IO::NR33 | IO::NR34 => self.channels[2].write(io, v, bus),
+            IO::NR41 | IO::NR42 | IO::NR43 | IO::NR44 => self.channels[3].write(io, v, bus),
+            _ => {}
+        }
     }
 }

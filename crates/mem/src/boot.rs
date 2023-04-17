@@ -1,4 +1,4 @@
-use shared::mem::{Device, IOBus, Mem};
+use shared::mem::{IOBus, Mem};
 use shared::rom::Rom;
 use crate::mbc::{Mbc, MemoryController};
 
@@ -88,11 +88,8 @@ impl<M: Mbc + 'static> Mbc for Boot<M> {
 }
 
 impl<MBC: Mbc> MemoryController for Boot<MBC> {
-    fn new(rom: &Rom, ram: Vec<u8>) -> Self where Self: Sized {
-        Self {
-            boot: Box::new(()),
-            inner: Some(MBC::new(rom, ram))
-        }
+    fn new(_: &Rom, _: Vec<u8>) -> Self where Self: Sized {
+        unreachable!()
     }
 
     fn ram_dump(&self) -> Vec<u8> { self.inner.as_ref().unwrap().ram_dump() }
@@ -100,13 +97,11 @@ impl<MBC: Mbc> MemoryController for Boot<MBC> {
     fn ram_bank(&self) -> usize { 0 }
 }
 
-impl<MBC: Mbc> Device for Boot<MBC> {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.inner.as_mut().unwrap().configure(bus);
-        self.boot = if bus.is_cgb() {
-            Box::new(CgbBoot::new())
-        } else {
-            Box::new(DmgBoot::new())
-        };
+impl<MBC: Mbc> Boot<MBC> {
+    pub fn new(rom: &Rom, ram: Vec<u8>, cgb: bool) -> Self {
+        Self {
+            boot: if cgb { Box::new(CgbBoot::new())} else { Box::new(DmgBoot::new()) },
+            inner: Some(MBC::new(rom, ram))
+        }
     }
 }

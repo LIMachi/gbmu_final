@@ -123,5 +123,4 @@ impl MemoryController for Mbc1 {
     fn ram_bank(&self) -> usize { self.ram_bank }
 }
 
-impl super::Device for Mbc1 { }
 impl super::Mbc for Mbc1 { }

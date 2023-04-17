@@ -1,5 +1,5 @@
-use shared::io::IO;
-use shared::mem::{Device, IOBus, OAM, Source};
+use shared::io::{IO, IODevice};
+use shared::mem::{IOBus, OAM, Source};
 
 pub struct Dma {
     st: u16,
@@ -14,16 +14,8 @@ impl Default for Dma {
 
 impl Dma {
     pub fn tick(&mut self, bus: &mut dyn IOBus) {
-        let reg = bus.io_mut(IO::DMA);
-        if reg.dirty() {
-            reg.reset_dirty();
-            self.p = 0;
-            self.st = (reg.value() as u16) << 8;
-            bus.lock();
-        }
         if self.p != 160 {
             let v = bus.read_with(self.st + self.p as u16, Source::Dma);
-            // log::debug!("copy {:#06X} {:#04X} {:#06X}", self.st + self.p as u16, v, OAM + self.p as u16);
             bus.write_with(OAM + self.p as u16, v, Source::Dma);
             self.p += 1;
             if self.p == 160 {
@@ -33,4 +25,12 @@ impl Dma {
     }
 }
 
-impl Device for Dma {}
+impl IODevice for Dma {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        if io == IO::DMA {
+            self.p = 0;
+            self.st = (v as u16) << 8;
+            bus.lock();
+        }
+    }
+}

@@ -2,8 +2,10 @@ use serde::{Serialize, Deserialize};
 use super::mem::Mem;
 
 mod io_regs;
+mod devices;
 
 pub use io_regs::IORegs;
+pub use devices::IODevice;
 
 pub const CGB_MODE: u8 = 0x80;
 pub const DMG_MODE: u8 = 0x04;

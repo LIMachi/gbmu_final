@@ -1,7 +1,5 @@
 use shared::events::*;
 use shared::io::{IO, IORegs};
-use shared::mem::Device;
-
 use shared::input::{Section, Keybindings};
 
 #[derive(Default)]
@@ -37,5 +35,3 @@ impl Joypad {
         if int { io.int_set(4); }
     }
 }
-
-impl Device for Joypad {}

@@ -1,6 +1,5 @@
 use crate::Bus;
 use shared::{cpu::{Reg, Value, Opcode}};
-use shared::mem::Device;
 use super::{ops::*, State, Registers, decode::decode};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -120,12 +119,4 @@ impl Cpu {
     }
 
     pub fn reset_finished(&mut self) { self.finished = false; }
-}
-
-impl Device for Cpu {
-    // fn configure(&mut self, bus: &dyn IOBus) {
-        // self.ie = bus.io(IO::IE);
-        // self.int_flags = bus.io(IO::IF);
-        // self.ds = bus.io(IO::KEY1);
-    // }
 }

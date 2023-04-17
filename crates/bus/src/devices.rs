@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+use std::ops::Range;
 use apu::Apu;
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
 use shared::input::Keybindings;
+use shared::io::{IO, IODevice};
+use shared::mem::IOBus;
 use crate::Timer;
 
 #[derive(Default)]
@@ -71,6 +75,15 @@ pub struct Devices {
 impl Devices {
     pub fn builder() -> ConsoleBuilder {
         ConsoleBuilder::default()
+    }
+
+    pub fn io_write(&mut self, io: u16, v: u8, bus: &mut dyn IOBus) {
+        if let Ok(io) = IO::try_from(io) {
+            self.ppu.write(io, v, bus);
+            self.dma.write(io, v, bus);
+            self.hdma.write(io, v, bus);
+            self.apu.write(io, v, bus);
+        }
     }
 }
 

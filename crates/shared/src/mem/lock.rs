@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::hash::Hash;
-use super::{Mem, Device, IOBus};
+use crate::io::{IO, IODevice};
+use super::{Mem, IOBus};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Source {
@@ -81,8 +82,8 @@ impl<M: Mem> Mem for Lock<M> {
     fn unlock(&mut self, access: Source) { self.unlock(access); }
 }
 
-impl<M: Mem + Device> Device for Lock<M> {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.inner.configure(bus);
+impl<M: Mem + IODevice> IODevice for Lock<M> {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        IODevice::write(&mut self.inner, io, v, bus);
     }
 }

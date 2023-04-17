@@ -1,4 +1,4 @@
-use shared::io::{CGB_MODE, IO};
+use shared::io::{CGB_MODE, IO, IODevice};
 use shared::mem::{IOBus, Source};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -60,40 +60,13 @@ impl Hdma {
 
     pub fn tick(&mut self, bus: &mut dyn IOBus) -> bool {
         if bus.io(IO::KEY0).value() & CGB_MODE == 0 { return false };
-        let stat = bus.io(IO::STAT).value();
-        if bus.io(IO::HDMA5).dirty() {
-            let control = bus.io_mut(IO::HDMA5);
-            control.reset_dirty();
-            match self.mode {
-                None => {
-                    let ctrl = control.value();
-                    let mode = Mode::new(ctrl & 0x80 != 0);
-                    self.src = u16::from_le_bytes([bus.io(IO::HDMA2).value(), bus.io(IO::HDMA1).value()]) & 0xFFF0;
-                    self.dst = (u16::from_le_bytes([bus.io(IO::HDMA4).value(), bus.io(IO::HDMA3).value()]) & 0x1FF0) + 0x8000;
-                    let src = self.src;
-                    let dst = self.dst;
-                    let len = ((ctrl & 0x7F) as usize + 1) * 0x10;
-                    self.statv = stat & 0x3;
-                    self.mode = Some(mode);
-                    self.state = if mode == Mode::HBlank { State::WaitHblank } else { State::Transfer };
-                    log::info!("HDMA ({mode:?}): [{src:#04X}-{:#04X}] -> [{dst:#04X}-{:#04X}] ({})", src + len as u16, dst + len as u16, len);
-                },
-                Some(_) if control.bit(7) == 0 => {
-                    log::info!("HDMA paused");
-                    control.set(7);
-                    self.count = 0;
-                    self.mode = None;
-                },
-                _ => unreachable!()
-            }
-        }
         let mut tick = false;
         self.state = match self.state {
             s@ (State::WaitHblank | State::Active) => {
+                let stat = bus.io(IO::STAT).value();
                 let old = self.statv;
                 self.statv = stat & 0x3;
                 if old != 0 && self.statv == 0 {
-                    log::info!("new batch");
                     tick = true;
                     State::Transfer
                 } else { s }
@@ -108,13 +81,11 @@ impl Hdma {
                     control.direct_write(len);
                     self.count = 0;
                     if done {
-                        log::info!("General DMA complete.");
                         self.mode = None; State::Wait
                     } else { State::Transfer }
                 } else { State::Transfer }
             },
             State::Transfer if self.mode == Some(Mode::HBlank) => {
-                log::info!("{:04X} -> {:04X} ({}/16)", self.src, self.dst, self.count);
                 tick = true;
                 if self.transfer(bus) { return false }
                 self.count += 1;
@@ -124,7 +95,6 @@ impl Hdma {
                     control.direct_write(len | 0x80);
                     self.count = 0;
                     if done {
-                        log::info!("HDMA complete.");
                         self.mode = None; State::Wait
                     } else { State::Active }
                 } else { State::Transfer }
@@ -132,5 +102,28 @@ impl Hdma {
             state => state
         };
         tick
+    }
+}
+
+impl IODevice for Hdma {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        if io == IO::HDMA5 {
+            match self.mode {
+                None => {
+                    let mode = Mode::new(v & 0x80 != 0);
+                    self.src = u16::from_le_bytes([bus.io(IO::HDMA2).value(), bus.io(IO::HDMA1).value()]) & 0xFFF0;
+                    self.dst = (u16::from_le_bytes([bus.io(IO::HDMA4).value(), bus.io(IO::HDMA3).value()]) & 0x1FF0) + 0x8000;
+                    self.statv = bus.io(IO::STAT).value() & 0x3;
+                    self.mode = Some(mode);
+                    self.state = if mode == Mode::HBlank { State::WaitHblank } else { State::Transfer };
+                },
+                Some(_) if v & 0x80 == 0 => {
+                    bus.io_mut(IO::HDMA5).set(7);
+                    self.count = 0;
+                    self.mode = None;
+                },
+                _ => unreachable!()
+            }
+        }
     }
 }

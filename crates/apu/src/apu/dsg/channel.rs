@@ -1,5 +1,4 @@
-use shared::io::{AccessMode, IO, IORegs};
-use shared::mem::Device;
+use shared::io::{AccessMode, IO, IODevice, IORegs};
 
 mod wave;
 mod pulse;
@@ -9,6 +8,7 @@ mod envelope;
 pub use pulse::Channel as PulseChannel;
 pub use wave::Channel as WaveChannel;
 pub use noise::Channel as NoiseChannel;
+use shared::mem::IOBus;
 
 pub enum Event {
     Envelope,
@@ -25,7 +25,7 @@ pub(crate) enum Channels {
 }
 
 // inner waveform generator
-pub(crate) trait SoundChannel: Device {
+pub(crate) trait SoundChannel: IODevice {
     fn output(&self, io: &mut IORegs) -> u8;
 
     fn channel(&self) -> Channels;
@@ -189,16 +189,6 @@ impl Channel {
     }
 
     pub fn clock(&mut self, io: &mut IORegs) {
-        let nr4 = io.io_mut(self.nr4);
-        if nr4.dirty() {
-            nr4.reset_dirty();
-            if nr4.bit(7) != 0 { self.trigger(io); }
-        }
-        let nr1 = io.io_mut(self.nr1);
-        if nr1.dirty() {
-            nr1.reset_dirty();
-            self.reload_length(nr1.value());
-        }
         if !self.inner.dac_enabled(io) {
             self.disable(io);
         }
@@ -207,10 +197,17 @@ impl Channel {
         }
     }
 
-    pub fn trigger(&mut self, io: &mut IORegs) -> bool {
+    pub fn trigger(&mut self, io: &mut IORegs) {
         self.enable(io);
         if self.inner.trigger(io) { self.disable(io); }
         self.reload_length(io.io(self.nr1).value());
-        false
+    }
+}
+
+impl IODevice for Channel {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        if io == self.nr4 && v & 0x80 != 0 { self.trigger(bus.io_regs()); }
+        if io == self.nr1 { self.reload_length(v); }
+        self.inner.write(io, v, bus);
     }
 }

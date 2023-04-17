@@ -1,5 +1,5 @@
-use shared::io::{AccessMode, IO, IORegs};
-use shared::mem::{Device, IOBus};
+use shared::io::{AccessMode, IO, IODevice, IORegs};
+use shared::mem::{IOBus};
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
 
@@ -54,10 +54,10 @@ impl Sweep {
         if self.negate { self.shadow.wrapping_sub(f) } else { self.shadow + f }
     }
 
-    pub fn tick(&mut self, io: &mut IORegs, wave1: IO, wave2: IO) -> bool {
-        if !self.enabled { return false }
+    pub fn tick(&mut self, io: &mut IORegs, wave1: IO, wave2: IO) -> (u16, bool) {
+        if !self.enabled { return (self.shadow, false) }
         self.timer -= 1;
-        if self.timer == 0 {
+        let overflow = if self.timer == 0 {
             self.timer = self.pace;
             if self.timer == 0 { self.timer = 8 }
             if self.enabled && self.pace != 0 {
@@ -72,24 +72,29 @@ impl Sweep {
             } else { false }
         } else {
             false
-        }
+        };
+        (self.shadow, overflow)
     }
 }
 
 pub struct Channel {
     cycle: usize,
     freq_timer: u16,
+    freq: u16,
     envelope: Envelope,
     sweep: Sweep,
     has_sweep: bool,
     registers: Registers,
-    triggered: bool
+    triggered: bool,
+    dac: bool
 }
 
 impl Channel {
     pub fn new(sweep: bool) -> Self {
         Self {
             triggered: false,
+            dac: false,
+            freq: 0,
             cycle: 0,
             freq_timer: 0,
             envelope: Envelope::default(),
@@ -116,16 +121,6 @@ impl Channel {
     fn frequency(&self, io: &mut IORegs) -> u16 {
         io.io_mut(self.registers.wave1).value() as u16 | ((io.io_mut(self.registers.wave2).value() as u16 & 0x7) << 8)
     }
-
-    fn update_sweep(&mut self, io: &mut IORegs) {
-        io.io_mut(IO::NR10).reset_dirty();
-        self.sweep.update(io.io(IO::NR10).value());
-    }
-
-    fn update_envelope(&mut self, io: &mut IORegs) {
-        self.envelope.update(io.io(self.registers.volume).value());
-        io.io_mut(self.registers.volume).reset_dirty();
-    }
 }
 
 impl SoundChannel for Channel {
@@ -138,17 +133,13 @@ impl SoundChannel for Channel {
         if self.has_sweep { Channels::Sweep } else { Channels::Pulse }
     }
 
-    fn dac_enabled(&self, io: &mut IORegs) -> bool {
-        io.io(self.registers.volume).value() & 0xF8 != 0
-    }
+    fn dac_enabled(&self, io: &mut IORegs) -> bool { self.dac }
 
     fn clock(&mut self, io: &mut IORegs) {
-        if io.io_mut(self.registers.volume).dirty() { self.update_envelope(io); }
-        if self.has_sweep && io.io(IO::NR10).dirty() { self.update_sweep(io); }
         if !self.triggered { return }
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x7;
-            self.freq_timer = 4 * (0x7FF - self.frequency(io));
+            self.freq_timer = 4 * (0x7FF - self.freq);
         } else {
             self.freq_timer -= 1;
         }
@@ -157,12 +148,16 @@ impl SoundChannel for Channel {
     fn trigger(&mut self, io: &mut IORegs) -> bool {
         self.triggered = true;
         self.envelope.trigger();
-        self.freq_timer = 4 * (0x7FF - self.frequency(io)) | (self.freq_timer & 0x3);
-        self.sweep.trigger(self.frequency(io)) > 2047
+        self.freq_timer = 4 * (0x7FF - self.freq) | (self.freq_timer & 0x3);
+        self.sweep.trigger(self.freq) > 2047
     }
 
     fn sweep(&mut self, io: &mut IORegs) -> bool {
-        if self.has_sweep { self.sweep.tick(io, self.registers.wave1, self.registers.wave2) }
+        if self.has_sweep {
+            let (freq, overflow) = self.sweep.tick(io, self.registers.wave1, self.registers.wave2);
+            self.freq = freq;
+            overflow
+        }
         else { false }
     }
 
@@ -185,19 +180,16 @@ impl SoundChannel for Channel {
     }
 }
 
-impl Device for Channel {
-    fn configure(&mut self, _bus: &dyn IOBus) {
-        // if self.has_sweep {
-        //     self.registers.sweep = bus.io(IO::NR10);
-        //     self.registers.length = bus.io(IO::NR11);
-        //     self.registers.volume = bus.io(IO::NR12);
-        //     self.registers.wave1 = bus.io(IO::NR13);
-        //     self.registers.wave2 = bus.io(IO::NR14);
-        // } else {
-        //     self.registers.length = bus.io(IO::NR21);
-        //     self.registers.volume = bus.io(IO::NR22);
-        //     self.registers.wave1 = bus.io(IO::NR23);
-        //     self.registers.wave2 = bus.io(IO::NR24);
-        // }
+impl IODevice for Channel {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        if io == self.registers.volume {
+            self.envelope.update(v);
+            self.dac = v & 0xF8 != 0;
+        }
+        else if io == self.registers.wave1 {
+            self.freq = (bus.io(self.registers.wave2).value() as u16 & 0x7) << 8 | v as u16;
+        } else if io == self.registers.wave2 {
+            self.freq = (v as u16 & 0x7) << 8 | bus.io(self.registers.wave1).value() as u16
+        } else if self.has_sweep && io == IO::NR10 { self.sweep.update(v); }
     }
 }

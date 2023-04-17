@@ -115,7 +115,9 @@ impl Audio {
 
     pub(crate) fn bind(&self) -> Input {
         let (producer, consumer) = RingBuffer::new(self.sample_rate() as usize);
+        self.sink.clear();
         self.sink.append(Output::new(self.sample_rate(), consumer));
+        self.sink.play();
         Input(producer)
     }
 

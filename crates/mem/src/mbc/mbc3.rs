@@ -120,7 +120,6 @@ impl MemoryController for Mbc3 {
     }
 }
 
-impl Device for Mbc3 { }
 impl super::Mbc for Mbc3 {
     fn tick(&mut self) {
         self.rtc.tick();

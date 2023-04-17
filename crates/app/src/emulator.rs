@@ -246,11 +246,8 @@ impl Console {
             .with_apu(controller.audio.apu())
             .with_link(controller.serial_port())
             .build();
-        let mbc = mem::mbc::Controller::new(&rom);
-        let mbc = if skip { mbc.skip_boot() } else { mbc };
-        let bus = bus::Bus::new(cgb);
-        let bus = if skip { bus.skip_boot(if cgb { rom.raw()[0x143] } else { 0 }) } else { bus }
-            .with_mbc(mbc);
+        let bus = bus::Bus::new(cgb).skip_boot(skip, if cgb { rom.raw()[0x143] } else { 0 })
+            .with_mbc(mem::mbc::Controller::new(&rom, cgb));
         log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
         Self {
             speed: Default::default(),

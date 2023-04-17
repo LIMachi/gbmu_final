@@ -96,5 +96,4 @@ impl MemoryController for Mbc5 {
     }
 }
 
-impl Device for Mbc5 { }
 impl super::Mbc for Mbc5 { }

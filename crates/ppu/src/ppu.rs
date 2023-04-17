@@ -1,6 +1,6 @@
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
-use shared::io::{IO, IORegs, LCDC};
+use shared::io::{IO, IODevice, IORegs, LCDC};
 use shared::mem::*;
 
 mod fetcher;
@@ -155,4 +155,10 @@ impl Ppu {
     }
 
     pub(crate) fn default_state() -> PpuState { VState::new().boxed() }
+}
+
+impl IODevice for Ppu {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+
+    }
 }

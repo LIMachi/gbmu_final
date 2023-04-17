@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use shared::{mem::*, rom::{Rom, Mbc as Mbcs}};
+use shared::io::{IO, IODevice};
 use crate::boot::Boot;
 
 pub mod mbc0;
@@ -16,14 +17,13 @@ pub trait MemoryController {
     fn ram_bank(&self) -> usize { 0 }
 }
 
-pub(crate) trait Mbc: MemoryController + Mem + Device {
+pub(crate) trait Mbc: MemoryController + Mem {
     fn is_boot(&self) -> bool { false }
     fn unmap(&mut self) -> Box<dyn Mbc> { unreachable!() }
     fn tick(&mut self) { }
 }
 
 pub struct Unplugged { }
-impl Device for Unplugged { }
 impl Mem for Unplugged { }
 impl Mbc for Unplugged { }
 
@@ -39,8 +39,12 @@ pub struct Controller {
     inner: Box<dyn Mbc>
 }
 
+impl Default for Controller {
+    fn default() -> Self { Controller::unplugged() }
+}
+
 impl Controller {
-    pub fn new(rom: &Rom) -> Self {
+    pub fn new(rom: &Rom, cgb: bool) -> Self {
         let (sav, ram) = if rom.header.cartridge.capabilities().save() {
             let sav = rom.location.clone().join(&rom.filename).with_extension("sav");
             let ram = if let Some(mut f) = std::fs::File::open(&sav).ok() {
@@ -52,11 +56,11 @@ impl Controller {
             (Some(sav), ram)
         } else { (None, vec![0xAF; rom.header.ram_size.size()]) };
         let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
-            Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram)),
-            Mbcs::MBC1 => Box::new(Boot::<mbc1::Mbc1>::new(rom, ram)),
-            Mbcs::MBC2 => Box::new(Boot::<mbc2::Mbc2>::new(rom, ram)),
-            Mbcs::MBC3 => Box::new(Boot::<mbc3::Mbc3>::new(rom, ram)),
-            Mbcs::MBC5 => Box::new(Boot::<mbc5::Mbc5>::new(rom, ram)),
+            Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram, cgb)),
+            Mbcs::MBC1 => Box::new(Boot::<mbc1::Mbc1>::new(rom, ram, cgb)),
+            Mbcs::MBC2 => Box::new(Boot::<mbc2::Mbc2>::new(rom, ram, cgb)),
+            Mbcs::MBC3 => Box::new(Boot::<mbc3::Mbc3>::new(rom, ram, cgb)),
+            Mbcs::MBC5 => Box::new(Boot::<mbc5::Mbc5>::new(rom, ram, cgb)),
             Mbcs::Unknown => unimplemented!()
         };
 
@@ -118,8 +122,10 @@ impl Mem for Controller {
     fn unlock(&mut self, access: Source) { self.inner.unlock(access) }
 }
 
-impl Device for Controller {
-    fn configure(&mut self, bus: &dyn IOBus) {
-        self.inner.configure(bus);
+impl IODevice for Controller {
+    fn write(&mut self, io: IO, _: u8, _: &mut dyn IOBus) {
+        if io == IO::POST && self.inner.is_boot() {
+            self.post();
+        }
     }
 }

@@ -1,5 +1,6 @@
-use shared::io::{IO, IORegs};
-use shared::mem::Device;
+use shared::io::{IO, IODevice, IORegs};
+
+use shared::mem::IOBus;
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
 
@@ -8,11 +9,13 @@ pub struct Channel {
     buffer: u16,
     freq_timer: u16,
     envelope: Envelope,
+    dac: bool,
 }
 
 impl Channel {
     pub fn new() -> Self {
         Self {
+            dac: false,
             triggered: false,
             buffer: 0xFFFF,
             freq_timer: 0,
@@ -32,8 +35,6 @@ impl Channel {
     }
 }
 
-impl Device for Channel {}
-
 impl SoundChannel for Channel {
     fn output(&self, _io: &mut IORegs) -> u8 {
         ((self.buffer & 1) as u8 ^ 1) * self.envelope.volume()
@@ -41,16 +42,11 @@ impl SoundChannel for Channel {
 
     fn channel(&self) -> Channels { Channels::Noise }
 
-    fn dac_enabled(&self, io: &mut IORegs) -> bool {
-        io.io(IO::NR42).value() & 0xF8 != 0
+    fn dac_enabled(&self, _: &mut IORegs) -> bool {
+        self.dac
     }
 
     fn clock(&mut self, io: &mut IORegs) {
-        let volume = io.io_mut(IO::NR42);
-        if volume.dirty() {
-            self.envelope.update(volume.value());
-            volume.reset_dirty();
-        }
         if !self.triggered { return }
         if self.freq_timer == 0 {
             self.freq_timer = self.frequency(io);
@@ -81,4 +77,13 @@ impl SoundChannel for Channel {
     fn envelope(&mut self) { self.envelope.clock(); }
 
     fn length(&self) -> u8 { 0x3F }
+}
+
+impl IODevice for Channel {
+    fn write(&mut self, io: IO, v: u8, _: &mut dyn IOBus) {
+        if io == IO::NR42 {
+            self.dac = v & 0xF8 != 0;
+            self.envelope.update(v);
+        }
+    }
 }
