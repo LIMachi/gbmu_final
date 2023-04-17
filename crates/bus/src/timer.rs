@@ -28,7 +28,7 @@ impl Timer {
             d = d.wrapping_add(1);
             div.direct_write(d);
         }
-        let tac = io.io_mut(IO::TAC).value();
+        let tac = io.io(IO::TAC).value();
         let tac_enable = tac & 4 != 0;
         let edge = tac_enable && (match tac & 0x3 {
             0 => d >> 1,

@@ -157,7 +157,7 @@ impl Channel {
 
     pub fn event(&mut self, event: Event, io: &mut IORegs) {
         match event {
-            Event::Length if io.io_mut(self.nr4).bit(6) != 0 && self.length_timer != 0 => {
+            Event::Length if io.io(self.nr4).bit(6) != 0 && self.length_timer != 0 => {
                 self.length_timer -= 1;
                 if self.length_timer == 0 { self.enabled = false; }
             },
@@ -176,7 +176,7 @@ impl Channel {
         let out = if self.enabled { self.inner.output(io) } else { 0 };
         if cgb {
             let n = (self.inner.channel() as u8) & 1;
-            let t = io.io_mut(self.pcm).value() & (0xF0 >> (4 * n));
+            let t = io.io(self.pcm).value() & (0xF0 >> (4 * n));
             let p = t | ((out & 0xF) << (4 * n));
             io.io_mut(self.pcm).direct_write(p);
         }
@@ -210,7 +210,7 @@ impl Channel {
     pub fn trigger(&mut self, io: &mut IORegs) -> bool {
         self.enable(io);
         if self.inner.trigger(io) { self.disable(io); }
-        self.reload_length(io.io_mut(self.nr1).value());
+        self.reload_length(io.io(self.nr1).value());
         false
     }
 }

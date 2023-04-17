@@ -60,7 +60,7 @@ impl Port {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        let data = io.io_mut(IO::SB).value();
+        let data = io.io(IO::SB).value();
         let ctrl = io.io_mut(IO::SC);
         if ctrl.dirty() {
             if ctrl.value() & 0x81 == 0x81 {

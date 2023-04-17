@@ -61,7 +61,7 @@ impl Hdma {
     pub fn tick(&mut self, bus: &mut dyn IOBus) -> bool {
         if bus.io(IO::KEY0).value() & CGB_MODE == 0 { return false };
         let stat = bus.io(IO::STAT).value();
-        if bus.io_mut(IO::HDMA5).dirty() {
+        if bus.io(IO::HDMA5).dirty() {
             let control = bus.io_mut(IO::HDMA5);
             control.reset_dirty();
             match self.mode {

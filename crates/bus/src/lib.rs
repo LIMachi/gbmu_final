@@ -85,7 +85,7 @@ impl Bus {
         } else { self.clock += 1; }
         devices.joy.tick(&mut self.io);
 
-        let ds = self.io.io_mut(IO::KEY1).bit(7) != 0;
+        let ds = self.io.io(IO::KEY1).bit(7) != 0;
         if clock == 0 || clock == 2 {
             let tick = devices.hdma.tick(self);
             if clock == 0 || ds {
@@ -188,7 +188,7 @@ impl shared::cpu::Bus for Bus {
     }
 
     fn interrupt(&mut self) -> u8 {
-        (self.io.io_mut(IO::IF).read() & self.ie.read()) & 0x1F
+        (self.io.io(IO::IF).read() & self.ie.read()) & 0x1F
     }
 }
 

@@ -119,18 +119,18 @@ impl Channel {
 
     fn update_sweep(&mut self, io: &mut IORegs) {
         io.io_mut(IO::NR10).reset_dirty();
-        self.sweep.update(io.io_mut(IO::NR10).value());
+        self.sweep.update(io.io(IO::NR10).value());
     }
 
     fn update_envelope(&mut self, io: &mut IORegs) {
-        self.envelope.update(io.io_mut(self.registers.volume).value());
+        self.envelope.update(io.io(self.registers.volume).value());
         io.io_mut(self.registers.volume).reset_dirty();
     }
 }
 
 impl SoundChannel for Channel {
     fn output(&self, io: &mut IORegs) -> u8 {
-        let waveform = io.io_mut(self.registers.length).value() >> 6;
+        let waveform = io.io(self.registers.length).value() >> 6;
         DUTY_CYCLES[waveform as usize][self.cycle] * self.envelope.volume()
     }
 
@@ -139,12 +139,12 @@ impl SoundChannel for Channel {
     }
 
     fn dac_enabled(&self, io: &mut IORegs) -> bool {
-        io.io_mut(self.registers.volume).value() & 0xF8 != 0
+        io.io(self.registers.volume).value() & 0xF8 != 0
     }
 
     fn clock(&mut self, io: &mut IORegs) {
         if io.io_mut(self.registers.volume).dirty() { self.update_envelope(io); }
-        if self.has_sweep && io.io_mut(IO::NR10).dirty() { self.update_sweep(io); }
+        if self.has_sweep && io.io(IO::NR10).dirty() { self.update_sweep(io); }
         if !self.triggered { return }
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x7;

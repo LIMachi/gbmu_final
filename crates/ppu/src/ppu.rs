@@ -88,9 +88,7 @@ impl Ppu {
         let input = input || (stat.bit(4) != 0 && mode == Mode::VBlank);
         let input = input || (stat.bit(5) != 0 && mode == Mode::Search);
         let input = input || (stat.bit(6) != 0 && stat.bit(2) != 0);
-        if self.stat.tick(input) {
-            regs.io_mut(IO::IF).set(1);
-        }
+        if self.stat.tick(input) { regs.int_set(1); }
 
         match mode {
             Mode::Search => self.oam_mut().lock(Source::Ppu),
@@ -119,7 +117,7 @@ impl Ppu {
 
     pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
         self.cram.tick(io);
-        let lcdc = io.io_mut(IO::LCDC).value();
+        let lcdc = io.io(IO::LCDC).value();
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
             io.io_mut(IO::LY).direct_write(0);

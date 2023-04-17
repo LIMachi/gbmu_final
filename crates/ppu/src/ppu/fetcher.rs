@@ -146,12 +146,12 @@ impl Fetcher {
                 let s = 8u8.saturating_sub(sp.x) as usize;
                 colors.rotate_left(s);
                 colors[8-s..].iter_mut().for_each(|x| *x = 0);
-                oam.merge(colors.into_iter().map(|x| Pixel::sprite(x, n, self.attrs)).collect());
+                oam.merge(colors.iter().map(|x| Pixel::sprite(*x, n, self.attrs)));
                 self.set_mode(self.prev);
                 bg.enable();
-            } else if bg.push(colors.into_iter().map(|x|
-                Pixel::bg(if io.io(IO::KEY0).value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { x }, self.attrs)
-            ).collect()) {
+            } else if bg.push(colors.iter().map(|x|
+                Pixel::bg(if io.io(IO::KEY0).value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { *x }, self.attrs)
+            )) {
                 self.x += 1;
             } else {
                 self.low = Some(low);

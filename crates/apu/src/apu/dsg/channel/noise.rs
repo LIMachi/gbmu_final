@@ -21,7 +21,7 @@ impl Channel {
     }
 
     fn frequency(&self, io: &mut IORegs) -> u16 {
-        let f = io.io_mut(IO::NR43).value() as u16;
+        let f = io.io(IO::NR43).value() as u16;
         let r = f & 0x7;
         let s = f >> 4;
         match (r, s) {
@@ -42,7 +42,7 @@ impl SoundChannel for Channel {
     fn channel(&self) -> Channels { Channels::Noise }
 
     fn dac_enabled(&self, io: &mut IORegs) -> bool {
-        io.io_mut(IO::NR42).value() & 0xF8 != 0
+        io.io(IO::NR42).value() & 0xF8 != 0
     }
 
     fn clock(&mut self, io: &mut IORegs) {

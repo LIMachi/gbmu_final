@@ -31,13 +31,13 @@ impl CRAM {
     pub fn color(&self, pixel: super::Pixel, io: &mut IORegs) -> [u8; 3] {
         const DMG_COLORS: [[u8; 3]; 4] = [[0xBF; 3], [0x7F; 3], [0x3F; 3], [0; 3]];
 
-        match (pixel.color, pixel.attrs, pixel.sprite, io.io_mut(IO::KEY0).value() & CGB_MODE != 0) {
+        match (pixel.color, pixel.attrs, pixel.sprite, io.io(IO::KEY0).value() & CGB_MODE != 0) {
             (c, a, true, false) => {
-                let palette = if a.obp1() { io.io_mut(IO::OBP1) } else { io.io_mut(IO::OBP0) }.read() >> (2 * c);
+                let palette = if a.obp1() { io.io(IO::OBP1) } else { io.io_mut(IO::OBP0) }.read() >> (2 * c);
                 DMG_COLORS[(palette & 3) as usize]
             },
             (c, _, false, false) => {
-                let palette = io.io_mut(IO::BGP).read() >> (2 * c);
+                let palette = io.io(IO::BGP).read() >> (2 * c);
                 DMG_COLORS[(palette & 3) as usize]
             },
             (c, a, true, true) => {

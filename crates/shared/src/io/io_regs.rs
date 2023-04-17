@@ -26,7 +26,7 @@ impl IORegs {
     }
 
     pub fn compat_mode(&mut self) {
-        if self.io_mut(IO::KEY0).value() == DMG_MODE {
+        if self.io(IO::KEY0).value() == DMG_MODE {
             log::info!("DMG compatibility mode: enabled");
             self.io_mut(IO::HDMA5).direct_write(0).set_access(IORegs::DISABLED);
             self.io_mut(IO::KEY1).direct_write(0).set_access(IORegs::DISABLED);
@@ -39,7 +39,7 @@ impl IORegs {
     }
 
     pub fn post(&mut self) {
-        log::info!("compat mode: {:#04X}", self.io_mut(IO::KEY0).value());
+        log::info!("compat mode: {:#04X}", self.io(IO::KEY0).value());
         self.io_mut(IO::POST).set_access(IORegs::DISABLED);
         self.io_mut(IO::KEY0).set_access(IORegs::DISABLED);
     }

@@ -34,7 +34,7 @@ impl Joypad {
         let v =  0xF ^ (dir | act);
         let int = (p ^ v) & p != 0;
         joy.direct_write((p4 << 4) | (p5 << 5) | v);
-        if int { { io.io_mut(IO::IF).set(4); } }
+        if int { io.int_set(4); }
     }
 }
 

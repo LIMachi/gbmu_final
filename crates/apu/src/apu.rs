@@ -108,7 +108,7 @@ impl Apu {
         for channel in self.channels.iter_mut() {
             channel.clock(regs);
         }
-        if self.fedge.tick(regs.io_mut(IO::DIV).bit(if ds { 5 } else { 4 }) != 0) {
+        if self.fedge.tick(regs.io(IO::DIV).bit(if ds { 5 } else { 4 }) != 0) {
             match self.div_apu {
                 0 | 4 => self.channels.iter_mut().for_each(|x| x.event(Event::Length, regs)),
                 2 | 6 => self.channels.iter_mut().for_each(|x| {

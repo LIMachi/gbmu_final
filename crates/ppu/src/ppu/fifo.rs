@@ -20,13 +20,13 @@ impl ObjFifo {
         self.inner.pop_front()
     }
 
-    pub fn merge(&mut self, data: Vec<Pixel>) -> bool {
+    pub fn merge(&mut self, data: impl Iterator<Item = Pixel>) -> bool {
         for _ in self.inner.len()..8 {
             self.inner.push_back(Pixel::bg(0, Attributes::default()));
         }
         self.inner
             .iter_mut()
-            .zip(data.into_iter())
+            .zip(data)
             .for_each(|(obj, p)| { obj.mix(p); });
         true
     }
@@ -80,7 +80,7 @@ impl BgFifo {
         } else { None }
     }
 
-    pub fn push(&mut self, data: Vec<Pixel>) -> bool {
+    pub fn push(&mut self, data: impl Iterator<Item = Pixel>) -> bool {
         if self.inner.len() > 8 { return false };
         for pix in data {
             self.inner.push_back(pix);
