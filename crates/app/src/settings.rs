@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use shared::{egui, Events};
-use shared::egui::{Align, Button, CentralPanel, Context, Response, TextEdit, Ui, Vec2};
+use shared::egui::{Align, Button, CentralPanel, Context, Response, ScrollArea, TextEdit, Ui, Vec2};
 use shared::input::Section;
 use crate::emulator::Emulator;
 
@@ -142,11 +142,16 @@ impl shared::Ui for Settings {
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("AUDIO OUTPUT");
                 });
+                let scroll = ScrollArea::vertical();
                 let mut device = &emu.audio.device();
                 let devices: Vec<&String> = self.devices.iter().collect();
-                devices.iter().for_each(|dev| {
-                    ui.radio_value(&mut device, dev, *dev);
-                });
+                scroll.max_height(120.)
+                    .auto_shrink([false, true])
+                    .show(ui, |ui| {
+                        devices.iter().for_each(|dev| {
+                            ui.radio_value(&mut device, dev, *dev);
+                        });
+                    });
                 if device != &emu.audio.device() {
                     let device = device.clone().clone();
                     emu.audio.switch(device, &mut emu.console.gb.apu);
