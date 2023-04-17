@@ -75,25 +75,16 @@ impl Mem for Mbc3 {
         }
     }
 
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        let s = st as usize;
+    fn get_range(&self, st: u16, _: u16) -> Vec<u8> {
         match st {
-            ROM..=ROM_END => self.rom[s..((st + len) as usize).min(BANK_SIZE)].to_vec(),
-            SROM..=SROM_END => {
-                let s = s - SROM as usize;
-                let end = (s + len as usize).min(BANK_SIZE) + self.rom_bank * BANK_SIZE;
-                let st = s + self.rom_bank * BANK_SIZE;
-                self.rom[st..end].to_vec()
+            ROM => self.rom[..BANK_SIZE].to_vec(),
+            SROM => {
+                let st = BANK_SIZE * self.rom_bank;
+                self.rom[st..(st + BANK_SIZE)].to_vec()
             },
-            SRAM..=SRAM_END if self.ram_bank < self.ram_banks => {
-                let s = s - SRAM as usize;
-                let st = s + RAM_SIZE * self.ram_bank as usize;
-                let end = (st + len as usize).min((self.ram_bank + 1) as usize * RAM_SIZE);
-                if end > self.ram.len() {
-                    eprintln!("hope you're not reading from that rambank ({}) because it's not mapped !", self.ram_bank);
-                    return vec![];
-                }
-                self.ram[st..end].to_vec()
+            SRAM => {
+                let st = RAM_SIZE * self.ram_bank;
+                self.rom[st..(st + RAM_SIZE)].to_vec()
             },
             _ => vec![]
         }

@@ -99,7 +99,6 @@ impl Bus {
                     MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
                     st => st
                 };
-                #[cfg(feature = "serial")]
                 devices.serial.tick(&mut self.io);
                 devices.timer.tick(&mut self.io);
                 devices.dma.tick(self);
@@ -107,7 +106,6 @@ impl Bus {
             }
         }
         devices.ppu.tick(&mut self.io, &mut self.oam, &mut self.vram, &mut devices.lcd);
-        #[cfg(feature = "audio")]
         devices.apu.tick(&mut self.io, ds, settings.sound);
         let bp = settings.breakpoints.tick(&devices.cpu, self.last());
         devices.cpu.reset_finished();

@@ -128,64 +128,58 @@ impl shared::Ui for Settings {
                 let model = &mut emu.cgb;
                 ui.radio_value(model, Mode::Dmg, format!("{:?}", Mode::Dmg));
                 ui.radio_value(model, Mode::Cgb, format!("{:?}", Mode::Cgb));
-                #[cfg(feature = "boot")]
                 ui.checkbox( &mut emu.bios, "enable boot rom");
-                #[cfg(feature = "audio")]
-                {
-                    ui.separator();
-                    ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
-                        ui.label("SOUNDS");
-                    });
-                    ui.add(egui::Slider::new(&mut emu.audio_settings.volume, 0f32..=1f32).text("Volume"));
-                    ui.checkbox(&mut emu.audio_settings.channels[0], "Channel 1 - Sweep");
-                    ui.checkbox(&mut emu.audio_settings.channels[1], "Channel 2 - Square");
-                    ui.checkbox(&mut emu.audio_settings.channels[2], "Channel 3 - Wave");
-                    ui.checkbox(&mut emu.audio_settings.channels[3], "Channel 4 - Noise");
-                    ui.separator();
-                    ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
-                        ui.label("AUDIO OUTPUT");
-                    });
-                    let mut device = &emu.audio.device();
-                    let devices: Vec<&String> = self.devices.iter().collect();
-                    devices.iter().for_each(|dev| {
-                        ui.radio_value(&mut device, dev, *dev);
-                    });
-                    if device != &emu.audio.device() {
-                        let device = device.clone().clone();
-                        emu.audio.switch(device, &mut emu.console.gb.apu);
-                    }
+                ui.separator();
+                ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
+                    ui.label("SOUNDS");
+                });
+                ui.add(egui::Slider::new(&mut emu.audio_settings.volume, 0f32..=1f32).text("Volume"));
+                ui.checkbox(&mut emu.audio_settings.channels[0], "Channel 1 - Sweep");
+                ui.checkbox(&mut emu.audio_settings.channels[1], "Channel 2 - Square");
+                ui.checkbox(&mut emu.audio_settings.channels[2], "Channel 3 - Wave");
+                ui.checkbox(&mut emu.audio_settings.channels[3], "Channel 4 - Noise");
+                ui.separator();
+                ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
+                    ui.label("AUDIO OUTPUT");
+                });
+                let mut device = &emu.audio.device();
+                let devices: Vec<&String> = self.devices.iter().collect();
+                devices.iter().for_each(|dev| {
+                    ui.radio_value(&mut device, dev, *dev);
+                });
+                if device != &emu.audio.device() {
+                    let device = device.clone().clone();
+                    emu.audio.switch(device, &mut emu.console.gb.apu);
                 }
-                #[cfg(feature = "serial")]
-                {
-                    ui.separator();
-                    ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
-                        ui.label(if emu.link_do(|x| x.connected()) { "SERIAL - (Connected)" } else { "SERIAL" });
-                    });
-                    ui.label(format!("server listening on port {}", emu.link_port));
+                ui.separator();
+                ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
+                    ui.label(if emu.link_do(|x| x.connected()) { "SERIAL - (Connected)" } else { "SERIAL" });
+                });
+                ui.label(format!("server listening on port {}", emu.link_port));
 
-                    ui.horizontal(|ui| {
-                        let host = TextEdit::singleline(&mut emu.settings.host).desired_width(120.);
-                        ui.label("Host: ");
-                        ui.add(host);
-                    });
-                    ui.horizontal(|ui| {
-                        let port = TextEdit::singleline(&mut emu.settings.port).desired_width(48.);
-                        ui.label(" Port: ");
-                        ui.add(port);
-                    });
-                    if ui.button("Connect").clicked() {
-                        match (emu.settings.host.parse(), emu.settings.port.parse()) {
-                            (Ok(addr), Ok(port)) => {
-                                let addr: Ipv4Addr = addr;
-                                let port: u16 = port;
-                                emu.link_do(|link| link.connect(addr, port));
-                            },
-                            (a, p) => {
-                                log::warn!("failed to parse: {a:?}, {p:?}");
-                            }
+                ui.horizontal(|ui| {
+                    let host = TextEdit::singleline(&mut emu.settings.host).desired_width(120.);
+                    ui.label("Host: ");
+                    ui.add(host);
+                });
+                ui.horizontal(|ui| {
+                    let port = TextEdit::singleline(&mut emu.settings.port).desired_width(48.);
+                    ui.label(" Port: ");
+                    ui.add(port);
+                });
+                if ui.button("Connect").clicked() {
+                    match (emu.settings.host.parse(), emu.settings.port.parse()) {
+                        (Ok(addr), Ok(port)) => {
+                            let addr: Ipv4Addr = addr;
+                            let port: u16 = port;
+                            emu.link_do(|link| link.connect(addr, port));
+                        },
+                        (a, p) => {
+                            log::warn!("failed to parse: {a:?}, {p:?}");
                         }
                     }
                 }
+
             });
     }
 

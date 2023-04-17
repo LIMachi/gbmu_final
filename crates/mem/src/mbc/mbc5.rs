@@ -46,7 +46,7 @@ impl Mem for Mbc5 {
         match absolute {
             RAM_ENABLE..=RAM_ENABLE_END => self.enabled_ram = (value & 0xF) == 0xA,
             ROM_BANK..=ROM_BANK_END => self.rom_bank = ((self.rom_bank & 0x100) | (value as usize)) % self.rom_banks,
-            ROM_BANK_H..=ROM_BANK_H_END => self.rom_bank = ((value as usize & 0x1) << 8) | (self.rom_bank & 0xFF),
+            ROM_BANK_H..=ROM_BANK_H_END => self.rom_bank = (((value as usize & 0x1) << 8) | (self.rom_bank & 0xFF)) % self.rom_banks,
             RAM_BANK..=RAM_BANK_END => self.ram_bank = (value as usize & 0xF) % self.ram_banks,
             SRAM..=SRAM_END => {
                 let addr = addr as usize + self.ram_bank as usize * RAM_SIZE;
@@ -56,25 +56,17 @@ impl Mem for Mbc5 {
         }
     }
 
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        let s = st as usize;
+    fn get_range(&self, st: u16, _: u16) -> Vec<u8> {
         match st {
-            ROM..=ROM_END => self.rom[s..((st + len) as usize).min(BANK_SIZE)].to_vec(),
-            SROM..=SROM_END => {
-                let s = s - SROM as usize;
-                let end = (s + len as usize).min(BANK_SIZE) + self.rom_bank * BANK_SIZE;
-                let st = s + self.rom_bank * BANK_SIZE;
-                self.rom[st..end].to_vec()
+            ROM => self.rom[..BANK_SIZE].to_vec(),
+            SROM => {
+                log::info!("rom bank {} out of {}", self.rom_bank, self.rom_banks);
+                let st = BANK_SIZE * self.rom_bank;
+                self.rom[st..(st + BANK_SIZE)].to_vec()
             },
-            SRAM..=SRAM_END => {
-                let s = s - SRAM as usize;
-                let st = s + RAM_SIZE * self.ram_bank as usize;
-                let end = (st + len as usize).min((self.ram_bank + 1) as usize * RAM_SIZE);
-                if end > self.ram.len() {
-                    eprintln!("hope you're not reading from that rambank ({}) because it's not mapped !", self.ram_bank);
-                    return vec![];
-                }
-                self.ram[st..end].to_vec()
+            SRAM => {
+                let st = RAM_SIZE * self.ram_bank;
+                self.rom[st..(st + RAM_SIZE)].to_vec()
             },
             _ => vec![]
         }

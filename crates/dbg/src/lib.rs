@@ -30,13 +30,13 @@ trait Debugger<E: Emulator> {
 }
 
 impl<E: Emulator> Debugger<E> for E {
+    fn pause(&mut self) {
+        self.breakpoints().pause();
+    }
+
     fn play(&mut self, dice: &mut Disassembly<E>) {
         self.play();
         dice.follow();
-    }
-
-    fn pause(&mut self) {
-        self.breakpoints().pause();
     }
 
     fn step(&mut self, dice: &mut Disassembly<E>) {

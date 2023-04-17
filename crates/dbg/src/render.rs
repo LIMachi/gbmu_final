@@ -242,8 +242,8 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         ui.add(text);
                                         if ui.add(egui::Button::new("-")).clicked() { ext.set_speed((sp - 1).max(-15)); }
                                     });
-                                    if ui.add(into.clone()).clicked() { ext.step_into(&mut self.disassembly); };
-                                    if ui.add(pause.clone()).clicked() { ext.pause(); };
+                                    if ui.add(into).clicked() { ext.step_into(&mut self.disassembly); };
+                                    if ui.add(pause).clicked() { ext.pause(); log::info!("pause"); };
                                     if ui.add(play).clicked() { Debugger::<E>::play(ext, &mut self.disassembly); };
                                     if ui.add(step).clicked() { ext.step(&mut self.disassembly) };
                                     if ui.add(reset).clicked() { ext.reset(); };

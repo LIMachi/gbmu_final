@@ -47,10 +47,8 @@ pub struct AppConfig {
     pub debug: DbgConfig,
     #[serde(default)]
     pub keys: Keybindings,
-    #[cfg(feature = "audio")]
     #[serde(default)]
     pub sound_device: apu::SoundConfig,
-    #[cfg(feature = "audio")]
     #[serde(default)]
     pub audio_settings: AudioSettings,
     #[serde(default)]
