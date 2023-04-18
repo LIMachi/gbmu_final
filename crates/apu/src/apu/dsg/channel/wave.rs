@@ -37,6 +37,10 @@ impl Channel {
             freq: 0
         }
     }
+
+    fn frequency(&self, io: &mut IORegs) -> u16 {
+        io.io(IO::NR33).value() as u16 | ((io.io(IO::NR34).value() as u16 & 0x7) << 8)
+    }
 }
 
 impl SoundChannel for Channel {
@@ -48,7 +52,7 @@ impl SoundChannel for Channel {
 
     fn channel(&self) -> Channels { Channels::Wave }
 
-    fn dac_enabled(&self, io: &mut IORegs) -> bool {
+    fn dac_enabled(&self) -> bool {
         self.dac
     }
 
@@ -100,8 +104,7 @@ impl IODevice for Channel {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
         match io {
             IO::NR30 => self.dac = v & 0x80 != 0,
-            IO::NR33 => self.freq = (bus.io(IO::NR34).value() as u16 & 0x7) << 8 | v as u16,
-            IO::NR34 => self.freq = (v as u16 & 0x7) << 8 | bus.io(IO::NR33).value() as u16,
+            IO::NR33 | IO::NR34 => self.freq = self.frequency(bus.io_regs()),
             _ => {}
         }
     }

@@ -42,7 +42,7 @@ impl SoundChannel for Channel {
 
     fn channel(&self) -> Channels { Channels::Noise }
 
-    fn dac_enabled(&self, _: &mut IORegs) -> bool {
+    fn dac_enabled(&self) -> bool {
         self.dac
     }
 
@@ -71,7 +71,7 @@ impl SoundChannel for Channel {
         self.buffer = 0xFFFF;
         self.envelope.trigger();
         self.freq_timer = self.frequency(io);
-        false
+        !self.dac
     }
 
     fn envelope(&mut self) { self.envelope.clock(); }

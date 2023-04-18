@@ -55,7 +55,7 @@ impl DSG {
         channels.iter_mut()
             .for_each(|c| {
                 if state[i] {
-                    any_dac |= c.dac_enabled(io);
+                    any_dac |= c.dac_enabled();
                     self.output[0] += self.panned(Panning::Left, c, io);
                     self.output[1] += self.panned(Panning::Right, c, io);
                 }

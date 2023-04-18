@@ -31,7 +31,7 @@ pub(crate) trait SoundChannel: IODevice {
     fn channel(&self) -> Channels;
     fn enable(&mut self) { }
     fn disable(&mut self) { }
-    fn dac_enabled(&self, _io: &mut IORegs) -> bool { false }
+    fn dac_enabled(&self) -> bool { false }
 
     fn clock(&mut self, io: &mut IORegs);
     fn trigger(&mut self, io: &mut IORegs) -> bool;
@@ -180,19 +180,18 @@ impl Channel {
             let p = t | ((out & 0xF) << (4 * n));
             io.io_mut(self.pcm).direct_write(p);
         }
-        self.dac.tick(if self.dac_enabled(io) { Some(1. - out as f32 / 7.5) } else { None })
+        self.dac.tick(if self.dac_enabled() { Some(1. - out as f32 / 7.5) } else { None })
     }
 
     pub fn channel(&self) -> Channels { self.inner.channel() }
-    pub fn dac_enabled(&self, io: &mut IORegs) -> bool {
-        self.inner.dac_enabled(io)
+    pub fn dac_enabled(&self) -> bool {
+        self.inner.dac_enabled()
     }
 
     pub fn clock(&mut self, io: &mut IORegs) {
-        if !self.inner.dac_enabled(io) {
+        if !self.inner.dac_enabled() {
             self.disable(io);
-        }
-        if self.enabled {
+        } else if self.enabled {
             self.inner.clock(io);
         }
     }
@@ -206,8 +205,8 @@ impl Channel {
 
 impl IODevice for Channel {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        self.inner.write(io, v, bus);
         if io == self.nr4 && v & 0x80 != 0 { self.trigger(bus.io_regs()); }
         if io == self.nr1 { self.reload_length(v); }
-        self.inner.write(io, v, bus);
     }
 }

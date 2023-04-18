@@ -54,10 +54,10 @@ impl Sweep {
         if self.negate { self.shadow.wrapping_sub(f) } else { self.shadow + f }
     }
 
-    pub fn tick(&mut self, io: &mut IORegs, wave1: IO, wave2: IO) -> (u16, bool) {
-        if !self.enabled { return (self.shadow, false) }
+    pub fn tick(&mut self, io: &mut IORegs, wave1: IO, wave2: IO) -> bool {
+        if !self.enabled { return false }
         self.timer -= 1;
-        let overflow = if self.timer == 0 {
+        if self.timer == 0 {
             self.timer = self.pace;
             if self.timer == 0 { self.timer = 8 }
             if self.enabled && self.pace != 0 {
@@ -65,15 +65,14 @@ impl Sweep {
                 if f <= 2047 && self.shift != 0 {
                     io.io_mut(wave1).direct_write(f as u8);
                     let wave2 = io.io_mut(wave2);
-                    wave2.direct_write((wave2.value() & 0x40) | ((f & 0x7FF) >> 8) as u8);
+                    wave2.direct_write((wave2.value() & 0x40) | ((f >> 8) & 0x7) as u8);
                     self.shadow = f;
                 }
                 f > 2047 || self.calc() > 2047
             } else { false }
         } else {
             false
-        };
-        (self.shadow, overflow)
+        }
     }
 }
 
@@ -119,7 +118,7 @@ impl Channel {
     }
 
     fn frequency(&self, io: &mut IORegs) -> u16 {
-        io.io_mut(self.registers.wave1).value() as u16 | ((io.io_mut(self.registers.wave2).value() as u16 & 0x7) << 8)
+        io.io(self.registers.wave1).value() as u16 | ((io.io(self.registers.wave2).value() as u16 & 0x7) << 8)
     }
 }
 
@@ -133,7 +132,7 @@ impl SoundChannel for Channel {
         if self.has_sweep { Channels::Sweep } else { Channels::Pulse }
     }
 
-    fn dac_enabled(&self, io: &mut IORegs) -> bool { self.dac }
+    fn dac_enabled(&self) -> bool { self.dac }
 
     fn clock(&mut self, io: &mut IORegs) {
         if !self.triggered { return }
@@ -154,8 +153,8 @@ impl SoundChannel for Channel {
 
     fn sweep(&mut self, io: &mut IORegs) -> bool {
         if self.has_sweep {
-            let (freq, overflow) = self.sweep.tick(io, self.registers.wave1, self.registers.wave2);
-            self.freq = freq;
+            let overflow = self.sweep.tick(io, self.registers.wave1, self.registers.wave2);
+            self.freq = self.frequency(io);
             overflow
         }
         else { false }
@@ -186,10 +185,8 @@ impl IODevice for Channel {
             self.envelope.update(v);
             self.dac = v & 0xF8 != 0;
         }
-        else if io == self.registers.wave1 {
-            self.freq = (bus.io(self.registers.wave2).value() as u16 & 0x7) << 8 | v as u16;
-        } else if io == self.registers.wave2 {
-            self.freq = (v as u16 & 0x7) << 8 | bus.io(self.registers.wave1).value() as u16
+        else if io == self.registers.wave1 || io == self.registers.wave2 {
+            self.freq = self.frequency(bus.io_regs());
         } else if self.has_sweep && io == IO::NR10 { self.sweep.update(v); }
     }
 }
