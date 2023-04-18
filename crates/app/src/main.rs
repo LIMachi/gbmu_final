@@ -80,7 +80,7 @@ impl App {
                 },
                 Event::UserEvent(Events::Close) => {
                     let conf = AppConfig {
-                        sound_device: self.emu.audio_device.clone(),
+                        sound_device: self.emu.audio.config(),
                         audio_settings: self.emu.audio_settings.clone(),
                         roms: self.emu.roms.clone(),
                         debug: DbgConfig {

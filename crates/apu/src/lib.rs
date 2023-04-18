@@ -36,6 +36,12 @@ impl Controller {
         self.driver.device()
     }
 
+    pub fn config(&self) -> SoundConfig {
+        SoundConfig {
+            dev_name: self.driver.device().clone()
+        }
+    }
+
     pub fn switch<S: Into<String>>(&mut self, name: S, apu: &mut Apu) {
         match self.driver.switch(name) {
             Ok(x) => apu.switch(x.sample_rate(), x.bind()),
