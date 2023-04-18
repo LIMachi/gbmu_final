@@ -126,7 +126,9 @@ impl Apu {
 impl IODevice for Apu {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
         match io {
-            IO::NR52 => self.power(bus.io_regs(), v & 0x80 != 0),
+            IO::NR52 => {
+                self.power(bus.io_regs(), v & 0x80 != 0)
+            },
             IO::NR10 | IO::NR11 | IO::NR12 | IO::NR13 | IO::NR14 => self.channels[0].write(io, v, bus),
             IO::NR21 | IO::NR22 | IO::NR23 | IO::NR24 => self.channels[1].write(io, v, bus),
             IO::NR30 | IO::NR31 | IO::NR32 | IO::NR33 | IO::NR34 => self.channels[2].write(io, v, bus),

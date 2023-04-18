@@ -67,4 +67,10 @@ impl Chrono {
         self.el = Duration::default();
         self.st = Instant::now();
     }
+
+    pub fn restart(&mut self) {
+        self.el = Duration::default();
+        self.st = Instant::now();
+        self.on = true;
+    }
 }

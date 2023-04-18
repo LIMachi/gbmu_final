@@ -10,13 +10,6 @@ enum Panning {
     Left = 4,
 }
 
-// impl std::ops::AddAssign<&mut Channel> for DSG {
-//     fn add_assign(&mut self, rhs: &mut Channel) {
-//         self.output[0] += self.panned(Panning::Left, rhs);
-//         self.output[1] += self.panned(Panning::Right, rhs);
-//     }
-// }
-
 pub(crate) struct DSG {
     output: [f32; 2],
     capacitor: [f32; 2],
@@ -63,7 +56,6 @@ impl DSG {
             .for_each(|c| {
                 if state[i] {
                     any_dac |= c.dac_enabled(io);
-                    // *self += c;
                     self.output[0] += self.panned(Panning::Left, c, io);
                     self.output[1] += self.panned(Panning::Right, c, io);
                 }

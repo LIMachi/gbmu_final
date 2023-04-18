@@ -22,24 +22,13 @@ use shared::input::{Keybindings, Section};
 use crate::app::RomConfig;
 use crate::settings::Mode;
 
+#[derive(Default)]
 pub struct Console {
     speed: i32,
     rom: Option<Rom>,
     pub bus: bus::Bus,
     pub gb: Devices,
     running: bool
-}
-
-impl Default for Console {
-    fn default() -> Self {
-        Self {
-            speed: Default::default(),
-            rom: None,
-            bus: bus::Bus::new(false),
-            running: false,
-            gb: Devices::builder().build()
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -246,8 +235,7 @@ impl Console {
             .with_apu(controller.audio.apu())
             .with_link(controller.serial_port())
             .build();
-        let bus = bus::Bus::new(cgb).skip_boot(skip, if cgb { rom.raw()[0x143] } else { 0 })
-            .with_mbc(mem::mbc::Controller::new(&rom, cgb));
+        let bus = bus::Bus::init(&rom).cgb(cgb).skip_boot(skip).build();
         log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
         Self {
             speed: Default::default(),

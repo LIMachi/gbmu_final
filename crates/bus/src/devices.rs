@@ -72,6 +72,10 @@ pub struct Devices {
     pub serial: serial::Port,
 }
 
+impl Default for Devices {
+    fn default() -> Self { Devices::builder().build() }
+}
+
 impl Devices {
     pub fn builder() -> ConsoleBuilder {
         ConsoleBuilder::default()

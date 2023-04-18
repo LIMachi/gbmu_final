@@ -115,18 +115,17 @@ impl Audio {
 
     pub(crate) fn bind(&self) -> Input {
         let (producer, consumer) = RingBuffer::new(self.sample_rate() as usize);
-        self.sink.clear();
         self.sink.append(Output::new(self.sample_rate(), consumer));
-        self.sink.play();
         Input(producer)
     }
 
     pub(crate) fn new(config: &super::SoundConfig) -> Self {
+        let device = cpal::default_host().default_output_device().unwrap();
         let mut audio = Self {
-            device: cpal::default_host().default_output_device().unwrap(),
+            device,
             sink: Sink::new_idle().0,
             dev_name: config.dev_name.clone(),
-            sample_rate: SampleRate(44100),
+            sample_rate: SampleRate(0),
             handle: None,
             stream: None,
         };

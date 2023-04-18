@@ -1,6 +1,6 @@
 #![feature(trait_upcasting)]
 
-use mem::{Hram, Oam, Vram, Wram};
+use mem::{Hram, mbc, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::io::{IO, IOReg, IORegs};
 
@@ -11,6 +11,7 @@ pub use timer::Timer;
 pub use devices::Devices;
 
 pub use devices::Settings;
+use shared::rom::Rom;
 
 pub struct Empty {}
 impl Mem for Empty {}
@@ -29,8 +30,40 @@ pub struct Bus {
     last: Option<Op>
 }
 
+pub struct Builder<'a> {
+    skip: bool,
+    cgb: bool,
+    rom: &'a Rom
+}
+
+impl<'a> Builder<'a> {
+    pub fn cgb(mut self, cgb: bool) -> Self {
+        self.cgb = cgb;
+        self
+    }
+
+    pub fn skip_boot(mut self, skip: bool) -> Self {
+        self.skip = skip;
+        self
+    }
+
+    pub fn build(mut self) -> Bus {
+        let mut bus = Bus::new(self.cgb).with_mbc(mbc::Controller::new(self.rom, self.cgb));
+        if self.skip { bus.skip_boot(self.rom.raw()[0x143]); }
+        bus
+    }
+}
+
+impl Default for Bus {
+    fn default() -> Self { Bus::new(false) }
+}
+
 impl Bus {
-    pub fn new(cgb: bool) -> Self {
+    pub fn init(rom: &Rom) -> Builder {
+        Builder { rom, skip: false, cgb: false }
+    }
+
+    fn new(cgb: bool) -> Self {
         Self {
             clock: 0,
             mbc: mem::mbc::Controller::unplugged().locked(),
@@ -46,16 +79,15 @@ impl Bus {
         }
     }
 
-    pub fn with_mbc(mut self, mut controller: mem::mbc::Controller) -> Self {
+    fn with_mbc(mut self, mut controller: mem::mbc::Controller) -> Self {
         self.mbc = controller.locked();
         self
     }
 
-    pub fn skip_boot(mut self, skip: bool, console: u8) -> Self {
-        if skip {
-            self.status = MemStatus::ReqRead(0x100);
-            self.io.skip_boot(console);
-        }
+    fn skip_boot(&mut self, console: u8) -> &mut Self {
+        self.status = MemStatus::ReqRead(0x100);
+        self.io.skip_boot(console);
+        self.mbc.inner_mut().post();
         self
     }
 
@@ -75,7 +107,7 @@ impl Bus {
         }
     }
 
-    pub fn last(&mut self) -> Option<Op> {
+    fn last(&mut self) -> Option<Op> {
         self.last.take()
     }
 
@@ -87,19 +119,18 @@ impl Bus {
         devices.joy.tick(&mut self.io);
 
         let ds = self.io.io(IO::KEY1).bit(7) != 0;
+        self.status = match self.status {
+            MemStatus::ReqRead(addr) => {
+                let v = self.read(addr);
+                self.last = Some(Op::Read(addr, v));
+                MemStatus::Read(v)
+            },
+            MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
+            st => st
+        };
         if clock == 0 || clock == 2 {
             let tick = devices.hdma.tick(self);
             if clock == 0 || ds {
-                self.last = None;
-                self.status = match self.status {
-                    MemStatus::ReqRead(addr) => {
-                        let v = self.read(addr);
-                        self.last = Some(Op::Read(addr, v));
-                        MemStatus::Read(v)
-                    },
-                    MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
-                    st => st
-                };
                 devices.serial.tick(&mut self.io);
                 devices.timer.tick(&mut self.io);
                 devices.dma.tick(self);
@@ -164,6 +195,7 @@ impl shared::cpu::Bus for Bus {
                 match addr {
                     0xFF50 if self.io.writable(IO::POST) => {
                         self.io.post();
+                        self.mbc.inner_mut().post();
                     },
                     0xFF4C if self.io.writable(IO::KEY0) => {
                         self.io.compat_mode();

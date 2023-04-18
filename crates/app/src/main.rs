@@ -128,16 +128,14 @@ fn main() {
                         acc -= cy;
                     }
                     dt += current.elapsed();
+                } else if st.elapsed().as_secs_f64() > 0.1 {
+                    run = true;
+                    current = std::time::Instant::now();
+                    st.restart();
                 }
                 if st.elapsed().as_secs() != 0 {
                     let t = cycles as f64 / st.elapsed().as_secs_f64();
-                    st.stop();
-                    st.start();
-                    if !run {
-                        run = true;
-                        current = std::time::Instant::now();
-                        return ;
-                    }
+                    st.restart();
                     let p = (t / 4194304.) * 100.;
                     let n = dt.as_secs_f64() * 100.;
                     log::debug!("cycles: {:.0} ({:0.2} %) | took {dt:?} ({n:0.2}% capacity)", t, p);

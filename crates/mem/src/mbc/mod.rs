@@ -125,6 +125,7 @@ impl Mem for Controller {
 impl IODevice for Controller {
     fn write(&mut self, io: IO, _: u8, _: &mut dyn IOBus) {
         if io == IO::POST && self.inner.is_boot() {
+            log::info!("--- POST ----");
             self.post();
         }
     }
