@@ -1,18 +1,18 @@
 extern crate core;
-use rodio::cpal;
+
 use cpal::traits::DeviceTrait;
+use rodio::cpal;
 use serde::{Deserialize, Serialize};
+
+pub use apu::Apu;
+use driver::{Audio, Input};
 
 mod apu;
 mod driver;
 
-pub use apu::Apu;
-use driver::{Audio, Input};
-use shared::audio_settings::AudioSettings;
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SoundConfig {
-    dev_name: String
+    dev_name: String,
 }
 
 impl Default for SoundConfig {
@@ -24,11 +24,11 @@ impl Default for SoundConfig {
 }
 
 pub struct Controller {
-    driver: Audio
+    driver: Audio,
 }
 
 impl Controller {
-    pub fn devices() -> impl Iterator<Item = String> {
+    pub fn devices() -> impl Iterator<Item=String> {
         Audio::devices().filter_map(|x| x.name().ok())
     }
 

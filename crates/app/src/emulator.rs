@@ -1,25 +1,25 @@
 use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
+
 use apu::SoundConfig;
 use bus::Devices;
 use mem::{Oam, Vram};
 use serial::com::Serial;
 use serial::Link;
+use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
-use shared::rom::Rom;
-use shared::Events;
 use shared::cpu::Bus;
-use shared::winit::window::Window;
-use shared::mem::{IOBus, MBCController};
 use shared::emulator::{ReadAccess, Schedule};
+use shared::emulator::BusWrapper;
+use shared::Events;
+use shared::input::{Keybindings, Section};
+use shared::mem::{IOBus, MBCController};
+use shared::rom::Rom;
+use shared::winit::window::Window;
 
 use crate::{AppConfig, Proxy};
-use crate::render::{Event, Render};
-
-use shared::audio_settings::AudioSettings;
-use shared::emulator::BusWrapper;
-use shared::input::{Keybindings, Section};
 use crate::app::RomConfig;
+use crate::render::{Event, Render};
 use crate::settings::Mode;
 
 #[derive(Default)]
@@ -28,20 +28,20 @@ pub struct Console {
     rom: Option<Rom>,
     pub bus: bus::Bus,
     pub gb: Devices,
-    running: bool
+    running: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EmuSettings {
     pub host: String,
-    pub port: String
+    pub port: String,
 }
 
 impl Default for EmuSettings {
     fn default() -> Self {
         Self {
             host: "127.0.0.1".to_string(),
-            port: "27542".to_string()
+            port: "27542".to_string(),
         }
     }
 }
@@ -62,7 +62,6 @@ pub struct Emulator {
 }
 
 impl Emulator {
-
     pub fn new(proxy: Proxy, conf: AppConfig) -> Self {
         let link = Link::new();
         let port = link.port;
@@ -93,11 +92,16 @@ impl Emulator {
     }
 
     pub fn enabled_boot(&self) -> bool {
-            self.bios
+        self.bios
     }
 
     pub fn serial_port(&mut self) -> serial::com::Serial {
         self.link.port()
+    }
+    pub fn serial_claim(&mut self) {
+        if self.link.borrowed() {
+            self.link.store(self.console.gb.serial.disconnect());
+        }
     }
 
     pub fn cycle(&mut self, clock: u8) {
@@ -110,7 +114,10 @@ impl Emulator {
     pub fn is_running(&self) -> bool { self.console.running }
 
     pub fn stop(&mut self) {
-        // TODO drop serial first ?
+        self.serial_claim();
+        self.link_do(|x| {
+            x.disconnect();
+        });
         self.console = Console::default();
     }
 
@@ -119,9 +126,7 @@ impl Emulator {
     }
 
     fn insert(&mut self, rom: Rom, running: bool) {
-        if self.link.borrowed() {
-            self.link.store(self.console.gb.serial.disconnect());
-        }
+        self.serial_claim();
         self.console = Console::new(self, rom, running);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -136,11 +141,11 @@ impl Render for Screen {
         emu.console.gb.lcd.init(window);
     }
     fn render(&mut self, emu: &mut Emulator) {
-         emu.console.gb.lcd.render();
+        emu.console.gb.lcd.render();
     }
 
     fn resize(&mut self, w: u32, h: u32, emu: &mut Emulator) {
-         emu.console.gb.lcd.resize(w, h);
+        emu.console.gb.lcd.resize(w, h);
     }
 
     fn should_redraw(&self, emu: &mut Emulator) -> bool {
@@ -155,14 +160,14 @@ impl Render for Screen {
                     window.set_window_icon(raw.icon());
                 }
                 window.set_title("GBMU");
-            },
-            Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); },
+            }
+            Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); }
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
                 if event == &WindowEvent::CloseRequested { emu.stop(); }
                 if let WindowEvent::KeyboardInput { input, .. } = event {
                     emu.console.gb.joy.handle(*input);
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -198,7 +203,7 @@ impl Schedule for Emulator {
     }
 
     fn reset(&mut self) {
-        let Some(rom) = self.console.rom.clone() else { return };
+        let Some(rom) = self.console.rom.clone() else { return; };
         self.insert(rom, false);
     }
 
@@ -236,7 +241,7 @@ impl Console {
             rom: Some(rom),
             running,
             gb,
-            bus
+            bus,
         }
     }
 
@@ -250,7 +255,7 @@ impl Console {
     }
 
     pub fn cycle(&mut self, clock: u8, settings: bus::Settings) {
-        if !self.running { return }
+        if !self.running { return; }
         self.running = self.bus.tick(&mut self.gb, clock, settings);
     }
 
