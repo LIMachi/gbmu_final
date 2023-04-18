@@ -1,9 +1,8 @@
 use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
 
 pub enum Event { Stop, Connected(SocketAddr), Disconnect }
@@ -26,12 +25,15 @@ impl Client {
             loop {
                 match self.inner.read_exact(&mut buf) {
                     Ok(()) => match self.data.send(buf[0]) {
-                        Err(_) => { log::warn!("client: failed to send down recv data"); break },
+                        Err(_) => {
+                            log::warn!("client: failed to send down recv data");
+                            break;
+                        }
                         _ => {}
                     },
                     Err(e) => {
                         match e.kind() {
-                            ErrorKind::WouldBlock => {},
+                            ErrorKind::WouldBlock => {}
                             _ => break
                         }
                     }
@@ -65,7 +67,7 @@ pub struct Server {
     send: Sender<u8>,
     events: Sender<Event>,
     connect: Receiver<(Ipv4Addr, u16)>,
-    stop: Receiver<Event>
+    stop: Receiver<Event>,
 }
 
 impl Server {
@@ -77,10 +79,10 @@ impl Server {
         self.client = Some(stream.try_clone().expect("failed to clone socket"));
         log::info!("client connected from {addr:?}");
         if let Some(rd) = self.signal.as_mut() {
-            while let Ok(_) = rd.recv_timeout(Duration::from_secs(5)) { }
+            while let Ok(_) = rd.recv_timeout(Duration::from_secs(5)) {}
         }
         self.signal = Some(rec_d);
-        Client::spawn(stream, tx,  td, self.connected.clone()).run();
+        Client::spawn(stream, tx, td, self.connected.clone()).run();
         self.connected.store(true, Ordering::Relaxed);
         self.events.send(Event::Connected(addr)).ok();
     }
@@ -92,15 +94,18 @@ impl Server {
                 self.data = None;
                 self.client.take().map(|x| x.shutdown(Shutdown::Both));
                 None
-            },
+            }
             _ => None
         } { self.send.send(v).ok(); }
     }
 
     fn send(&mut self, data: u8) {
         match self.client.as_mut().map(|x| x.write(&[data])) {
-            Some(Ok(0)) => { self.client = None; self.data = None; },
-            Some(Err(e)) => { log::warn!("error client send: {e:?}") },
+            Some(Ok(0)) => {
+                self.client = None;
+                self.data = None;
+            }
+            Some(Err(e)) => { log::warn!("error client send: {e:?}") }
             _ => {}
         }
     }
@@ -111,12 +116,13 @@ impl Server {
             Some(Event::Disconnect) => {
                 self.client.as_ref().map(|x| x.shutdown(Shutdown::Both).ok());
                 if let Some(rd) = self.signal.as_mut() {
-                    while let Ok(_) = rd.recv_timeout(Duration::from_secs(5)) { }
+                    while let Ok(_) = rd.recv_timeout(Duration::from_secs(5)) {}
                 }
                 self.client = None;
                 self.signal = None;
                 false
-            },
+            }
+            None => { false }
             _ => unreachable!()
         }
     }
@@ -135,7 +141,7 @@ impl Server {
                     self.connect(stream, SocketAddr::new(IpAddr::V4(addr), port));
                 }
             }
-            if self.recv_events() { break }
+            if self.recv_events() { break; }
             if let Some(_) = self.stop.try_recv().ok() { break; }
         }
     }
@@ -155,7 +161,7 @@ impl Serial {
             connect: tc,
             recv: ri,
             send: to,
-            connected: Arc::new(AtomicBool::new(false))
+            connected: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -191,7 +197,7 @@ impl Serial {
             signal: tx_end,
             recv: rx_r,
             send: tx_s,
-            port
+            port,
         }
     }
 
