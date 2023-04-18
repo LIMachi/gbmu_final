@@ -233,11 +233,11 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     let into = egui::ImageButton::new(self.tex(Texture::Into), sz).frame(false);
                                     ui.allocate_ui_with_layout(Vec2::splat(64.), Layout::top_down(Align::Center), |ui| {
                                         let sp = ext.speed();
-                                        if ui.add(egui::Button::new("+")).clicked() { ext.set_speed((sp + 1).min(1)); }
+                                        if ui.add(egui::Button::new("+")).clicked() { ext.set_speed((sp + 1).min(5)); }
                                         let text = match sp {
                                             0 => egui::Label::new("Normal"),
-                                            1 => egui::Label::new("x2"),
-                                            n => egui::Label::new(format!("x1/{}", 1 << -n))
+                                            n @ 1..=5 => egui::Label::new(format!("{}x", 1. + n as f32 / 5.)),
+                                            n => egui::Label::new(format!("1/{}", (1 << -n)))
                                         };
                                         ui.add(text);
                                         if ui.add(egui::Button::new("-")).clicked() { ext.set_speed((sp - 1).max(-15)); }

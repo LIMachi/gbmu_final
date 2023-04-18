@@ -117,12 +117,7 @@ impl Emulator {
     }
 
     pub fn cycle_time(&self) -> f64 {
-        match self.console.speed {
-            0 => Console::CYCLE_TIME,
-            1 => Console::CYCLE_TIME / 2.,
-            n if n < 0 => Console::CYCLE_TIME * ((1 << -n) as f64),
-            _ => unimplemented!()
-        }
+        self.console.speed_mult() * Console::CYCLE_TIME
     }
 
     fn insert(&mut self, rom: Rom, running: bool) {
@@ -212,6 +207,7 @@ impl Schedule for Emulator {
     fn speed(&self) -> i32 { self.console.speed }
     fn set_speed(&mut self, speed: i32) {
         self.console.speed = speed;
+        self.console.gb.apu.set_speed(self.console.speed_mult());
         let time = self.cycle_time();
         log::info!("CY: {time} / CPS: {}", 1f64 / time);
     }
@@ -243,6 +239,15 @@ impl Console {
             running,
             gb,
             bus
+        }
+    }
+
+    fn speed_mult(&self) -> f64 {
+        match self.speed {
+            0 => 1.,
+            n @ 1..=5 => 1. / (1. + 0.2 * n as f64),
+            n if n < 0 => (1 << -n) as f64,
+            _ => unimplemented!()
         }
     }
 

@@ -33,7 +33,8 @@ pub struct Oam<'a, E: Emulator + PpuAccess>(pub(crate) &'a mut VramViewer<E>, pu
 
 impl<E: Emulator + PpuAccess> Widget for Oam<'_, E> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let ppu = self.1.ppu();
+        let oam = self.1.oam();
+        let lcdc = self.1.bus().io(IO::LCDC).value();
         ui.vertical(|ui| {
             for j in 0..5 {
                 let sp = ui.spacing().item_spacing.y;
@@ -42,9 +43,9 @@ impl<E: Emulator + PpuAccess> Widget for Oam<'_, E> {
                     ui.spacing_mut().item_spacing.y = sp;
                     for i in 0..8 {
                         let index = i + j * 8;
-                        let sprite = ppu.sprite(index);
+                        let sprite = oam.sprites[index];
                         let h = self.0.tex(if sprite.x > 0 && sprite.y > 0 { Textures::Tile(sprite.tile as usize) } else { Textures::Placeholder }).unwrap().id();
-                        let h2 = self.0.tex(if ppu.lcdc.obj_tall() { Textures::Tile(sprite.tile as usize + 1) } else { Textures::Placeholder }).unwrap().id();
+                        let h2 = self.0.tex(if lcdc.obj_tall() { Textures::Tile(sprite.tile as usize + 1) } else { Textures::Placeholder }).unwrap().id();
                         if ui.add(Sprite(&sprite, h, h2)).hovered() {
                         }
                     }

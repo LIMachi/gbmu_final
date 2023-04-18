@@ -12,7 +12,9 @@ pub struct Cpu {
     prev: Opcode,
     at: u16,
     mode: Mode,
-    instructions: Vec<Vec<Op>>,
+    instructions: &'static [&'static [Op]],
+    ins: usize,
+    count: usize,
     regs: Registers,
     cache: Vec<Value>,
     prefixed: bool,
@@ -31,7 +33,9 @@ impl Default for Cpu {
         Self {
             mode: Mode::Running,
             prev: Opcode::Nop,
-            instructions: Vec::new(),
+            instructions: decode(Opcode::Nop),
+            ins: 0,
+            count: 1,
             regs: Registers::default(),
             cache: Vec::new(),
             prefixed: false,
@@ -50,7 +54,7 @@ impl Cpu {
     pub fn registers(&self) -> &Registers { &self.regs }
 
     fn check_interrupts(&mut self, bus: &mut dyn Bus) {
-        if !self.instructions.is_empty() || self.prev == Opcode::Ei { return };
+        if self.ins < self.count || self.prev == Opcode::Ei { return };
         let int = bus.interrupt();
         if int != 0 {
             if self.mode == Mode::Halt { self.mode = Mode::Running };
@@ -58,7 +62,9 @@ impl Cpu {
                 self.ime = false;
                 let (bit, ins) = super::decode::interrupt(int);
                 bus.int_reset(bit);
-                self.instructions = ins.iter().rev().map(|x| x.to_vec()).collect();
+                self.instructions = ins;
+                self.count = self.instructions.len();
+                self.ins = 0;
             }
         }
     }
@@ -71,7 +77,7 @@ impl Cpu {
             return ;
         }
         let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime, &mut self.mode));
-        if self.instructions.is_empty() {
+        if self.ins >= self.count {
             let opcode = state.read();
             let Ok(opcode) = Opcode::try_from((opcode, prefixed)) else { unreachable!(); };
 
@@ -101,21 +107,24 @@ impl Cpu {
                 }
             }
 
-            self.instructions = decode(opcode).iter().rev().map(|x| x.to_vec()).collect();
+            self.instructions = decode(opcode);
+            self.ins = 0;
+            self.count = self.instructions.len();
             self.prev = opcode;
             self.at = state.register(Reg::PC).u16();
             if let Opcode::Invalid(n) = opcode {
                 log::warn!("invalid opcode {n:#02x}");
             }
         }
-        for op in self.instructions.pop().expect("this can never be empty") {
+        for op in self.instructions[self.ins] {
             if op(&mut state) == BREAK {
                 state.clear();
-                self.instructions.clear();
+                self.ins = self.count;
                 break;
             }
         }
-        self.finished = self.instructions.is_empty();
+        self.ins += 1;
+        self.finished = self.ins >= self.count;
     }
 
     pub fn reset_finished(&mut self) { self.finished = false; }
