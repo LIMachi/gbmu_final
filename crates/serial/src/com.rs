@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::time::Duration;
 
-pub enum Event { Stop, Connected(SocketAddr) }
+pub enum Event { Stop, Connected(SocketAddr), Disconnect }
 
 struct Client {
     inner: TcpStream,
@@ -46,7 +46,7 @@ impl Client {
 
 
 pub struct Serial {
-    stop: Sender<Event>,
+    signal: Sender<Event>,
     events: Receiver<Event>,
     connect: Sender<(Ipv4Addr, u16)>,
     recv: Receiver<u8>,
@@ -105,6 +105,22 @@ impl Server {
         }
     }
 
+    fn recv_events(&mut self) -> bool {
+        match self.stop.try_recv().ok() {
+            Some(Event::Stop) => true,
+            Some(Event::Disconnect) => {
+                self.client.as_ref().map(|x| x.shutdown(Shutdown::Both).ok());
+                if let Some(rd) = self.signal.as_mut() {
+                    while let Ok(_) = rd.recv_timeout(Duration::from_secs(5)) { }
+                }
+                self.client = None;
+                self.signal = None;
+                false
+            },
+            _ => unreachable!()
+        }
+    }
+
     pub fn run(mut self) {
         loop {
             match self.socket.accept() {
@@ -119,6 +135,7 @@ impl Server {
                     self.connect(stream, SocketAddr::new(IpAddr::V4(addr), port));
                 }
             }
+            if self.recv_events() { break }
             if let Some(_) = self.stop.try_recv().ok() { break; }
         }
     }
@@ -133,7 +150,7 @@ impl Serial {
         let (_ti, ri) = channel();
         Self {
             port: 0,
-            stop: ts,
+            signal: ts,
             events: re,
             connect: tc,
             recv: ri,
@@ -171,7 +188,7 @@ impl Serial {
             connected,
             events: rx_e,
             connect: tx_c,
-            stop: tx_end,
+            signal: tx_end,
             recv: rx_r,
             send: tx_s,
             port
@@ -182,21 +199,21 @@ impl Serial {
         self.connected.load(Ordering::Relaxed)
     }
 
-    pub fn event(&mut self) -> Option<Event> {
+    pub fn event(&self) -> Option<Event> {
         self.events.try_recv().ok()
     }
 
-    pub fn connect(&mut self, ip: Ipv4Addr, port: u16) {
+    pub fn connect(&self, ip: Ipv4Addr, port: u16) {
         log::info!("Connecting to peer {ip:?}:{port}");
         self.connect.send((ip, port)).ok();
     }
 
-    pub fn send(&mut self, data: u8) { self.send.send(data).ok(); }
-    pub fn recv(&mut self) -> Option<u8> {
+    pub fn disconnect(&self) {
+        self.signal.send(Event::Disconnect).ok();
+    }
+
+    pub fn send(&self, data: u8) { self.send.send(data).ok(); }
+    pub fn recv(&self) -> Option<u8> {
         self.recv.try_recv().ok()
     }
-}
-
-impl Drop for Serial {
-    fn drop(&mut self) { self.stop.send(Event::Stop).ok(); }
 }

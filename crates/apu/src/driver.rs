@@ -1,17 +1,13 @@
-use rodio::{cpal, Source, Device, OutputStream, OutputStreamHandle, Sink, SupportedStreamConfig};
-use cpal::{
-    traits::{HostTrait, DeviceTrait},
-    SampleRate,
-    SampleFormat
-};
-use rtrb::{Consumer, Producer, RingBuffer};
-use anyhow::Context;
-
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::time::Duration;
-use shared::utils::Cell;
 
+use anyhow::Context;
+use cpal::{
+    SampleFormat,
+    SampleRate,
+    traits::{DeviceTrait, HostTrait},
+};
+use rodio::{cpal, Device, OutputStream, OutputStreamHandle, Sink, Source, SupportedStreamConfig};
+use rtrb::{Consumer, Producer, RingBuffer};
 
 pub(crate) struct Input(pub(crate) Producer<f32>);
 
@@ -28,9 +24,9 @@ impl Input {
     }
 }
 
-pub(crate)struct Output {
+pub(crate) struct Output {
     sample_rate: u32,
-    consumer: Consumer<f32>
+    consumer: Consumer<f32>,
 }
 
 impl Output {
@@ -39,10 +35,6 @@ impl Output {
             sample_rate,
             consumer,
         }
-    }
-
-    fn read_sample(&mut self) -> f32 {
-        self.consumer.pop().unwrap_or(0.)
     }
 }
 
@@ -60,7 +52,8 @@ impl Iterator for Output {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Some(self.read_sample())
+        self.consumer.pop().ok()
+            .or_else(|| if self.consumer.is_abandoned() { None } else { Some(0.) })
     }
 }
 
@@ -70,7 +63,7 @@ pub(crate) struct Audio {
     device: Device,
     stream: Option<OutputStream>,
     handle: Option<OutputStreamHandle>,
-    sink: Sink
+    sink: Sink,
 }
 
 pub(crate) fn default_device() -> String {
@@ -78,7 +71,7 @@ pub(crate) fn default_device() -> String {
 }
 
 impl Audio {
-    pub fn devices() -> impl Iterator<Item = Device> {
+    pub fn devices() -> impl Iterator<Item=Device> {
         cpal::default_host().output_devices().unwrap()
     }
 
