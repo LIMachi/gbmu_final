@@ -81,7 +81,7 @@ impl Server {
         }
         self.signal = Some(rec_d);
         Client::spawn(stream, tx,  td, self.connected.clone()).run();
-        *self.connected.lock().unwrap() = true;
+        self.connected.store(true, Ordering::Relaxed);
         self.events.send(Event::Connected(addr)).ok();
     }
 

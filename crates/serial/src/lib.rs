@@ -63,11 +63,12 @@ impl Port {
     pub fn tick(&mut self, io: &mut IORegs) {
         if !self.cable.connected() && io.io(IO::SC).bit(0) & 0x81 == 0x81 {
             let sb = io.io_mut(IO::SB);
-            if sb.value() != 0xFF {
+            let v = sb.value();
+            if v != 0xFF {
                 let v = v << 1 | 1;
                 sb.direct_write(v);
                 if v == 0xFF {
-                    io.io(IO::SC).reset(7);
+                    io.io_mut(IO::SC).reset(7);
                     io.int_set(3);
                 }
             }
@@ -76,7 +77,7 @@ impl Port {
             if io.io(IO::SC).bit(0) == 0 {
                 self.cable.send(io.io(IO::SB).value());
             }
-            io.io(IO::SC).reset(7);
+            io.io_mut(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(o);
             io.int_set(3);
         }
