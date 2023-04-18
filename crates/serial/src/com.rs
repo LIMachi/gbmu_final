@@ -1,6 +1,7 @@
 use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::sync::mpsc::{Sender, Receiver, channel, TryRecvError};
 use std::time::Duration;
@@ -11,11 +12,11 @@ struct Client {
     inner: TcpStream,
     data: Sender<u8>,
     done: Sender<()>,
-    connected: Arc<Mutex<bool>>,
+    connected: Arc<AtomicBool>,
 }
 
 impl Client {
-    pub fn spawn(client: TcpStream, data: Sender<u8>, done: Sender<()>, connected: Arc<Mutex<bool>>) -> Self {
+    pub fn spawn(client: TcpStream, data: Sender<u8>, done: Sender<()>, connected: Arc<AtomicBool>) -> Self {
         Self { inner: client, data, done, connected }
     }
     pub fn run(mut self) {
@@ -36,7 +37,8 @@ impl Client {
                     }
                 }
             }
-            *self.connected.lock().unwrap() = false;
+            log::info!("Connection reset by peer");
+            self.connected.store(false, Ordering::Relaxed);
             self.done.send(()).ok();
         });
     }
@@ -49,13 +51,13 @@ pub struct Serial {
     connect: Sender<(Ipv4Addr, u16)>,
     recv: Receiver<u8>,
     send: Sender<u8>,
-    connected: Arc<Mutex<bool>>,
+    connected: Arc<AtomicBool>,
     pub(crate) port: u16,
 }
 
 pub struct Server {
     socket: TcpListener,
-    connected: Arc<Mutex<bool>>,
+    connected: Arc<AtomicBool>,
     client: Option<TcpStream>,
     signal: Option<Receiver<()>>,
     data: Option<Receiver<u8>>,
@@ -136,12 +138,12 @@ impl Serial {
             connect: tc,
             recv: ri,
             send: to,
-            connected: Arc::new(Mutex::new(false))
+            connected: Arc::new(AtomicBool::new(false))
         }
     }
 
     pub fn build() -> Self {
-        let connected = Arc::new(Mutex::new(false));
+        let connected = Arc::new(AtomicBool::new(false));
         let srv = TcpListener::bind(
             &(27542..27552).map(|port| SocketAddr::from(([0, 0, 0, 0], port)))
                 .collect::<Vec<SocketAddr>>()[..]).expect("failed to find available port");
@@ -177,7 +179,7 @@ impl Serial {
     }
 
     pub fn connected(&self) -> bool {
-        *self.connected.lock().unwrap()
+        self.connected.load(Ordering::Relaxed)
     }
 
     pub fn event(&mut self) -> Option<Event> {
@@ -190,7 +192,9 @@ impl Serial {
     }
 
     pub fn send(&mut self, data: u8) { self.send.send(data).ok(); }
-    pub fn recv(&mut self) -> Option<u8> { self.recv.try_recv().ok() }
+    pub fn recv(&mut self) -> Option<u8> {
+        self.recv.try_recv().ok()
+    }
 }
 
 impl Drop for Serial {

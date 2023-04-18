@@ -47,6 +47,7 @@ impl Controller {
     pub fn new(rom: &Rom, cgb: bool) -> Self {
         let (sav, ram) = if rom.header.cartridge.capabilities().save() {
             let sav = rom.location.clone().join(&rom.filename).with_extension("sav");
+            log::info!("Trying to load save data...");
             let ram = if let Some(mut f) = std::fs::File::open(&sav).ok() {
                 use std::io::Read;
                 let mut v = Vec::with_capacity(rom.header.ram_size.size());
@@ -54,7 +55,10 @@ impl Controller {
                 v
             } else { vec![0xAF; rom.header.ram_size.size()] };
             (Some(sav), ram)
-        } else { (None, vec![0xAF; rom.header.ram_size.size()]) };
+        } else {
+            log::info!("No save detected, fresh file");
+            (None, vec![0xAF; rom.header.ram_size.size()])
+        };
         let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
             Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram, cgb)),
             Mbcs::MBC1 => Box::new(Boot::<mbc1::Mbc1>::new(rom, ram, cgb)),

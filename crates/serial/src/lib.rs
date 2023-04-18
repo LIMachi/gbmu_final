@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
-use shared::io::{IO, IORegs};
+use shared::io::{IO, IODevice, IORegs};
+use shared::mem::{IOBus, Mem};
 use crate::com::Serial;
 
 pub mod com;
@@ -60,19 +61,22 @@ impl Port {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        let data = io.io(IO::SB).value();
-        let ctrl = io.io_mut(IO::SC);
-        if ctrl.dirty() {
-            if ctrl.value() & 0x81 == 0x81 {
-                self.cable.send(data);
+        if !self.cable.connected() && io.io(IO::SC).bit(0) & 0x81 == 0x81 {
+            let sb = io.io_mut(IO::SB);
+            if sb.value() != 0xFF {
+                let v = v << 1 | 1;
+                sb.direct_write(v);
+                if v == 0xFF {
+                    io.io(IO::SC).reset(7);
+                    io.int_set(3);
+                }
             }
-            ctrl.reset_dirty();
         }
         if let Some(o) = self.cable.recv() {
-            if ctrl.bit(0) == 0 {
-                self.cable.send(data);
+            if io.io(IO::SC).bit(0) == 0 {
+                self.cable.send(io.io(IO::SB).value());
             }
-            ctrl.reset(7);
+            io.io(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(o);
             io.int_set(3);
         }
@@ -80,5 +84,13 @@ impl Port {
 
     pub fn disconnect(&mut self) -> Serial {
         std::mem::replace(&mut self.cable, Serial::phantom())
+    }
+}
+
+impl IODevice for Port {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        if io == IO::SC && v & 0x81 == 0x81 {
+            self.cable.send(bus.io(IO::SB).value());
+        }
     }
 }
