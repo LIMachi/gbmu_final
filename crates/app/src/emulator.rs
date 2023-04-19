@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
 
-use apu::SoundConfig;
 use bus::Devices;
 use mem::{Oam, Vram};
 use serial::com::Serial;

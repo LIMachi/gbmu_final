@@ -134,7 +134,7 @@ impl SoundChannel for Channel {
 
     fn dac_enabled(&self) -> bool { self.dac }
 
-    fn clock(&mut self, io: &mut IORegs) {
+    fn clock(&mut self, _io: &mut IORegs) {
         if !self.triggered { return }
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x7;
@@ -144,7 +144,7 @@ impl SoundChannel for Channel {
         }
     }
 
-    fn trigger(&mut self, io: &mut IORegs) -> bool {
+    fn trigger(&mut self, _io: &mut IORegs) -> bool {
         self.triggered = true;
         self.envelope.trigger();
         self.freq_timer = 4 * (0x7FF - self.freq) | (self.freq_timer & 0x3);

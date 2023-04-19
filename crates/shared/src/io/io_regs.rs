@@ -45,9 +45,7 @@ impl IORegs {
     }
 
     pub fn skip_boot(&mut self, console: u8) {
-        if self.cgb.v != 0 {
-            self.set(IO::KEY0, console);
-        }
+        self.set(IO::KEY0, console);
         self.set(IO::BGP, 0xFC);
         self.set(IO::OBP0, 0xFF);
         self.set(IO::OBP1, 0xFF);

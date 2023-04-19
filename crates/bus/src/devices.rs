@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::ops::Range;
 use apu::Apu;
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;

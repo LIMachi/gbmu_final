@@ -158,7 +158,7 @@ impl Ppu {
 }
 
 impl IODevice for Ppu {
-    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+    fn write(&mut self, _io: IO, _v: u8, _bus: &mut dyn IOBus) {
 
     }
 }

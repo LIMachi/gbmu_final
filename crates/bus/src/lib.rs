@@ -17,7 +17,7 @@ impl Mem for Empty {}
 
 pub struct Bus {
     clock: u8,
-    mbc: Lock<mem::mbc::Controller>,
+    mbc: Lock<mbc::Controller>,
     ram: Lock<Wram>,
     hram: Hram,
     un_1: Empty,
@@ -46,7 +46,7 @@ impl<'a> Builder<'a> {
         self
     }
 
-    pub fn build(mut self) -> Bus {
+    pub fn build(self) -> Bus {
         let mut bus = Bus::new(self.cgb).with_mbc(mbc::Controller::new(self.rom, self.cgb));
         let compat = if self.cgb { self.rom.raw()[0x143] } else { 0 };
         if self.skip { bus.skip_boot(compat); }
@@ -66,7 +66,7 @@ impl Bus {
     fn new(cgb: bool) -> Self {
         Self {
             clock: 0,
-            mbc: mem::mbc::Controller::unplugged().locked(),
+            mbc: mbc::Controller::unplugged().locked(),
             last: None,
             io: IORegs::init(cgb),
             vram: Vram::new(cgb).locked(),
@@ -79,7 +79,7 @@ impl Bus {
         }
     }
 
-    fn with_mbc(mut self, mut controller: mem::mbc::Controller) -> Self {
+    fn with_mbc(mut self, controller: mbc::Controller) -> Self {
         self.mbc = controller.locked();
         self
     }

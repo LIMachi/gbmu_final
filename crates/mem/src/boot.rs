@@ -1,4 +1,4 @@
-use shared::mem::{IOBus, Mem};
+use shared::mem::Mem;
 use shared::rom::Rom;
 use crate::mbc::{Mbc, MemoryController};
 
