@@ -1,12 +1,12 @@
+use dsg::{Channel, Event};
+use shared::audio_settings::AudioSettings;
+use shared::io::{IO, IODevice, IORegs};
 use shared::mem::IOBus;
+use shared::utils::FEdge;
+
 use super::Input;
 
 mod dsg;
-
-use shared::io::{IO, IODevice, IORegs};
-use dsg::{Channel, Event};
-use shared::audio_settings::AudioSettings;
-use shared::utils::FEdge;
 
 pub const TICK_RATE: f64 = 4_194_304.;
 
@@ -20,7 +20,7 @@ pub struct Apu {
     input: Input,
     dsg: dsg::DSG,
     channels: Vec<Channel>,
-    on: bool
+    on: bool,
 }
 
 impl Default for Apu {
@@ -36,7 +36,7 @@ impl Default for Apu {
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
             channels: vec![],
-            on: false
+            on: false,
         }
     }
 }
@@ -53,9 +53,6 @@ impl Apu {
     }
 
     pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
-        #[cfg(feature = "debug")]
-        let channels = vec![];
-        #[cfg(not(feature = "debug"))]
         let channels = vec![
             Channel::sweep(),
             Channel::pulse(),
@@ -72,7 +69,7 @@ impl Apu {
             input,
             dsg: dsg::DSG::new(1.),
             channels,
-            on: false
+            on: false,
         };
         apu.dsg.set_charge_factor(apu.charge_factor());
         apu
@@ -136,7 +133,7 @@ impl IODevice for Apu {
         match io {
             IO::NR52 => {
                 self.power(bus.io_regs(), v & 0x80 != 0)
-            },
+            }
             IO::NR10 | IO::NR11 | IO::NR12 | IO::NR13 | IO::NR14 => self.channels[0].write(io, v, bus),
             IO::NR21 | IO::NR22 | IO::NR23 | IO::NR24 => self.channels[1].write(io, v, bus),
             IO::NR30 | IO::NR31 | IO::NR32 | IO::NR33 | IO::NR34 => self.channels[2].write(io, v, bus),

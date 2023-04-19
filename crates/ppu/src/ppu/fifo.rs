@@ -1,10 +1,14 @@
 use std::collections::VecDeque;
+
 use shared::io::{IO, IORegs, LCDC};
+
 use crate::ppu::pixel::Attributes;
+
 use super::pixel::Pixel;
 
 pub struct ObjFifo {
     inner: VecDeque<Pixel>,
+    opri: bool,
 }
 
 trait Fifo {
@@ -12,36 +16,36 @@ trait Fifo {
 }
 
 impl ObjFifo {
-    pub fn new() -> Self {
-        ObjFifo { inner: VecDeque::with_capacity(8) }
+    pub fn new(opri: bool) -> Self {
+        ObjFifo { inner: VecDeque::with_capacity(8), opri }
     }
 
     pub fn pop(&mut self) -> Option<Pixel> {
         self.inner.pop_front()
     }
 
-    pub fn merge(&mut self, data: impl Iterator<Item = Pixel>) -> bool {
+    pub fn merge(&mut self, data: impl Iterator<Item=Pixel>) -> bool {
         for _ in self.inner.len()..8 {
             self.inner.push_back(Pixel::bg(0, Attributes::default()));
         }
         self.inner
             .iter_mut()
             .zip(data)
-            .for_each(|(obj, p)| { obj.mix(p); });
+            .for_each(|(obj, p)| { obj.mix(p, self.opri); });
         true
     }
 }
 
 pub struct BgFifo {
     inner: VecDeque<Pixel>,
-    enabled: bool
+    enabled: bool,
 }
 
 impl BgFifo {
     pub fn new() -> Self {
         BgFifo {
             enabled: false,
-            inner: VecDeque::with_capacity(16)
+            inner: VecDeque::with_capacity(16),
         }
     }
 
@@ -66,10 +70,7 @@ impl BgFifo {
             let res = match (oam.pop(), self.inner.pop_front()) {
                 (None, Some(bg)) => Some(bg),
                 (Some(oam), Some(bg)) => Some({
-                    if oam.color == 0x0 { bg }
-                    else if !cgb && oam.attrs.priority() && bg.color != 0 { bg }
-                    else if cgb && io.io(IO::LCDC).value().priority() && bg.color != 0 && (oam.attrs.priority() || bg.attrs.priority()) { bg }
-                    else { oam }
+                    if oam.color == 0x0 { bg } else if !cgb && oam.attrs.priority() && bg.color != 0 { bg } else if cgb && io.io(IO::LCDC).value().priority() && bg.color != 0 && (oam.attrs.priority() || bg.attrs.priority()) { bg } else { oam }
                 }),
                 (_, None) => unreachable!()
             };
@@ -80,8 +81,8 @@ impl BgFifo {
         } else { None }
     }
 
-    pub fn push(&mut self, data: impl Iterator<Item = Pixel>) -> bool {
-        if self.inner.len() > 8 { return false };
+    pub fn push(&mut self, data: impl Iterator<Item=Pixel>) -> bool {
+        if self.inner.len() > 8 { return false; };
         for pix in data {
             self.inner.push_back(pix);
         }

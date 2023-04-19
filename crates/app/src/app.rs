@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
-use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Vec2, Widget};
-use shared::rom::Rom;
-use shared::utils::image::ImageLoader;
 
-use shared::serde::{Serialize, Deserialize};
 use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoint;
+use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Vec2, Widget};
 use shared::input::Keybindings;
+use shared::rom::Rom;
+use shared::serde::{Deserialize, Serialize};
+use shared::utils::image::ImageLoader;
+
 use crate::emulator::Emulator;
 
 const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
@@ -20,23 +21,22 @@ enum Texture {
     Spritesheet,
     Debug,
     Add,
-    Cover(String)
+    Cover(String),
 }
 
-// TODO serde Deserialize/Serialize + serde_toml
 // paths are OS specific paths to rom directories/files mixup
 // each of these paths should be handed to Rom::find_roms for recursive dir traversal and rom retrieval
 // if no roms.conf file is found (use default directories later, for now project root path)
 #[derive(Default, Serialize, Deserialize, Clone)]
 #[serde(rename = "roms")]
 pub struct RomConfig {
-    paths: Vec<String>
+    paths: Vec<String>,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone)]
 #[serde(rename = "debug")]
 pub struct DbgConfig {
-    pub breaks: Vec<Breakpoint>
+    pub breaks: Vec<Breakpoint>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -69,7 +69,7 @@ pub struct Menu {
     textures: HashMap<Texture, TextureHandle>,
     roms: HashMap<String, Rom>,
     sender: Sender<(String, Rom)>,
-    receiver: Receiver<(String, Rom)>
+    receiver: Receiver<(String, Rom)>,
 }
 
 impl Default for Menu {
@@ -79,7 +79,7 @@ impl Default for Menu {
             textures: HashMap::with_capacity(512),
             roms: HashMap::with_capacity(512),
             sender,
-            receiver
+            receiver,
         }
     }
 }
@@ -92,17 +92,17 @@ impl Menu {
             for path in walk.max_depth(5).follow_links(true) {
                 match path {
                     Ok(entry) => {
-                        if !entry.file_type().is_file() { continue }
+                        if !entry.file_type().is_file() { continue; }
                         let ext = entry.path().extension().and_then(|x| x.to_str());
                         let key = entry.path().to_str();
-                        if ext.is_none() || key.is_none() { continue };
+                        if ext.is_none() || key.is_none() { continue; };
                         if ["gbc", "gb"].contains(&ext.unwrap()) {
                             let key = key.unwrap().to_string();
                             if let Ok(rom) = Rom::load(entry.path()) {
                                 sender.send((key, rom)).ok();
                             }
                         }
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -111,7 +111,7 @@ impl Menu {
 
     pub fn add_path<P: AsRef<Path>>(&mut self, conf: &mut RomConfig, path: P) {
         if let Some(path) = path.as_ref().to_str().map(|x| x.to_string()) {
-            if conf.paths.contains(&path) { return }
+            if conf.paths.contains(&path) { return; }
             self.search(&path);
             conf.paths.push(path);
         }
@@ -128,15 +128,15 @@ impl Menu {
         for f in dir.read_dir().unwrap() {
             let f = if f.is_err() { continue; } else { f.unwrap() };
             let fpath = f.path();
-            if fpath == path { continue ; }
+            if fpath == path { continue; }
             let ty = f.file_type();
-            if ty.is_err() { continue; } else if !ty.unwrap().is_file() { continue }
+            if ty.is_err() { continue; } else if !ty.unwrap().is_file() { continue; }
             let ext = fpath.extension();
             let file = fpath.file_stem();
             if ext.is_some() && file.is_some() && ["jpeg", "jpg", "png"].contains(&fpath.extension().and_then(|x| x.to_str()).unwrap()) {
                 if file.unwrap() == path.file_stem().unwrap() {
                     names.insert(0, fpath);
-                    break ;
+                    break;
                 }
                 names.push(f.path());
             }
@@ -155,7 +155,7 @@ const ROM_GRID: f32 = 128.;
 
 struct RomView<'a> {
     rom: &'a Rom,
-    handle: Option<TextureHandle>
+    handle: Option<TextureHandle>,
 }
 
 impl<'a> Widget for RomView<'a> {
@@ -174,11 +174,6 @@ impl<'a> Widget for RomView<'a> {
             .fill(DARK_BLACK)
             .show(&mut ui, |ui| {
                 let title = &self.rom.header.title;
-                let title = if title.chars().next().unwrap() == '\0' {
-                    self.rom.filename.clone()
-                } else {
-                    title.clone()
-                };
                 ui.label(title);
             });
         response
@@ -223,7 +218,10 @@ impl shared::Ui for Menu {
             .frame(frame)
             .show(ctx, |ui| {
                 ui.columns(2, |uis| {
-                    let [l, r] = match uis { [l, r] => [l, r], _ => unreachable!() };
+                    let [l, r] = match uis {
+                        [l, r] => [l, r],
+                        _ => unreachable!()
+                    };
                     let debug = egui::ImageButton::new(self.tex(Texture::Debug), (28., 28.)).frame(false);
                     let spritesheet = egui::ImageButton::new(self.tex(Texture::Spritesheet), (28., 28.)).frame(false);
                     let setting = egui::ImageButton::new(self.tex(Texture::Settings), (24., 24.)).frame(false);
@@ -251,9 +249,11 @@ impl shared::Ui for Menu {
                         egui::Grid::new("roms").show(ui, |ui| {
                             let mut n = 1;
                             for rom in self.roms.values() {
-                                if n as f32 * (ROM_GRID + ui.spacing().item_spacing.x * 2.) + ui.spacing().scroll_bar_width + ui.spacing().scroll_bar_outer_margin > w { ui.end_row(); n = 1; }
+                                if n as f32 * (ROM_GRID + ui.spacing().item_spacing.x * 2.) + ui.spacing().scroll_bar_width + ui.spacing().scroll_bar_outer_margin > w {
+                                    ui.end_row();
+                                    n = 1;
+                                }
                                 if ui.add(RomView::new(rom, &self.textures)).clicked() {
-                                    // TODO defer full loading of rom to this point and just lazily fill the header during rom discovery
                                     emu.proxy.send_event(Events::Play(rom.clone())).ok();
                                 }
                                 n += 1;

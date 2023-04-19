@@ -112,11 +112,12 @@ impl Emulator {
 
     pub fn is_running(&self) -> bool { self.console.running }
 
-    pub fn stop(&mut self) {
+    pub fn stop(&mut self, save: bool) {
         self.serial_claim();
         self.link_do(|x| {
             x.disconnect();
         });
+        if save { self.console.bus.save(false); }
         self.console = Console::default();
     }
 
@@ -126,6 +127,7 @@ impl Emulator {
 
     fn insert(&mut self, rom: Rom, running: bool) {
         self.serial_claim();
+        self.console.bus.save(false);
         self.console = Console::new(self, rom, running);
         self.proxy.send_event(Events::Reload).ok();
     }
@@ -162,7 +164,7 @@ impl Render for Screen {
             }
             Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); }
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
-                if event == &WindowEvent::CloseRequested { emu.stop(); }
+                if event == &WindowEvent::CloseRequested { emu.stop(true); }
                 if let WindowEvent::KeyboardInput { input, .. } = event {
                     emu.console.gb.joy.handle(*input);
                 }

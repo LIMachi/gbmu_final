@@ -150,6 +150,10 @@ impl Bus {
         devices.cpu.reset_finished();
         bp
     }
+
+    pub fn save(&mut self, autosave: bool) {
+        self.mbc.inner_mut().save(autosave);
+    }
 }
 
 impl shared::cpu::Bus for Bus {

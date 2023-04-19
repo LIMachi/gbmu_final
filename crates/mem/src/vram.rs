@@ -1,11 +1,12 @@
 use std::collections::HashSet;
+
 use shared::mem::Mem;
 
 const BANK_SIZE: usize = 0x2000;
 
 enum Storage {
     DMG([u8; BANK_SIZE]),
-    CGB([[u8; BANK_SIZE]; 2], usize)
+    CGB([[u8; BANK_SIZE]; 2], usize),
 }
 
 impl Storage {
@@ -93,7 +94,7 @@ impl Mem for Vram {
 impl Vram {
     pub fn new(cgb: bool) -> Self {
         Self {
-            tile_cache: HashSet::with_capacity(728),
+            tile_cache: HashSet::with_capacity(768),
             mem: if cgb {
                 Storage::CGB([[0; BANK_SIZE]; 2], 0)
             } else {

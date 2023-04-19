@@ -1,6 +1,8 @@
+use shared::{cpu::{Opcode, Reg, Value}};
+
 use crate::Bus;
-use shared::{cpu::{Reg, Value, Opcode}};
-use super::{ops::*, State, Registers, decode::decode};
+
+use super::{decode::decode, ops::*, Registers, State};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum Mode {
@@ -19,7 +21,7 @@ pub struct Cpu {
     cache: Vec<Value>,
     prefixed: bool,
     finished: bool,
-    ime: bool
+    ime: bool,
 }
 
 impl shared::cpu::Cpu for Cpu {
@@ -34,7 +36,7 @@ impl Default for Cpu {
             mode: Mode::Running,
             prev: Opcode::Nop,
             instructions: decode(Opcode::Nop),
-            ins: 0,
+            ins: 1,
             count: 1,
             regs: Registers::default(),
             cache: Vec::new(),
@@ -54,7 +56,7 @@ impl Cpu {
     pub fn registers(&self) -> &Registers { &self.regs }
 
     fn check_interrupts(&mut self, bus: &mut dyn Bus) {
-        if self.ins < self.count || self.prev == Opcode::Ei { return };
+        if self.ins < self.count || self.prev == Opcode::Ei { return; };
         let int = bus.interrupt();
         if int != 0 {
             if self.mode == Mode::Halt { self.mode = Mode::Running };
@@ -74,7 +76,7 @@ impl Cpu {
         self.prefixed = false;
         if !prefixed { self.check_interrupts(bus); }
         if self.mode == Mode::Halt {
-            return ;
+            return;
         }
         let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime, &mut self.mode));
         if self.ins >= self.count {
@@ -85,9 +87,12 @@ impl Cpu {
             {
                 use std::io::Write;
                 static mut OUT: Option<std::fs::File> = None;
-                let file = unsafe { OUT.as_mut().unwrap_or_else(|| {
-                    OUT = Some(std::fs::File::create("out.log").unwrap()); OUT.as_mut().unwrap()
-                } ) };
+                let file = unsafe {
+                    OUT.as_mut().unwrap_or_else(|| {
+                        OUT = Some(std::fs::File::create("out.log").unwrap());
+                        OUT.as_mut().unwrap()
+                    })
+                };
                 if !prefixed {
                     let (a, f, b, c, d, e, h, l, sp, pc) = (
                         state.register(Reg::A).u8(), state.register(Reg::F).u8(), state.register(Reg::B).u8(), state.register(Reg::C).u8(),

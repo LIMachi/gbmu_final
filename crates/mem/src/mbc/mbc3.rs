@@ -1,20 +1,20 @@
 use shared::mem::*;
 use shared::rom::Rom;
-use crate::mbc::MemoryController;
-
 use shared::utils::rtc::Rtc;
 
-const BANK_SIZE: usize = 0x4000;
-const RAM_SIZE : usize = 0x2000;
+use crate::mbc::MemoryController;
 
-const RAM_ENABLE: u16     = 0x0000;
+const BANK_SIZE: usize = 0x4000;
+const RAM_SIZE: usize = 0x2000;
+
+const RAM_ENABLE: u16 = 0x0000;
 const RAM_ENABLE_END: u16 = 0x1FFF;
-const ROM_BANK: u16       = 0x2000;
-const ROM_BANK_END: u16   = 0x3FFF;
-const RAM_BANK: u16       = 0x4000;
-const RAM_BANK_END: u16   = 0x5FFF;
-const LATCH: u16          = 0x6000;
-const LATCH_END: u16      = 0x7FFF;
+const ROM_BANK: u16 = 0x2000;
+const ROM_BANK_END: u16 = 0x3FFF;
+const RAM_BANK: u16 = 0x4000;
+const RAM_BANK_END: u16 = 0x5FFF;
+const LATCH: u16 = 0x6000;
+const LATCH_END: u16 = 0x7FFF;
 
 pub struct Mbc3 {
     rom: Vec<u8>,
@@ -35,17 +35,23 @@ impl Mem for Mbc3 {
             SROM..=SROM_END => {
                 let bank = self.rom_bank % self.rom_banks;
                 let addr = addr as usize + bank * BANK_SIZE;
-                if addr > self.rom.len() { eprintln!("out of bounds cartridge rom read at {absolute}"); 0xFF } else { self.rom[addr] }
-            },
+                if addr >= self.rom.len() {
+                    eprintln!("out of bounds cartridge rom read at {absolute}");
+                    0xFF
+                } else { self.rom[addr] }
+            }
             SRAM..=SRAM_END => {
                 match self.ram_bank {
                     n @ 0x8..=0xC => self.rtc.read(n as u8),
                     n => {
                         let addr = addr as usize + n * RAM_SIZE;
-                        if addr > self.ram.len() { eprintln!("out of bounds cartridge ram read at {absolute}"); 0xFF } else { self.ram[addr] }
+                        if addr >= self.ram.len() {
+                            eprintln!("out of bounds cartridge ram read at {absolute}");
+                            0xFF
+                        } else { self.ram[addr] }
                     }
                 }
-            },
+            }
             _ => unreachable!()
         }
     }
@@ -53,15 +59,16 @@ impl Mem for Mbc3 {
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         match absolute {
             RAM_ENABLE..=RAM_ENABLE_END => self.enabled_ram = (value & 0xF) == 0xA,
-            ROM_BANK..=ROM_BANK_END => { let bank = value as usize % self.rom_banks;
+            ROM_BANK..=ROM_BANK_END => {
+                let bank = value as usize % self.rom_banks;
                 self.rom_bank = if bank == 0 { 1 } else { bank };
-            },
+            }
             RAM_BANK..=RAM_BANK_END => self.ram_bank = value as usize & 0xF,
             LATCH..=LATCH_END => {
                 let old = self.latch;
                 self.latch = value != 0;
                 if !old && self.latch { self.rtc.latch(); }
-            },
+            }
             SRAM..=SRAM_END => {
                 match self.ram_bank {
                     n @ 0x8..=0xC => self.rtc.write(n as u8, value),
@@ -70,7 +77,7 @@ impl Mem for Mbc3 {
                         self.ram[addr] = value;
                     }
                 }
-            },
+            }
             _ => {}
         }
     }
@@ -81,11 +88,11 @@ impl Mem for Mbc3 {
             SROM => {
                 let st = BANK_SIZE * self.rom_bank;
                 self.rom[st..(st + BANK_SIZE)].to_vec()
-            },
+            }
             SRAM => {
                 let st = RAM_SIZE * self.ram_bank;
                 self.rom[st..(st + RAM_SIZE)].to_vec()
-            },
+            }
             _ => vec![]
         }
     }

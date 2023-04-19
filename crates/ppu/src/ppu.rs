@@ -1,7 +1,9 @@
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
+use pixel::Pixel;
 use shared::io::{IO, IODevice, IORegs, LCDC};
 use shared::mem::*;
+use states::*;
 
 mod fetcher;
 mod cram;
@@ -11,11 +13,8 @@ mod states;
 
 pub(crate) type PpuState = Box<dyn State>;
 
-use states::*;
-use pixel::Pixel;
-
 pub(crate) struct REdge {
-    inner: bool
+    inner: bool,
 }
 
 impl REdge {
@@ -34,13 +33,13 @@ impl REdge {
 pub(crate) struct Window {
     pub scan_enabled: bool,
     pub enabled: bool,
-    pub y: u8
+    pub y: u8,
 }
 
 #[derive(Default)]
 pub(crate) struct Scroll {
     pub x: u8,
-    pub y: u8
+    pub y: u8,
 }
 
 pub struct Ppu {
@@ -67,7 +66,7 @@ impl Ppu {
             win: Default::default(),
             stat: REdge::new(),
             oam: None,
-            vram: None
+            vram: None,
         }
     }
 
@@ -116,7 +115,6 @@ impl Ppu {
     }
 
     pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
-        self.cram.tick(io);
         let lcdc = io.io(IO::LCDC).value();
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
@@ -159,6 +157,6 @@ impl Ppu {
 
 impl IODevice for Ppu {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
-
+        self.cram.write(io, v, bus);
     }
 }

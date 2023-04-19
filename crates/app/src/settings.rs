@@ -1,10 +1,12 @@
 use std::net::Ipv4Addr;
+
 use serde::{Deserialize, Serialize};
 use winit::event::{Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 
 use shared::{egui, Events};
 use shared::egui::{Align, Button, CentralPanel, Context, Response, ScrollArea, TextEdit, Ui, Vec2};
 use shared::input::Section;
+
 use crate::emulator::Emulator;
 
 pub struct Settings {
@@ -16,16 +18,15 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             devices: apu::Controller::devices().collect(),
-            key: None
+            key: None,
         }
     }
 }
 
-// TODO mode auto ?
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum Mode {
     Dmg,
-    Cgb
+    Cgb,
 }
 
 impl Default for Mode {
@@ -46,7 +47,7 @@ impl Mode {
 struct Keybind<'a> {
     key: Section,
     bind: Option<VirtualKeyCode>,
-    value: &'a mut Option<Section>
+    value: &'a mut Option<Section>,
 }
 
 impl<'a> Keybind<'a> {
@@ -59,7 +60,7 @@ impl<'a> Keybind<'a> {
     }
 }
 
-impl <'a>egui::Widget for Keybind<'a> {
+impl<'a> egui::Widget for Keybind<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.horizontal(|ui| {
             ui.label(format!("{:?}", self.key));
@@ -77,23 +78,23 @@ impl <'a>egui::Widget for Keybind<'a> {
     }
 }
 
-struct KeybindSection<'s, I: IntoIterator<Item = Section>> {
+struct KeybindSection<'s, I: IntoIterator<Item=Section>> {
     settings: &'s mut Settings,
     emu: &'s mut Emulator,
-    iter: I
+    iter: I,
 }
 
-impl<'s, I: IntoIterator<Item = Section>> KeybindSection<'s, I> {
+impl<'s, I: IntoIterator<Item=Section>> KeybindSection<'s, I> {
     fn new(settings: &'s mut Settings, emu: &'s mut Emulator, iter: I) -> Self {
         Self {
             settings,
             emu,
-            iter
+            iter,
         }
     }
 }
 
-impl <'s, I: IntoIterator<Item = Section>>egui::Widget for KeybindSection<'s, I> {
+impl<'s, I: IntoIterator<Item=Section>> egui::Widget for KeybindSection<'s, I> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.vertical(|ui| {
             for section in self.iter {
@@ -120,7 +121,7 @@ impl shared::Ui for Settings {
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("DEBUG");
                 });
-                ui.add(KeybindSection::new(self, emu,Section::shortcuts()));
+                ui.add(KeybindSection::new(self, emu, Section::shortcuts()));
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("MODEL");
@@ -128,7 +129,7 @@ impl shared::Ui for Settings {
                 let model = &mut emu.cgb;
                 ui.radio_value(model, Mode::Dmg, format!("{:?}", Mode::Dmg));
                 ui.radio_value(model, Mode::Cgb, format!("{:?}", Mode::Cgb));
-                ui.checkbox( &mut emu.bios, "enable boot rom");
+                ui.checkbox(&mut emu.bios, "enable boot rom");
                 ui.separator();
                 ui.with_layout(egui::Layout::top_down(Align::Center), |ui| {
                     ui.label("SOUNDS");
@@ -178,26 +179,27 @@ impl shared::Ui for Settings {
                             let addr: Ipv4Addr = addr;
                             let port: u16 = port;
                             emu.link_do(|link| link.connect(addr, port));
-                        },
+                        }
                         (a, p) => {
                             log::warn!("failed to parse: {a:?}, {p:?}");
                         }
                     }
                 }
-
             });
     }
 
     fn handle(&mut self, event: &Event<Events>, emu: &mut Emulator) {
-      match event {
-          Event::WindowEvent { event: WindowEvent::KeyboardInput {
-              input: KeyboardInput { virtual_keycode: Some(input), .. }, ..
-          }, .. } => {
-              if let Some(key) = self.key.take() {
-                  emu.bindings.set(key,*input);
-              }
-          }
-          _ => {}
-      }
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput { virtual_keycode: Some(input), .. }, ..
+                }, ..
+            } => {
+                if let Some(key) = self.key.take() {
+                    emu.bindings.set(key, *input);
+                }
+            }
+            _ => {}
+        }
     }
 }

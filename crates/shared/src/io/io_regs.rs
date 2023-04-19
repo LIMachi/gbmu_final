@@ -2,7 +2,7 @@ use super::*;
 
 pub struct IORegs {
     cgb: IOReg,
-    range: Vec<IOReg>
+    range: Vec<IOReg>,
 }
 
 impl IORegs {
@@ -16,7 +16,7 @@ impl IORegs {
                     .map(|x| (x.access(), x.default(cgb))).unwrap_or(Default::default());
                 IOReg::with_access(access)
                     .with_value(value)
-            }).collect()
+            }).collect(),
         }
     }
 
@@ -46,22 +46,24 @@ impl IORegs {
 
     pub fn skip_boot(&mut self, console: u8) {
         self.set(IO::KEY0, console);
+        self.set(IO::POST, 0x1);
         self.set(IO::BGP, 0xFC);
         self.set(IO::OBP0, 0xFF);
         self.set(IO::OBP1, 0xFF);
         self.set(IO::LCDC, 0x91);
+        self.set(IO::STAT, 0x1);
         self.set(IO::DIV, 0xAC);
         self.compat_mode();
         self.post();
     }
 
     pub fn io(&self, io: IO) -> &IOReg {
-        if io == IO::CGB { return &self.cgb }
+        if io == IO::CGB { return &self.cgb; }
         &self.range[io as u16 as usize - crate::mem::IO as usize]
     }
 
     pub fn io_mut(&mut self, io: IO) -> &mut IOReg {
-        if io == IO::CGB { return &mut self.cgb }
+        if io == IO::CGB { return &mut self.cgb; }
         &mut self.range[io as u16 as usize - crate::mem::IO as usize]
     }
 

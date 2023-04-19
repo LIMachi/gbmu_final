@@ -1,4 +1,5 @@
-use shared::io::{CGB_MODE, IO, IORegs};
+use shared::io::{CGB_MODE, IO, IODevice, IORegs};
+use shared::mem::IOBus;
 
 pub struct CRAM {
     bgdata: [u8; 64],
@@ -35,45 +36,43 @@ impl CRAM {
             (c, a, true, false) => {
                 let palette = if a.obp1() { io.io(IO::OBP1) } else { io.io_mut(IO::OBP0) }.read() >> (2 * c);
                 DMG_COLORS[(palette & 3) as usize]
-            },
+            }
             (c, _, false, false) => {
                 let palette = io.io(IO::BGP).read() >> (2 * c);
                 DMG_COLORS[(palette & 3) as usize]
-            },
+            }
             (c, a, true, true) => {
                 let palette = a.palette();
                 let rgb555 = self.objdata[palette * 8 + c as usize * 2] as u16 | (self.objdata[palette * 8 + c as usize * 2 + 1] as u16) << 8;
                 rgb555.to_bytes()
-            },
+            }
             (c, a, false, true) => {
                 let palette = a.palette();
                 let rgb555 = self.bgdata[palette * 8 + c as usize * 2] as u16 | (self.bgdata[palette * 8 + c as usize * 2 + 1] as u16) << 8;
                 rgb555.to_bytes()
-            },
+            }
         }
     }
+}
 
-    // TODO lock access
-    pub fn tick(&mut self, io: &mut IORegs) {
-        let bcpd = io.io_mut(IO::BCPD);
-        if bcpd.dirty() {
-            bcpd.reset_dirty();
-            let color = bcpd.value();
-            let bcps = io.io_mut(IO::BCPS);
-            let inc = bcps.bit(7) != 0;
-            let addr = bcps.value() & 0x3F;
-            if inc { bcps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
-            self.bgdata[addr as usize] = color;
-        }
-        let ocpd = io.io_mut(IO::OCPD);
-        if ocpd.dirty() {
-            ocpd.reset_dirty();
-            let color = ocpd.value();
-            let ocps = io.io_mut(IO::OCPS);
-            let inc = ocps.bit(7) != 0;
-            let addr = ocps.value() & 0x3F;
-            if inc { ocps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
-            self.objdata[addr as usize] = color;
+impl IODevice for CRAM {
+    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+        match io {
+            IO::BCPD => {
+                let bcps = bus.io_mut(IO::BCPS);
+                let inc = bcps.bit(7) != 0;
+                let addr = bcps.value() & 0x3F;
+                if inc { bcps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
+                self.bgdata[addr as usize] = v;
+            }
+            IO::OCPD => {
+                let ocps = bus.io_mut(IO::OCPS);
+                let inc = ocps.bit(7) != 0;
+                let addr = ocps.value() & 0x3F;
+                if inc { ocps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
+                self.objdata[addr as usize] = v;
+            }
+            _ => {}
         }
     }
 }

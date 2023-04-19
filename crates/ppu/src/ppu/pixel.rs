@@ -15,17 +15,16 @@ pub struct Pixel {
     pub color: u8,
     pub index: Option<u8>,
     pub attrs: Attributes,
-    pub sprite: bool
+    pub sprite: bool,
 }
 
 impl Pixel {
-
     pub fn sprite(color: u8, index: u8, attrs: Attributes) -> Self {
         Self {
             color,
             index: Some(index),
             attrs,
-            sprite: true
+            sprite: true,
         }
     }
 
@@ -34,19 +33,18 @@ impl Pixel {
             color,
             index: None,
             attrs,
-            sprite: false
+            sprite: false,
         }
     }
 
     /// sprite priority mix
-    // TODO fix object priority in DMG + OPRI
-    pub fn mix(&mut self, rhs: Pixel) {
+    pub fn mix(&mut self, rhs: Pixel, opri: bool) {
         *self = match (self.color, rhs.color, self.index, rhs.index) {
             (_, _, None, Some(_)) => rhs,
-            (_, _, Some(_), None ) => *self,
+            (_, _, Some(_), None) => *self,
             (_, 0, ..) => *self,
             (0, ..) => rhs,
-            (_, _, Some(x1), Some(x2) ) if x1 > x2 => rhs,
+            (_, _, Some(x1), Some(x2)) if !opri && x1 > x2 => rhs,
             _ => *self,
         }
     }

@@ -1,9 +1,9 @@
-use shared::mem::{HRAM, Mem};
+use shared::mem::Mem;
 
 const STACK_SIZE: usize = 0x7F;
 
 pub struct Hram {
-    mem: Vec<u8>
+    mem: Vec<u8>,
 }
 
 impl Mem for Hram {
@@ -16,9 +16,7 @@ impl Mem for Hram {
     }
 
     fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        let st = st as usize - HRAM as usize;
-        let end = st + len as usize;
-        self.mem[st..end.min(STACK_SIZE)].to_vec()
+        self.mem.clone()
     }
 }
 

@@ -1,11 +1,12 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+
+pub use devices::IODevice;
+pub use io_regs::IORegs;
+
 use super::mem::Mem;
 
 mod io_regs;
 mod devices;
-
-pub use io_regs::IORegs;
-pub use devices::IODevice;
 
 pub const CGB_MODE: u8 = 0x80;
 pub const DMG_MODE: u8 = 0x04;
@@ -29,7 +30,6 @@ pub trait LCDC {
     fn obj_tall(&self) -> bool;
     fn obj_enable(&self) -> bool;
     fn priority(&self) -> bool;
-
 }
 
 impl LCDC for u8 {
@@ -73,159 +73,159 @@ impl LCDC for u8 {
 #[repr(u16)]
 pub enum IO {
     ///0x100
-    CGB              = 0x100,
+    CGB = 0x100,
     ///0xFF00
-    JOYP             = 0xFF00,
+    JOYP = 0xFF00,
     ///0xFF01
-    SB               = 0xFF01,
+    SB = 0xFF01,
     ///0xFF02
-    SC               = 0xFF02,
+    SC = 0xFF02,
     ///0xFF04
-    DIV              = 0xFF04,
+    DIV = 0xFF04,
     ///0xFF05
-    TIMA             = 0xFF05,
+    TIMA = 0xFF05,
     ///0xFF06
-    TMA              = 0xFF06,
+    TMA = 0xFF06,
     ///0xFF07
-    TAC              = 0xFF07,
+    TAC = 0xFF07,
     ///0xFF0F
-    IF               = 0xFF0F,
+    IF = 0xFF0F,
     ///0xFF10
-    NR10             = 0xFF10,
+    NR10 = 0xFF10,
     ///0xFF11
-    NR11             = 0xFF11,
+    NR11 = 0xFF11,
     ///0xFF12
-    NR12             = 0xFF12,
+    NR12 = 0xFF12,
     ///0xFF13
-    NR13             = 0xFF13,
+    NR13 = 0xFF13,
     ///0xFF14
-    NR14             = 0xFF14,
+    NR14 = 0xFF14,
     ///0xFF16
-    NR21             = 0xFF16,
+    NR21 = 0xFF16,
     ///0xFF17
-    NR22             = 0xFF17,
+    NR22 = 0xFF17,
     ///0xFF18
-    NR23             = 0xFF18,
+    NR23 = 0xFF18,
     ///0xFF19
-    NR24             = 0xFF19,
+    NR24 = 0xFF19,
     ///0xFF1A
-    NR30             = 0xFF1A,
+    NR30 = 0xFF1A,
     ///0xFF1B
-    NR31             = 0xFF1B,
+    NR31 = 0xFF1B,
     ///0xFF1C
-    NR32             = 0xFF1C,
+    NR32 = 0xFF1C,
     ///0xFF1D
-    NR33             = 0xFF1D,
+    NR33 = 0xFF1D,
     ///0xFF1E
-    NR34             = 0xFF1E,
+    NR34 = 0xFF1E,
     ///0xFF20
-    NR41             = 0xFF20,
+    NR41 = 0xFF20,
     ///0xFF21
-    NR42             = 0xFF21,
+    NR42 = 0xFF21,
     ///0xFF22
-    NR43             = 0xFF22,
+    NR43 = 0xFF22,
     ///0xFF23
-    NR44             = 0xFF23,
+    NR44 = 0xFF23,
     ///0xFF24
-    NR50             = 0xFF24,
+    NR50 = 0xFF24,
     ///0xFF25
-    NR51             = 0xFF25,
+    NR51 = 0xFF25,
     ///0xFF26
-    NR52             = 0xFF26,
+    NR52 = 0xFF26,
     ///0xFF30
-    WaveRam0         = 0xFF30,
+    WaveRam0 = 0xFF30,
     ///0xFF31
-    WaveRam1         = 0xFF31,
+    WaveRam1 = 0xFF31,
     ///0xFF32
-    WaveRam2         = 0xFF32,
+    WaveRam2 = 0xFF32,
     ///0xFF33
-    WaveRam3         = 0xFF33,
+    WaveRam3 = 0xFF33,
     ///0xFF34
-    WaveRam4         = 0xFF34,
+    WaveRam4 = 0xFF34,
     ///0xFF35
-    WaveRam5         = 0xFF35,
+    WaveRam5 = 0xFF35,
     ///0xFF36
-    WaveRam6         = 0xFF36,
+    WaveRam6 = 0xFF36,
     ///0xFF37
-    WaveRam7         = 0xFF37,
+    WaveRam7 = 0xFF37,
     ///0xFF38
-    WaveRam8         = 0xFF38,
+    WaveRam8 = 0xFF38,
     ///0xFF39
-    WaveRam9         = 0xFF39,
+    WaveRam9 = 0xFF39,
     ///0xFF3A
-    WaveRamA         = 0xFF3A,
+    WaveRamA = 0xFF3A,
     ///0xFF3B
-    WaveRamB         = 0xFF3B,
+    WaveRamB = 0xFF3B,
     ///0xFF3C
-    WaveRamC         = 0xFF3C,
+    WaveRamC = 0xFF3C,
     ///0xFF3D
-    WaveRamD         = 0xFF3D,
+    WaveRamD = 0xFF3D,
     ///0xFF3E
-    WaveRamE         = 0xFF3E,
+    WaveRamE = 0xFF3E,
     ///0xFF3F
-    WaveRamF         = 0xFF3F,
+    WaveRamF = 0xFF3F,
     ///0xFF40
-    LCDC             = 0xFF40,
+    LCDC = 0xFF40,
     ///0xFF41
-    STAT             = 0xFF41,
+    STAT = 0xFF41,
     ///0xFF42
-    SCY              = 0xFF42,
+    SCY = 0xFF42,
     ///0xFF43
-    SCX              = 0xFF43,
+    SCX = 0xFF43,
     ///0xFF44
-    LY               = 0xFF44,
+    LY = 0xFF44,
     ///0xFF45
-    LYC              = 0xFF45,
+    LYC = 0xFF45,
     ///0xFF46
-    DMA              = 0xFF46,
+    DMA = 0xFF46,
     ///0xFF47
-    BGP              = 0xFF47,
+    BGP = 0xFF47,
     ///0xFF48
-    OBP0             = 0xFF48,
+    OBP0 = 0xFF48,
     ///0xFF49
-    OBP1             = 0xFF49,
+    OBP1 = 0xFF49,
     ///0xFF4A
-    WY               = 0xFF4A,
+    WY = 0xFF4A,
     ///0xFF4B
-    WX               = 0xFF4B,
+    WX = 0xFF4B,
     ///0xFF4C
-    KEY0             = 0xFF4C,
+    KEY0 = 0xFF4C,
     ///0xFF4D
-    KEY1             = 0xFF4D,
+    KEY1 = 0xFF4D,
     ///0xFF4F
-    VBK              = 0xFF4F,
+    VBK = 0xFF4F,
     ///0xFF50
-    POST             = 0xFF50,
+    POST = 0xFF50,
     ///0xFF51
-    HDMA1            = 0xFF51,
+    HDMA1 = 0xFF51,
     ///0xFF52
-    HDMA2            = 0xFF52,
+    HDMA2 = 0xFF52,
     ///0xFF53
-    HDMA3            = 0xFF53,
+    HDMA3 = 0xFF53,
     ///0xFF54
-    HDMA4            = 0xFF54,
+    HDMA4 = 0xFF54,
     ///0xFF55
-    HDMA5            = 0xFF55,
+    HDMA5 = 0xFF55,
     ///0xFF56
-    RP               = 0xFF56,
+    RP = 0xFF56,
     ///0xFF68
-    BCPS             = 0xFF68,
+    BCPS = 0xFF68,
     ///0xFF69
-    BCPD             = 0xFF69,
+    BCPD = 0xFF69,
     ///0xFF6A
-    OCPS             = 0xFF6A,
+    OCPS = 0xFF6A,
     ///0xFF6B
-    OCPD             = 0xFF6B,
+    OCPD = 0xFF6B,
     ///0xFF6C
-    OPRI             = 0xFF6C,
+    OPRI = 0xFF6C,
     ///0xFF70
-    SVBK             = 0xFF70,
+    SVBK = 0xFF70,
     ///0xFF76
-    PCM12            = 0xFF76,
+    PCM12 = 0xFF76,
     ///0xFF77
-    PCM34            = 0xFF77,
+    PCM34 = 0xFF77,
     ///0xFFFF
-    IE               = 0xFFFF
+    IE = 0xFFFF,
 }
 
 impl IO {
@@ -442,36 +442,36 @@ impl IO {
         use Access::*;
         use AccessMode::*;
         match self {
-            IO::CGB      => Generic(R),
-            IO::JOYP     => Custom([R, R, R, R, RW, RW, U, U]),
-            IO::SB       => Generic(RW),
-            IO::SC       => Generic(RW),
-            IO::DIV      => Generic(RW),
-            IO::TIMA     => Generic(RW),
-            IO::TMA      => Generic(RW),
-            IO::TAC      => Custom([RW, RW, RW, U, U, U, U, U]),
-            IO::IF       => Custom([RW, RW, RW, RW, RW, U, U, U]),
-            IO::NR10     => Generic(RW),
-            IO::NR11     => Custom([W, W, W, W, W, W, RW, RW]),
-            IO::NR12     => Generic(RW),
-            IO::NR13     => Generic(W),
-            IO::NR14     => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR21     => Custom([W, W, W, W, W, W, RW, RW]),
-            IO::NR22     => Generic(RW),
-            IO::NR23     => Generic(W),
-            IO::NR24     => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR30     => Generic(RW),
-            IO::NR31     => Generic(W),
-            IO::NR32     => Generic(RW),
-            IO::NR33     => Generic(W),
-            IO::NR34     => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR41     => Generic(W),
-            IO::NR42     => Generic(RW),
-            IO::NR43     => Generic(RW),
-            IO::NR44     => Custom([W, W, W, U, U, U, RW, W]),
-            IO::NR50     => Generic(RW),
-            IO::NR51     => Generic(RW),
-            IO::NR52     => Custom([R, R, R, R, U, U, U, RW]),
+            IO::CGB => Generic(R),
+            IO::JOYP => Custom([R, R, R, R, RW, RW, U, U]),
+            IO::SB => Generic(RW),
+            IO::SC => Generic(RW),
+            IO::DIV => Generic(RW),
+            IO::TIMA => Generic(RW),
+            IO::TMA => Generic(RW),
+            IO::TAC => Custom([RW, RW, RW, U, U, U, U, U]),
+            IO::IF => Custom([RW, RW, RW, RW, RW, U, U, U]),
+            IO::NR10 => Generic(RW),
+            IO::NR11 => Custom([W, W, W, W, W, W, RW, RW]),
+            IO::NR12 => Generic(RW),
+            IO::NR13 => Generic(W),
+            IO::NR14 => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR21 => Custom([W, W, W, W, W, W, RW, RW]),
+            IO::NR22 => Generic(RW),
+            IO::NR23 => Generic(W),
+            IO::NR24 => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR30 => Generic(RW),
+            IO::NR31 => Generic(W),
+            IO::NR32 => Generic(RW),
+            IO::NR33 => Generic(W),
+            IO::NR34 => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR41 => Generic(W),
+            IO::NR42 => Generic(RW),
+            IO::NR43 => Generic(RW),
+            IO::NR44 => Custom([W, W, W, U, U, U, RW, W]),
+            IO::NR50 => Generic(RW),
+            IO::NR51 => Generic(RW),
+            IO::NR52 => Custom([R, R, R, R, U, U, U, RW]),
             IO::WaveRam0 => Generic(RW),
             IO::WaveRam1 => Generic(RW),
             IO::WaveRam2 => Generic(RW),
@@ -525,6 +525,7 @@ impl IO {
         match self {
             IO::JOYP => 0xFF,
             IO::KEY0 if cgb => 0x80,
+            IO::OPRI if !cgb => 1,
             _ => 0
         }
     }
@@ -532,6 +533,7 @@ impl IO {
 
 #[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Access { W, R, RW, U }
+
 #[derive(Debug, Copy, Clone)]
 pub enum AccessMode { Generic(Access), Custom([Access; 8]) }
 
@@ -610,7 +612,7 @@ pub struct IOReg {
     pub(crate) v: u8,
     dirty: bool,
     rmask: u8,
-    wmask: u8
+    wmask: u8,
 }
 
 impl Default for IOReg {
@@ -641,12 +643,13 @@ impl IOReg {
             v: 0,
             dirty: false,
             rmask: access.rmask(),
-            wmask: access.wmask()
+            wmask: access.wmask(),
         }
     }
 
     pub fn direct_write(&mut self, value: u8) -> &mut Self {
-        self.v = value; self
+        self.v = value;
+        self
     }
     pub fn reset_dirty(&mut self) { self.dirty = false; }
 
@@ -655,7 +658,10 @@ impl IOReg {
     pub fn rw() -> Self { IOReg::new(AccessMode::rw()) }
     pub fn custom(bits: [Access; 8]) -> Self { IOReg::new(AccessMode::Custom(bits)) }
     pub fn with_access(mode: AccessMode) -> Self { IOReg::new(mode) }
-    pub fn with_value(mut self, value: u8) -> Self { self.direct_write(value); self }
+    pub fn with_value(mut self, value: u8) -> Self {
+        self.direct_write(value);
+        self
+    }
     pub fn unset() -> Self { IOReg::new(AccessMode::Generic(Access::U)) }
 
     pub const fn value(&self) -> u8 { self.v }

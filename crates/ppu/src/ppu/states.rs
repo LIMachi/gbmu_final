@@ -1,11 +1,12 @@
 use std::fmt::{Debug, Formatter};
+
 use lcd::Lcd;
 use mem::oam::Sprite;
 use shared::io::{IO, IORegs, LCDC};
 use shared::mem::Source;
 
 use super::{
-    Ppu, fifo::{BgFifo, ObjFifo}, Scroll, fetcher::{self, Fetcher}
+    fetcher::{self, Fetcher}, fifo::{BgFifo, ObjFifo}, Ppu, Scroll,
 };
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -20,7 +21,7 @@ pub enum Mode {
 pub(crate) trait State: Debug {
     fn mode(&self) -> Mode;
     fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, lcd: &mut Lcd) -> Option<Box<dyn State>>;
-    fn boxed(self) -> Box<dyn State> where  Self: 'static + Sized { Box::new(self) }
+    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized { Box::new(self) }
     fn name(&self) -> String {
         format!("{:?}", self.mode())
     }
@@ -29,7 +30,7 @@ pub(crate) trait State: Debug {
 #[derive(Debug)]
 pub struct OamState {
     clock: u8,
-    sprite: usize
+    sprite: usize,
 }
 
 impl OamState {
@@ -55,12 +56,12 @@ impl Debug for TransferState {
 
 #[derive(Debug)]
 pub struct HState {
-    dots: usize
+    dots: usize,
 }
 
 #[derive(Debug)]
 pub struct VState {
-    dots: usize
+    dots: usize,
 }
 
 impl State for OamState {
@@ -68,7 +69,7 @@ impl State for OamState {
 
     fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, _: &mut Lcd) -> Option<Box<dyn State>> {
         self.clock += 1; // we only tick one every 2 clock cycle
-        if self.clock < 2 { return None }
+        if self.clock < 2 { return None; }
         self.clock = 0;
         let ly = io.io(IO::LY).value();
         if self.sprite == 0 {
@@ -84,7 +85,8 @@ impl State for OamState {
         if self.sprite == 40 {
             ppu.sc.x = ppu.sc.x.max(io.io(IO::SCX).value());
             ppu.sc.y = ppu.sc.y.max(io.io(IO::SCY).value());
-            Some(TransferState::new(ppu, io).boxed()) } else { None }
+            Some(TransferState::new(ppu, io).boxed())
+        } else { None }
     }
 }
 
@@ -92,7 +94,16 @@ impl TransferState {
     pub(crate) fn new(_ppu: &Ppu, io: &IORegs) -> Self where Self: Sized {
         let ly = io.io(IO::LY).value();
         let scx = io.io(IO::SCX).value() & 0x7;
-        Self { sprite: None, dots: 0, lx: 0, ly, scx, fetcher: Fetcher::new(), bg: BgFifo::new(), oam: ObjFifo::new() }
+        Self {
+            sprite: None,
+            dots: 0,
+            lx: 0,
+            ly,
+            scx,
+            fetcher: Fetcher::new(),
+            bg: BgFifo::new(),
+            oam: ObjFifo::new(io.io(IO::OPRI).bit(0) != 0),
+        }
     }
 }
 
@@ -122,7 +133,7 @@ impl State for TransferState {
                     self.sprite = Some(i);
                     self.fetcher.set_mode(fetcher::Mode::Sprite(sprite, self.lx));
                     self.bg.disable();
-                    break ;
+                    break;
                 }
             }
         }
@@ -140,7 +151,7 @@ impl State for TransferState {
                 if self.dots > 289 {
                     log::warn!("transfer took {} dots", self.dots);
                 }
-                return Some(HState::new(376usize.saturating_sub(self.dots)).boxed())
+                return Some(HState::new(376usize.saturating_sub(self.dots)).boxed());
             }
         }
         None

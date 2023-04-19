@@ -1,10 +1,18 @@
 #![feature(hash_drain_filter)]
 
 use std::time::Duration;
+
 use winit::{
     event_loop::{ControlFlow, EventLoopWindowTarget}
 };
 use winit::event_loop::EventLoopBuilder;
+
+use render::windows::Windows;
+use shared::{Events, Handle};
+use shared::utils::clock::{Chrono, Clock};
+
+use crate::app::{AppConfig, DbgConfig};
+use crate::render::{Event, EventLoop, Proxy};
 
 mod log;
 mod render;
@@ -12,16 +20,10 @@ mod settings;
 mod emulator;
 pub mod app;
 
-use render::windows::Windows;
-use shared::{Events, Handle};
-use shared::utils::clock::{Chrono, Clock};
-use crate::app::{AppConfig, DbgConfig};
-use crate::render::{Event, EventLoop, Proxy};
-
 pub struct App {
     emu: emulator::Emulator,
     event_loop: Option<EventLoop>,
-    pub windows: Windows
+    pub windows: Windows,
 }
 
 impl App {
@@ -56,13 +58,13 @@ impl App {
                 if !self.windows.is_open(Handle::Game) {
                     self.open(Handle::Game, target);
                 }
-            },
+            }
             Event::UserEvent(Events::Open(handle)) => {
                 let handle = *handle;
                 if !self.windows.is_open(handle) {
                     self.open(handle, target);
                 }
-            },
+            }
             _ => {}
         }
         self.windows.handle_events(event, flow, &mut self.emu);
@@ -77,8 +79,9 @@ impl App {
                 Event::MainEventsCleared => {
                     handler(&mut self);
                     self.windows.update(&mut self.emu);
-                },
+                }
                 Event::UserEvent(Events::Close) => {
+                    self.emu.stop(true);
                     let conf = AppConfig {
                         sound_device: self.emu.audio.config(),
                         audio_settings: self.emu.audio_settings.clone(),
@@ -97,7 +100,7 @@ impl App {
                         log::warn!("error while saving config {e:?}");
                     }
                     flow.set_exit();
-                },
+                }
                 _ => {}
             }
         })

@@ -1,14 +1,16 @@
 use std::any::Any;
+
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use log::error;
 use wgpu::{CompositeAlphaMode, Device, PresentMode, Queue, SurfaceConfiguration, TextureFormat, TextureUsages};
 use winit::event::WindowEvent;
-use shared::{Ui, egui};
+
+use shared::{egui, Ui};
 
 pub use super::*;
 
-pub struct EguiContext<Ctx, U: Ui<Ext= Ctx> + Default> {
+pub struct EguiContext<Ctx, U: Ui<Ext=Ctx> + Default> {
     data: U,
     window: Window,
     surface: wgpu::Surface,
@@ -16,24 +18,24 @@ pub struct EguiContext<Ctx, U: Ui<Ext= Ctx> + Default> {
     platform: Platform,
     inner: egui::Context,
     config: SurfaceConfiguration,
-    descriptor: ScreenDescriptor, // TODO update if window size or scale changes
+    descriptor: ScreenDescriptor,
     device: Device,
-    queue: Queue
+    queue: Queue,
 }
 
-impl<Ctx: 'static, U: 'static + Ui<Ext= Ctx> + Default> EguiContext<Ctx, U> {
+impl<Ctx: 'static, U: 'static + Ui<Ext=Ctx> + Default> EguiContext<Ctx, U> {
     pub fn new(instance: &Instance, window: Window, mut data: U, ctx: &mut Ctx) -> Self {
         let surface = unsafe { instance.create_surface(&window) };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
-            force_fallback_adapter: false
+            force_fallback_adapter: false,
         })).expect("no suitable adapter");
         let (device, queue) = pollster::block_on(adapter.request_device(
             &wgpu::DeviceDescriptor {
                 features: wgpu::Features::default(),
                 limits: wgpu::Limits::default(),
-                label: None
+                label: None,
             },
             None)).expect("no matching device");
         let size = window.inner_size();
@@ -43,7 +45,7 @@ impl<Ctx: 'static, U: 'static + Ui<Ext= Ctx> + Default> EguiContext<Ctx, U> {
             width: size.width,
             height: size.height,
             present_mode: PresentMode::default(),
-            alpha_mode: CompositeAlphaMode::Auto
+            alpha_mode: CompositeAlphaMode::Auto,
         };
 
         surface.configure(&device, &config);
@@ -51,14 +53,14 @@ impl<Ctx: 'static, U: 'static + Ui<Ext= Ctx> + Default> EguiContext<Ctx, U> {
         let descriptor = ScreenDescriptor {
             physical_width: size.width,
             physical_height: size.height,
-            scale_factor: window.scale_factor() as f32
+            scale_factor: window.scale_factor() as f32,
         };
         let platform = Platform::new(PlatformDescriptor {
             physical_width: size.width,
             physical_height: size.height,
             scale_factor: window.scale_factor(),
             font_definitions: Default::default(),
-            style: Default::default()
+            style: Default::default(),
         });
         let mut inner = platform.context();
         data.init(&mut inner, ctx);
@@ -72,7 +74,7 @@ impl<Ctx: 'static, U: 'static + Ui<Ext= Ctx> + Default> EguiContext<Ctx, U> {
             rpass,
             device,
             queue,
-            descriptor
+            descriptor,
         }
     }
 
@@ -82,7 +84,7 @@ impl<Ctx: 'static, U: 'static + Ui<Ext= Ctx> + Default> EguiContext<Ctx, U> {
     }
 }
 
-impl<Ctx, U: 'static + Ui<Ext = Ctx> + Default> Context<Ctx> for EguiContext<Ctx, U> {
+impl<Ctx, U: 'static + Ui<Ext=Ctx> + Default> Context<Ctx> for EguiContext<Ctx, U> {
     fn inner(&mut self) -> &mut Window {
         &mut self.window
     }
@@ -93,7 +95,7 @@ impl<Ctx, U: 'static + Ui<Ext = Ctx> + Default> Context<Ctx> for EguiContext<Ctx
             Err(wgpu::SurfaceError::Outdated) => return,
             Err(e) => {
                 error!("Dropped frame: {e:?}");
-                return ;
+                return;
             }
         };
         let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -107,7 +109,7 @@ impl<Ctx, U: 'static + Ui<Ext = Ctx> + Default> Context<Ctx> for EguiContext<Ctx
             &self.device,
             &self.queue,
             &jobs,
-            &self.descriptor
+            &self.descriptor,
         );
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("encoder"),
@@ -141,16 +143,16 @@ impl<Ctx, U: 'static + Ui<Ext = Ctx> + Default> Context<Ctx> for EguiContext<Ctx
             Event::WindowEvent { window_id, .. } if window_id == &self.window.id() => {
                 self.platform.handle_event(event);
                 self.data.handle(event, ctx);
-            },
+            }
             Event::UserEvent(_) => self.data.handle(event, ctx),
             Event::WindowEvent { event: wevent, .. } => {
                 match wevent {
-                    WindowEvent::CursorEntered { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::CursorMoved { ..} => {
+                    WindowEvent::CursorEntered { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::CursorMoved { .. } => {
                         self.platform.handle_event(event);
-                    },
+                    }
                     _ => {}
                 }
-            },
+            }
             _ => {}
         }
     }

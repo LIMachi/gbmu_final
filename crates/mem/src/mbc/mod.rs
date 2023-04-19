@@ -2,7 +2,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
-use shared::io::{IO, IODevice};
+use shared::io::IODevice;
 
 use crate::boot::Boot;
 
@@ -41,9 +41,7 @@ impl MemoryController for Unplugged {
 
 pub struct Controller {
     sav: Option<PathBuf>,
-    autosave: Option<PathBuf>,
     inner: Box<dyn Mbc>,
-    rom: String,
 }
 
 impl Default for Controller {
@@ -52,11 +50,10 @@ impl Default for Controller {
 
 impl Controller {
     pub fn new(rom: &Rom, cgb: bool) -> Self {
-        let (sav, autosave, ram) = if rom.header.cartridge.capabilities().save() {
-            let sav = rom.location.clone().join(&rom.filename).with_extension("sav");
-            let auto = rom.location.clone().join(&rom.filename).with_extension("autosav");
+        let (sav, ram) = if rom.header.cartridge.capabilities().save() {
+            let sav = rom.location.clone().join(&rom.filename);
             log::info!("Trying to load save data...");
-            let ram = if let Some(mut f) = std::fs::File::open(&sav).ok() {
+            let ram = if let Some(mut f) = std::fs::File::open(&sav.with_extension("sav")).ok() {
                 use std::io::Read;
                 let mut v = Vec::with_capacity(rom.header.ram_size.size());
                 f.read_to_end(&mut v).expect("failed to read save");
@@ -65,9 +62,9 @@ impl Controller {
                 log::info!("No save detected, fresh file");
                 vec![0xAF; rom.header.ram_size.size()]
             };
-            (Some(sav), Some(auto), ram)
+            (Some(sav), ram)
         } else {
-            (None, None, vec![0xAF; rom.header.ram_size.size()])
+            (None, vec![0xAF; rom.header.ram_size.size()])
         };
         let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
             Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram, cgb)),
@@ -80,9 +77,7 @@ impl Controller {
 
         Self {
             sav,
-            autosave,
             inner,
-            rom: rom.header.title.clone(),
         }
     }
 
@@ -91,42 +86,29 @@ impl Controller {
         self
     }
 
-    pub fn save(&self) {
+    pub fn save(&self, autosave: bool) {
         let ram = self.inner.ram_dump();
         if ram.is_empty() { return; }
-        if let Some(auto) = &self.autosave {
-            log::info!("autosave...");
-            let mut file = vec![];
+        let path = self.sav.clone();
+        if let Some(path) = &self.sav {
+            let file = path.with_extension(if autosave { "autosav" } else { "sav" });
+            log::info!("Saving... ({path:?})");
+            let mut backup = vec![];
             use std::io::Write;
-            if std::fs::File::open(&auto)
-                .and_then(|mut x| x.read_to_end(&mut file)).is_ok() {
-                std::fs::File::create(auto)
-                    .and_then(|mut x| x.write_all(&ram))
-                    .unwrap_or_else(|x| {
-                        log::warn!("autosave failed: {e:?}");
-                        std::fs::File::create(format!("backup_{}.autosav", self.rom))
-                            .and_then(|mut x| x.write_all(&file))
-                            .expect("backup failed.");
-                    });
-            }
+            std::fs::File::open(&file).and_then(|mut x| x.read_to_end(&mut backup)).ok();
+            std::fs::File::create(&file)
+                .and_then(|mut x| x.write_all(&ram))
+                .unwrap_or_else(|e| {
+                    log::warn!("autosave failed: {e:?}");
+                    std::fs::File::create(path.with_extension("bak"))
+                        .and_then(|mut x| x.write_all(&backup))
+                        .expect("backup failed.");
+                });
         }
     }
 
     pub fn unplugged() -> Self {
-        Self { sav: None, autosave: None, rom: "no_rom".to_string(), inner: Box::new(Unplugged {}) }
-    }
-}
-
-impl Drop for Controller {
-    fn drop(&mut self) {
-        let ram = self.inner.ram_dump();
-        if ram.is_empty() { return; }
-        if let Some(sav) = &self.sav {
-            log::info!("dumping ram to save file {:?}", sav);
-            use std::io::Write;
-            std::fs::File::create(&sav).ok()
-                .map(|mut f| f.write_all(&ram).expect("failed to write savefile"));
-        }
+        Self { sav: None, inner: Box::new(Unplugged {}) }
     }
 }
 
@@ -135,7 +117,12 @@ impl MBCController for Controller {
     fn ram_bank(&self) -> usize { self.inner.ram_bank() }
     fn tick(&mut self) { self.inner.tick(); }
 
-    fn post(&mut self) { self.inner = self.inner.unmap(); }
+    fn post(&mut self) {
+        if self.inner.is_boot() {
+            log::info!("---- POST ----");
+            self.inner = self.inner.unmap();
+        }
+    }
 }
 
 impl Mem for Controller {
@@ -159,11 +146,3 @@ impl Mem for Controller {
     fn unlock(&mut self, access: Source) { self.inner.unlock(access) }
 }
 
-impl IODevice for Controller {
-    fn write(&mut self, io: IO, _: u8, _: &mut dyn IOBus) {
-        if io == IO::POST && self.inner.is_boot() {
-            log::info!("--- POST ----");
-            self.post();
-        }
-    }
-}

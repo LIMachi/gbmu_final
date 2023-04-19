@@ -1,6 +1,8 @@
 use shared::egui::*;
 use shared::egui::epaint::ImageDelta;
 
+use crate::ppu::Ppu;
+
 use super::*;
 
 mod tabs;
@@ -8,14 +10,12 @@ mod tilemap;
 mod oam;
 mod bgmap;
 
-use crate::ppu::Ppu;
-
 pub struct VramViewer<E> {
     tab: Tabs,
     storage: HashMap<Textures, TextureHandle>,
     bg_data: Option<bgmap::TileData>,
     init: bool,
-    emu: PhantomData<E>
+    emu: PhantomData<E>,
 }
 
 impl<E> Default for VramViewer<E> {
@@ -25,7 +25,7 @@ impl<E> Default for VramViewer<E> {
             storage: Default::default(),
             init: false,
             emu: Default::default(),
-            bg_data: None
+            bg_data: None,
         }
     }
 }
@@ -50,11 +50,11 @@ pub(crate) enum Textures {
     Blank,
     Placeholder,
     Tile(usize),
-    Miniature
+    Miniature,
 }
 
 struct PixelBuffer<const W: usize, const H: usize> where [(); W * H]: Sized {
-    pixels: [u8; W * H]
+    pixels: [u8; W * H],
 }
 
 impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized {
@@ -72,7 +72,7 @@ impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized 
         let mut buf = [0; IW * IH * 4]; // 64 * 4
         for w in 0..W { // 0..8
             for h in 0..H { // 0..8
-                let color =  match self.pixels[w + h * W] { // w + 8 * h
+                let color = match self.pixels[w + h * W] { // w + 8 * h
                     0 => [255, 255, 255, 255],
                     1 => [192, 192, 192, 255],
                     2 => [128, 128, 128, 255],
@@ -99,7 +99,7 @@ impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized 
 enum Tabs {
     Oam,
     Tiledata,
-    Tilemap
+    Tilemap,
 }
 
 impl tabs::Tab for Tabs {
@@ -109,7 +109,6 @@ impl tabs::Tab for Tabs {
 }
 
 impl<E: Emulator> VramViewer<E> {
-
     pub(crate) fn get(&self, tile: usize) -> TextureHandle {
         self.storage.get(&Textures::Tile(tile))
             .or(self.storage.get(&Textures::Blank))
@@ -138,7 +137,7 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
         self.storage.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
         self.storage.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.storage.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
-        self.storage.insert(Textures::Miniature,ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.storage.insert(Textures::Miniature, ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.init = true;
     }
 
@@ -147,7 +146,7 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
             self.init(ctx, emu);
             self.init = true;
         }
-        let tiles: Vec<usize> = emu.vram_mut().tile_cache.drain().take(5).collect();
+        let tiles: Vec<usize> = emu.vram_mut().tile_cache.drain().collect();
         let vram = emu.vram();
         for n in tiles {
             let buf = PixelBuffer::<8, 8>::new(vram.tile_data(n % 384, n / 384)).image::<64, 64>();
@@ -156,13 +155,12 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
         }
         CentralPanel::default()
             .show(ctx, |ui|
-                tabs::Tabs::new(&mut self.tab, ui,&[Tabs::Oam, Tabs::Tiledata, Tabs::Tilemap])
+                tabs::Tabs::new(&mut self.tab, ui, &[Tabs::Oam, Tabs::Tiledata, Tabs::Tilemap])
                     .with_tab(Tabs::Oam, oam::Oam(self, emu))
                     .with_tab(Tabs::Tiledata, bgmap::BgMap(self, emu, ctx))
                     .with_tab(Tabs::Tilemap, tilemap::Tilemap(self))
                     .response());
     }
 
-    fn handle(&mut self, _event: &shared::Event, _emu: &mut E) {
-    }
+    fn handle(&mut self, _event: &shared::Event, _emu: &mut E) {}
 }
