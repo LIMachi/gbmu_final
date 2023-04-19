@@ -10,13 +10,6 @@ enum Storage {
 }
 
 impl Storage {
-    fn cgb(&self) -> bool {
-        match self {
-            Storage::DMG(_) => false,
-            Storage::CGB(..) => true
-        }
-    }
-
     fn read_bank(&self, addr: u16, bank: usize) -> u8 {
         match self {
             Storage::DMG(_) if bank == 1 => 0,

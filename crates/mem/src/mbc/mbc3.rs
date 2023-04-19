@@ -23,7 +23,6 @@ pub struct Mbc3 {
     rom_bank: usize,
     ram_bank: usize,
     rom_banks: usize,
-    ram_banks: usize,
     rtc: Rtc,
     latch: bool,
 }
@@ -110,7 +109,6 @@ impl MemoryController for Mbc3 {
             rom_bank: 1,
             ram_bank: 0,
             rom_banks: rom.header.rom_size.banks(),
-            ram_banks: rom.header.ram_size.banks(),
             latch: true,
         }
     }

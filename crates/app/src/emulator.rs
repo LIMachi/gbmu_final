@@ -44,7 +44,7 @@ impl Default for EmuSettings {
         Self {
             host: "127.0.0.1".to_string(),
             port: "27542".to_string(),
-            palette: Palette::Dmg,
+            palette: Palette::GrayScale,
         }
     }
 }

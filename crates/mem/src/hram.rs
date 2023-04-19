@@ -15,7 +15,7 @@ impl Mem for Hram {
         self.mem[addr as usize] = value;
     }
 
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+    fn get_range(&self, _st: u16, _len: u16) -> Vec<u8> {
         self.mem.clone()
     }
 }

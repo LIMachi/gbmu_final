@@ -1,4 +1,5 @@
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+use shared::io::IORegs;
 use shared::winit as winit;
 
 #[derive(Default)]
@@ -27,12 +28,13 @@ impl LCD for Lcd {
         self.enabled = true;
     }
 
-    fn disable(&mut self) {
+    fn disable(&mut self, io: &IORegs) {
         self.enabled = false;
+        let white = io.palette().color(0);
         if let Some(pixels) = self.pixels.as_mut() {
             let pixels = pixels.get_frame_mut();
             for i in 0..(4 * Lcd::WIDTH * Lcd::HEIGHT) as usize {
-                pixels[i] = if i % 4 == 3 { 0xFF } else { 0xAA };
+                pixels[i] = if i % 4 == 3 { 0xFF } else { white[i % 4] };
             }
         }
     }
@@ -74,6 +76,6 @@ impl Lcd {
 pub trait LCD {
     fn set(&mut self, x: usize, y: usize, pixel: [u8; 3]);
     fn enable(&mut self);
-    fn disable(&mut self);
+    fn disable(&mut self, io: &IORegs);
     fn vblank(&mut self);
 }

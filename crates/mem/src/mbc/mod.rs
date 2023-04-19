@@ -2,7 +2,6 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
-use shared::io::IODevice;
 
 use crate::boot::Boot;
 
@@ -54,7 +53,6 @@ impl Controller {
             let sav = rom.location.clone().join(&rom.filename);
             log::info!("Trying to load save data...");
             let ram = if let Some(mut f) = std::fs::File::open(&sav.with_extension("sav")).ok() {
-                use std::io::Read;
                 let mut v = Vec::with_capacity(rom.header.ram_size.size());
                 f.read_to_end(&mut v).expect("failed to read save");
                 v
@@ -89,7 +87,6 @@ impl Controller {
     pub fn save(&self, autosave: bool) {
         let ram = self.inner.ram_dump();
         if ram.is_empty() { return; }
-        let path = self.sav.clone();
         if let Some(path) = &self.sav {
             let file = path.with_extension(if autosave { "autosav" } else { "sav" });
             log::info!("Saving... ({path:?})");

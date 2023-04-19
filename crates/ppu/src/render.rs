@@ -42,8 +42,6 @@ pub trait PpuAccess: VramAccess {
     fn ppu(&self) -> &Ppu;
 }
 
-const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub(crate) enum Textures {
     None,

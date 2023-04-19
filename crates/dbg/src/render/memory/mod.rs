@@ -31,9 +31,9 @@ struct ViewerOptions {
 impl Default for ViewerOptions {
     fn default() -> Self {
         Self {
-            zero_color: Color32::from_gray(80),
-            address_color: Color32::from_rgb(125, 0, 125),
-            highlight_color: Color32::from_rgb(0, 140, 140),
+            zero_color: Color32::DARK_GRAY,
+            address_color: Color32::LIGHT_BLUE,
+            highlight_color: Color32::GREEN,
             text_style: TextStyle::Monospace,
             address_text_style: TextStyle::Monospace
         }

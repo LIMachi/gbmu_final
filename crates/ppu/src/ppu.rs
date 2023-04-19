@@ -120,7 +120,7 @@ impl Ppu {
             self.dots = 0;
             io.io_mut(IO::LY).direct_write(0);
             self.set_state(io, state, Box::new(HState::last()));
-            lcd.disable();
+            lcd.disable(io);
         }
         self.lcdc = lcdc;
         self.dots += 1;

@@ -8,15 +8,6 @@ enum Storage {
     Cgb(usize, [[u8; BANK_SIZE]; 8])
 }
 
-impl Storage {
-    fn bank(&self) -> usize {
-        match self {
-            Storage::Dmg(_) => 0,
-            Storage::Cgb(bank, _) => *bank
-        }
-    }
-}
-
 impl Mem for Storage {
     fn read(&self, addr: u16, _: u16) -> u8 {
         let addr = addr as usize;
