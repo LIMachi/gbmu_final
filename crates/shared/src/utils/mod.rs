@@ -5,6 +5,7 @@ pub mod image;
 pub mod clock;
 pub mod rtc;
 pub mod convert;
+pub mod palette;
 
 pub trait ToBox {
     fn boxed(&self) -> Box<&Self> where Self: Sized;
@@ -28,7 +29,7 @@ impl<T> Cell for T {
 
 #[derive(Default)]
 pub struct FEdge {
-    old: bool
+    old: bool,
 }
 
 impl FEdge {

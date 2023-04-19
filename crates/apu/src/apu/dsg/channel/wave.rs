@@ -56,7 +56,7 @@ impl SoundChannel for Channel {
         self.dac
     }
 
-    fn clock(&mut self, io: &mut IORegs) {
+    fn clock(&mut self, _io: &mut IORegs) {
         if self.freq_timer == 0 {
             self.cycle = (self.cycle + 1) & 0x1F;
             self.freq_timer = 2 * (0x7FF - self.freq);
@@ -65,7 +65,7 @@ impl SoundChannel for Channel {
         }
     }
 
-    fn trigger(&mut self, io: &mut IORegs) -> bool {
+    fn trigger(&mut self, _io: &mut IORegs) -> bool {
         self.cycle = 1;
         self.freq_timer = 2 * (0x7FF - self.freq) | (self.freq_timer & 0x3);
         false //FIXME: handle special cases/obscure behaviors

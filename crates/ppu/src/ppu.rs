@@ -39,7 +39,7 @@ pub(crate) struct Window {
 #[derive(Default)]
 pub(crate) struct Scroll {
     pub x: u8,
-    pub y: u8,
+    pub y: u8
 }
 
 pub struct Ppu {
@@ -66,7 +66,7 @@ impl Ppu {
             win: Default::default(),
             stat: REdge::new(),
             oam: None,
-            vram: None,
+            vram: None
         }
     }
 

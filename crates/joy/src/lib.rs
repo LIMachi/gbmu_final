@@ -1,11 +1,11 @@
 use shared::events::*;
+use shared::input::{Keybindings, KeyCat};
 use shared::io::{IO, IORegs};
-use shared::input::{Section, Keybindings};
 
 #[derive(Default)]
 pub struct Joypad {
     state: u8,
-    bindings: Keybindings
+    bindings: Keybindings,
 }
 
 impl Joypad {
@@ -15,7 +15,7 @@ impl Joypad {
 
     pub fn handle(&mut self, event: KeyboardInput) {
         if let Some(keycode) = event.virtual_keycode {
-            if let Some(Section::Joy(key)) = self.bindings.get(keycode) {
+            if let Some(KeyCat::Joy(key)) = self.bindings.get(keycode) {
                 let mask = 1u8 << (key as u8);
                 self.state = (self.state & !mask) | if event.state == ElementState::Pressed { mask } else { 0 };
             }
@@ -29,7 +29,7 @@ impl Joypad {
         let dir = if p4 == 0 { self.state >> 4 } else { 0 };
         let act = if p5 == 0 { self.state & 0xF } else { 0 };
         let p = joy.value() & 0xF;
-        let v =  0xF ^ (dir | act);
+        let v = 0xF ^ (dir | act);
         let int = (p ^ v) & p != 0;
         joy.direct_write((p4 << 4) | (p5 << 5) | v);
         if int { io.int_set(4); }

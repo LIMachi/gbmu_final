@@ -1,6 +1,9 @@
+use crate::utils::palette::Palette;
+
 use super::*;
 
 pub struct IORegs {
+    palette: Palette,
     cgb: IOReg,
     range: Vec<IOReg>,
 }
@@ -8,8 +11,9 @@ pub struct IORegs {
 impl IORegs {
     const DISABLED: AccessMode = AccessMode::Generic(Access::U);
 
-    pub fn init(cgb: bool) -> Self {
+    pub fn init(cgb: bool, palette: Palette) -> Self {
         Self {
+            palette,
             cgb: IOReg::rdonly().with_value(cgb as u8),
             range: (0..128).into_iter().map(|i| {
                 let (access, value) = IO::try_from(0xFF00 + i)
@@ -81,6 +85,11 @@ impl IORegs {
 
     pub fn writable(&self, io: IO) -> bool {
         self.range[io as u16 as usize - crate::mem::IO as usize].writable()
+    }
+
+    pub fn palette(&self) -> Palette { self.palette }
+    pub fn set_palette(&mut self, palette: Palette) {
+        self.palette = palette;
     }
 }
 

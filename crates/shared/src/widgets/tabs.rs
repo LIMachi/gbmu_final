@@ -1,6 +1,8 @@
 use std::hash::Hash;
-use shared::egui;
-use shared::egui::{Margin, Response, Sense, Ui, Vec2, Widget};
+
+use egui::{Color32, Margin, Response, Sense, Ui, Vec2, Widget};
+
+pub const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 pub trait Tab {
     fn name(&self) -> String;
@@ -8,14 +10,14 @@ pub trait Tab {
 
 pub struct Tabs<'ui, E: PartialEq + Eq + Copy + Clone + Hash + Tab> {
     current: E,
-    ui: &'ui mut egui::Ui,
-    res: Option<Response>
+    ui: &'ui mut Ui,
+    res: Option<Response>,
 }
 
 impl<'ui, E: PartialEq + Eq + Hash + Copy + Clone + Tab> Tabs<'ui, E> {
     pub fn new(current: &mut E, ui: &'ui mut Ui, values: &[E]) -> Self {
         egui::Frame::group(ui.style())
-            .fill(super::DARK_BLACK)
+            .fill(DARK_BLACK)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     for name in values {

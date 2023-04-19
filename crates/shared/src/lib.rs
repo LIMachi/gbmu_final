@@ -4,19 +4,20 @@
 
 
 pub use egui;
+pub use serde;
 pub use winit;
 
 pub mod events {
     pub use super::winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 }
 
+pub mod widgets;
 pub mod utils;
 pub mod mem;
 pub mod io;
 
 pub mod rom;
 pub mod breakpoints;
-pub use serde;
 
 pub mod input;
 pub mod audio_settings;
@@ -34,7 +35,7 @@ pub enum Handle {
     Debug,
     Game,
     Sprites,
-    Settings
+    Settings,
 }
 
 pub type Event<'a> = winit::event::Event<'a, Events>;
@@ -47,20 +48,20 @@ pub enum Events {
     Loaded,
     Open(Handle),
     AudioSwitch,
-    Close
+    Close,
 }
 
 pub enum Target {
     GB,
-    GBC
+    GBC,
 }
 
 pub trait Ui {
     type Ext;
 
-    fn init(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) { }
-    fn draw(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) { }
-    fn handle(&mut self, _event: &winit::event::Event<Events>, _ext: &mut <Self as Ui>::Ext) { }
+    fn init(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) {}
+    fn draw(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) {}
+    fn handle(&mut self, _event: &winit::event::Event<Events>, _ext: &mut <Self as Ui>::Ext) {}
 }
 
 impl Ui for () {

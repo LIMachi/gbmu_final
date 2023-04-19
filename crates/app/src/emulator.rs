@@ -11,9 +11,10 @@ use shared::cpu::Bus;
 use shared::emulator::{ReadAccess, Schedule};
 use shared::emulator::BusWrapper;
 use shared::Events;
-use shared::input::{Keybindings, Section};
+use shared::input::{Keybindings, KeyCat};
 use shared::mem::{IOBus, MBCController};
 use shared::rom::Rom;
+use shared::utils::palette::Palette;
 use shared::winit::window::Window;
 
 use crate::{AppConfig, Proxy};
@@ -34,6 +35,8 @@ pub struct Console {
 pub struct EmuSettings {
     pub host: String,
     pub port: String,
+    #[serde(default)]
+    pub palette: Palette,
 }
 
 impl Default for EmuSettings {
@@ -41,6 +44,7 @@ impl Default for EmuSettings {
         Self {
             host: "127.0.0.1".to_string(),
             port: "27542".to_string(),
+            palette: Palette::Dmg,
         }
     }
 }
@@ -149,10 +153,6 @@ impl Render for Screen {
         emu.console.gb.lcd.resize(w, h);
     }
 
-    fn should_redraw(&self, emu: &mut Emulator) -> bool {
-        emu.console.gb.lcd.request()
-    }
-
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator) {
         match event {
             Event::UserEvent(Events::Play(rom)) => {
@@ -171,6 +171,10 @@ impl Render for Screen {
             }
             _ => {}
         }
+    }
+
+    fn should_redraw(&self, emu: &mut Emulator) -> bool {
+        emu.console.gb.lcd.request()
     }
 }
 
@@ -191,7 +195,7 @@ impl ReadAccess for Emulator {
         self.console.bus.mbc()
     }
 
-    fn binding(&self, key: VirtualKeyCode) -> Option<Section> {
+    fn binding(&self, key: VirtualKeyCode) -> Option<KeyCat> {
         self.bindings.get(key)
     }
 }
@@ -235,7 +239,11 @@ impl Console {
             .with_apu(controller.audio.apu())
             .with_link(controller.serial_port())
             .build();
-        let bus = bus::Bus::init(&rom).cgb(cgb).skip_boot(skip).build();
+        let bus = bus::Bus::init(&rom)
+            .cgb(cgb)
+            .skip_boot(skip)
+            .palette(controller.settings.palette)
+            .build();
         log::info!("cartridge: {} | device: {}", rom.header.title, if cgb { "CGB" } else { "DMG" });
         Self {
             speed: Default::default(),

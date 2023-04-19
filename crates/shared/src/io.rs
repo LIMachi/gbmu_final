@@ -72,6 +72,8 @@ impl LCDC for u8 {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum IO {
+    ///0x140
+    DMGP = 0x140,
     ///0x100
     CGB = 0x100,
     ///0xFF00
@@ -231,6 +233,7 @@ pub enum IO {
 impl IO {
     pub const fn name(&self) -> &str {
         match self {
+            IO::DMGP => "DMGP",
             IO::CGB => "CGB",
             IO::JOYP => "JOY",
             IO::SB => "SB",
@@ -442,7 +445,8 @@ impl IO {
         use Access::*;
         use AccessMode::*;
         match self {
-            IO::CGB => Generic(R),
+            IO::DMGP => Generic(U),
+            IO::CGB => Generic(U),
             IO::JOYP => Custom([R, R, R, R, RW, RW, U, U]),
             IO::SB => Generic(RW),
             IO::SC => Generic(RW),

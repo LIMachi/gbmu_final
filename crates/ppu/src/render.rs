@@ -1,11 +1,11 @@
 use shared::egui::*;
 use shared::egui::epaint::ImageDelta;
+use shared::widgets::tabs;
 
 use crate::ppu::Ppu;
 
 use super::*;
 
-mod tabs;
 mod tilemap;
 mod oam;
 mod bgmap;
@@ -132,12 +132,12 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
         let count = if emu.bus().is_cgb() { 768 } else { 384 };
         for n in 0..count {
             let s = Textures::Tile(n);
-            self.storage.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
+            self.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
         }
-        self.storage.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
-        self.storage.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
-        self.storage.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
-        self.storage.insert(Textures::Miniature, ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.insert(Textures::Blank, ctx.load_texture("Blank", ColorImage::new([8, 8], Color32::WHITE), TextureOptions::NEAREST));
+        self.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
+        self.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
+        self.insert(Textures::Miniature, ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.init = true;
     }
 

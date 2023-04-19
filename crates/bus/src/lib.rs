@@ -4,8 +4,9 @@ pub use devices::Devices;
 pub use devices::Settings;
 use mem::{Hram, mbc, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
-use shared::io::{IO, IOReg, IORegs};
+use shared::io::{IO, IODevice, IOReg, IORegs};
 use shared::rom::Rom;
+use shared::utils::palette::Palette;
 pub use timer::Timer;
 
 mod timer;
@@ -17,7 +18,7 @@ impl Mem for Empty {}
 
 pub struct Bus {
     clock: u8,
-    mbc: Lock<mem::mbc::Controller>,
+    mbc: Lock<mbc::Controller>,
     ram: Lock<Wram>,
     hram: Hram,
     un_1: Empty,
@@ -30,6 +31,7 @@ pub struct Bus {
 }
 
 pub struct Builder<'a> {
+    palette: Option<Palette>,
     skip: bool,
     cgb: bool,
     rom: &'a Rom,
@@ -46,8 +48,14 @@ impl<'a> Builder<'a> {
         self
     }
 
-    pub fn build(mut self) -> Bus {
-        let mut bus = Bus::new(self.cgb).with_mbc(mbc::Controller::new(self.rom, self.cgb));
+    pub fn palette(mut self, palette: Palette) -> Self {
+        self.palette = Some(palette);
+        self
+    }
+
+    pub fn build(self) -> Bus {
+        let mut bus = Bus::new(self.cgb, self.palette.unwrap_or(Palette::Dmg))
+            .with_mbc(mbc::Controller::new(self.rom, self.cgb));
         let compat = if self.cgb { self.rom.raw()[0x143] } else { 0 };
         if self.skip { bus.skip_boot(compat); }
         bus
@@ -55,20 +63,20 @@ impl<'a> Builder<'a> {
 }
 
 impl Default for Bus {
-    fn default() -> Self { Bus::new(false) }
+    fn default() -> Self { Bus::new(false, Palette::Dmg) }
 }
 
 impl Bus {
     pub fn init(rom: &Rom) -> Builder {
-        Builder { rom, skip: false, cgb: false }
+        Builder { rom, skip: false, cgb: false, palette: None }
     }
 
-    fn new(cgb: bool) -> Self {
+    fn new(cgb: bool, palette: Palette) -> Self {
         Self {
             clock: 0,
-            mbc: mem::mbc::Controller::unplugged().locked(),
+            mbc: mbc::Controller::unplugged().locked(),
             last: None,
-            io: IORegs::init(cgb),
+            io: IORegs::init(cgb, palette),
             vram: Vram::new(cgb).locked(),
             oam: Oam::new().locked(),
             ram: Wram::new(cgb).locked(),
@@ -79,7 +87,7 @@ impl Bus {
         }
     }
 
-    fn with_mbc(mut self, mut controller: mem::mbc::Controller) -> Self {
+    fn with_mbc(mut self, controller: mbc::Controller) -> Self {
         self.mbc = controller.locked();
         self
     }
@@ -153,6 +161,11 @@ impl Bus {
 
     pub fn save(&mut self, autosave: bool) {
         self.mbc.inner_mut().save(autosave);
+    }
+
+    pub fn set_palette(&mut self, devices: &mut Devices, palette: Palette) {
+        self.io.set_palette(palette);
+        devices.ppu.write(IO::DMGP, 0, self);
     }
 }
 

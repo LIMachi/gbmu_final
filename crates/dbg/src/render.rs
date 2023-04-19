@@ -1,29 +1,32 @@
 use std::str::FromStr;
+
 use egui_extras::Column;
-use super::{Emulator, Ninja};
-use shared::{egui::{self, Ui, CentralPanel, Color32, Layout, Align, FontFamily, Widget, Response}, Events, Event};
-use shared::breakpoints::{Breakpoint};
-use shared::cpu::{Reg, Value, Flags, Opcode};
+
+pub use disassembly::Disassembly;
+pub use memory::Viewer;
+use shared::{egui::{self, Align, CentralPanel, Color32, FontFamily, Layout, Response, Ui, Widget}, Event, Events};
+use shared::breakpoints::Breakpoint;
+use shared::cpu::{Flags, Opcode, Reg, Value};
 use shared::egui::{Margin, ScrollArea, SidePanel, Vec2};
-use shared::input::{Section, Shortcut};
+use shared::emulator::Bus;
+use shared::input::{KeyCat, Shortcut};
 use shared::io::IO;
 use shared::utils::convert::Converter;
 use shared::utils::image::ImageLoader;
 use shared::winit::event::{ElementState, KeyboardInput, WindowEvent};
+
 use crate::{Context, Debugger, Texture};
+
+use super::{Emulator, Ninja};
 
 mod disassembly;
 mod memory;
-
-pub use disassembly::Disassembly;
-pub use memory::Viewer;
-use shared::emulator::Bus;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Kind {
     Reg(Reg),
     Cycles,
-    Instructions
+    Instructions,
 }
 
 impl Kind {
@@ -43,13 +46,13 @@ pub struct Data {
     raw: String,
     value: Value,
     reg: Kind,
-    count: usize
+    count: usize,
 }
 
 impl Data {
     fn breakpoint(&self) -> Breakpoint {
         match self.reg {
-            Kind::Reg(reg) =>  Breakpoint::register(reg, self.value),
+            Kind::Reg(reg) => Breakpoint::register(reg, self.value),
             Kind::Cycles => Breakpoint::cycles(self.count),
             Kind::Instructions => Breakpoint::instructions(self.count),
         }
@@ -68,15 +71,15 @@ impl Data {
     fn parse(&mut self) {
         match (self.value, self.reg) {
             (_, Kind::Cycles | Kind::Instructions) => { self.count = usize::from_str(&self.raw).unwrap_or(0); }
-            (Value::U8(_v), _) => { self.value = Value::U8(u8::convert(&self.raw)); },
-            (Value::U16(_v), _) => { self.value = Value::U16(u16::convert(&self.raw)); },
+            (Value::U8(_v), _) => { self.value = Value::U8(u8::convert(&self.raw)); }
+            (Value::U16(_v), _) => { self.value = Value::U16(u16::convert(&self.raw)); }
         };
     }
 
     fn update(&mut self) {
         match (self.reg, self.value) {
-            (Kind::Reg(r), Value::U16(v)) if r == Reg::A || r == Reg::B || r == Reg::C || r == Reg::D || r == Reg::E || r == Reg::F || r == Reg::H || r == Reg::L => { self.value = Value::U8(v as u8); },
-            (Kind::Reg(r), Value::U8(v)) if r == Reg::AF || r == Reg::BC || r == Reg::DE || r == Reg::HL || r == Reg::PC || r == Reg::SP => { self.value = Value::U16(v as u16); },
+            (Kind::Reg(r), Value::U16(v)) if r == Reg::A || r == Reg::B || r == Reg::C || r == Reg::D || r == Reg::E || r == Reg::F || r == Reg::H || r == Reg::L => { self.value = Value::U8(v as u8); }
+            (Kind::Reg(r), Value::U8(v)) if r == Reg::AF || r == Reg::BC || r == Reg::DE || r == Reg::HL || r == Reg::PC || r == Reg::SP => { self.value = Value::U16(v as u16); }
             _ => {}
         }
     }
@@ -157,12 +160,12 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
     }
 
     fn draw(&mut self, ctx: &mut Context, ext: &mut E) {
-        use egui::{FontId, TextStyle::*, FontFamily::Proportional};
+        use egui::{FontFamily::Proportional, FontId, TextStyle::*};
         let mut style = (*ctx.style()).clone();
         style.visuals.override_text_color = Some(Color32::WHITE);
         style.text_styles = [
             (Heading, FontId::new(30.0, Proportional)),
-            (Body, FontId::new(12.0,FontFamily::Monospace)),
+            (Body, FontId::new(12.0, FontFamily::Monospace)),
             (Monospace, FontId::new(10.0, FontFamily::Monospace)),
             (Button, FontId::new(14.0, Proportional)),
             (Small, FontId::new(10.0, Proportional)),
@@ -243,7 +246,10 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         if ui.add(egui::Button::new("-")).clicked() { ext.set_speed((sp - 1).max(-15)); }
                                     });
                                     if ui.add(into).clicked() { ext.step_into(&mut self.disassembly); };
-                                    if ui.add(pause).clicked() { ext.pause(); log::info!("pause"); };
+                                    if ui.add(pause).clicked() {
+                                        ext.pause();
+                                        log::info!("pause");
+                                    };
                                     if ui.add(play).clicked() { Debugger::<E>::play(ext, &mut self.disassembly); };
                                     if ui.add(step).clicked() { ext.step(&mut self.disassembly) };
                                     if ui.add(reset).clicked() { ext.reset(); };
@@ -279,15 +285,15 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         ext.breakpoints()
                                             .bp_mut()
                                             .drain_filter(|bp| {
-                                            if bp.temp() { return false };
-                                            let mut rem = false;
-                                            body.row(30.0, |mut row| {
-                                                row.col(|ui| { if ui.button("-").clicked() { rem = true; } });
-                                                row.col(|ui| { ui.checkbox(&mut bp.enabled, ""); });
-                                                row.col(|ui| { ui.label(bp.display()); });
+                                                if bp.temp() { return false; };
+                                                let mut rem = false;
+                                                body.row(30.0, |mut row| {
+                                                    row.col(|ui| { if ui.button("-").clicked() { rem = true; } });
+                                                    row.col(|ui| { ui.checkbox(&mut bp.enabled, ""); });
+                                                    row.col(|ui| { ui.label(bp.display()); });
+                                                });
+                                                rem
                                             });
-                                            rem
-                                        });
                                     });
                             });
                     });
@@ -310,29 +316,31 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     const CPU: &[IO] = &[IO::JOYP, IO::DIV, IO::TAC, IO::TIMA, IO::TMA, IO::IF, IO::IE, IO::SB, IO::SC];
                                     const MEM: &[IO] = &[IO::KEY1, IO::DMA, IO::VBK, IO::SVBK, IO::HDMA1, IO::HDMA2, IO::HDMA3, IO::HDMA4, IO::HDMA5];
                                     const AUDIO: &[IO] = &[IO::PCM12, IO::PCM34,
-                                                           IO::NR50, IO::NR51, IO::NR52, IO::NR10, IO::NR11, IO::NR12, IO::NR13, IO::NR14, IO::NR21, IO::NR22, IO::NR23, IO::NR24,
-                                                           IO::NR30, IO::NR31, IO::NR32, IO::NR33, IO::NR34, IO::NR41, IO::NR42, IO::NR43, IO::NR44,
-                                                           IO::WaveRam0, IO::WaveRam1, IO::WaveRam2, IO::WaveRam3, IO::WaveRam4, IO::WaveRam5, IO::WaveRam6, IO::WaveRam7,
-                                                           IO::WaveRam8, IO::WaveRam9, IO::WaveRamA, IO::WaveRamB, IO::WaveRamC, IO::WaveRamD, IO::WaveRamE, IO::WaveRamF];
+                                        IO::NR50, IO::NR51, IO::NR52, IO::NR10, IO::NR11, IO::NR12, IO::NR13, IO::NR14, IO::NR21, IO::NR22, IO::NR23, IO::NR24,
+                                        IO::NR30, IO::NR31, IO::NR32, IO::NR33, IO::NR34, IO::NR41, IO::NR42, IO::NR43, IO::NR44,
+                                        IO::WaveRam0, IO::WaveRam1, IO::WaveRam2, IO::WaveRam3, IO::WaveRam4, IO::WaveRam5, IO::WaveRam6, IO::WaveRam7,
+                                        IO::WaveRam8, IO::WaveRam9, IO::WaveRamA, IO::WaveRamB, IO::WaveRamC, IO::WaveRamD, IO::WaveRamE, IO::WaveRamF];
                                     const VIDEO: &[IO] = &[IO::LCDC, IO::STAT, IO::SCX, IO::SCY, IO::LY, IO::LYC, IO::DMA, IO::WX, IO::WY, IO::BGP, IO::OBP0, IO::OBP1, IO::BCPS, IO::BCPD, IO::OPRI, IO::OCPS];
                                     row.col(|ui| { io_table(ui, CPU, bus, "CPU", |_| {}); });
-                                    row.col(|ui| { io_table(ui, MEM, bus, "MEM", |ui: &mut Ui| {
-                                        ui.push_id("BANK_TABLE", |ui| {
-                                            egui_extras::TableBuilder::new(ui)
-                                                .columns(Column::exact(100.), 2)
-                                                .auto_shrink([false, false])
-                                                .body(|mut body| {
-                                                    body.row(16., |mut row| {
-                                                        row.col(|ui| { ui.label("ROM"); });
-                                                        row.col(|ui| { ui.label(format!("{:#04X}", ext.mbc().rom_bank())); });
+                                    row.col(|ui| {
+                                        io_table(ui, MEM, bus, "MEM", |ui: &mut Ui| {
+                                            ui.push_id("BANK_TABLE", |ui| {
+                                                egui_extras::TableBuilder::new(ui)
+                                                    .columns(Column::exact(100.), 2)
+                                                    .auto_shrink([false, false])
+                                                    .body(|mut body| {
+                                                        body.row(16., |mut row| {
+                                                            row.col(|ui| { ui.label("ROM"); });
+                                                            row.col(|ui| { ui.label(format!("{:#04X}", ext.mbc().rom_bank())); });
+                                                        });
+                                                        body.row(16., |mut row| {
+                                                            row.col(|ui| { ui.label("RAM"); });
+                                                            row.col(|ui| { ui.label(format!("{:#04X}", ext.mbc().ram_bank())); });
+                                                        });
                                                     });
-                                                    body.row(16., |mut row| {
-                                                        row.col(|ui| { ui.label("RAM"); });
-                                                        row.col(|ui| { ui.label(format!("{:#04X}", ext.mbc().ram_bank())); });
-                                                    });
-                                                });
-                                        });
-                                    })});
+                                            });
+                                        })
+                                    });
                                     row.col(|ui| { io_table(ui, AUDIO, bus, "AUDIO", |_| {}); });
                                     row.col(|ui| { io_table(ui, VIDEO, bus, "VIDEO", |_| {}); });
                                 });
@@ -345,17 +353,21 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
         match event {
             Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
             Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&ext),
-            Event::WindowEvent { event: WindowEvent::KeyboardInput {
-                input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Released, ..  }, .. }, ..
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Released, .. }, ..
+                }, ..
             } => {
                 self.keys.remove(input);
-            },
-            Event::WindowEvent { event: WindowEvent::KeyboardInput {
-                input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Pressed, ..  }, .. }, ..
+            }
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Pressed, .. }, ..
+                }, ..
             } => {
-                if self.keys.contains(input) { return }
+                if self.keys.contains(input) { return; }
                 self.keys.insert(*input);
-                if let Some(Section::Dbg(key)) = ext.binding(*input) {
+                if let Some(KeyCat::Dbg(key)) = ext.binding(*input) {
                     match key {
                         Shortcut::Step => ext.step(&mut self.disassembly),
                         Shortcut::Run => Debugger::<E>::play(ext, &mut self.disassembly),
