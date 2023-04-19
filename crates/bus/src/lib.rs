@@ -1,19 +1,18 @@
 #![feature(trait_upcasting)]
 
+pub use devices::Devices;
+pub use devices::Settings;
 use mem::{Hram, mbc, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::io::{IO, IOReg, IORegs};
+use shared::rom::Rom;
+pub use timer::Timer;
 
 mod timer;
 mod devices;
 
-pub use timer::Timer;
-pub use devices::Devices;
-
-pub use devices::Settings;
-use shared::rom::Rom;
-
 pub struct Empty {}
+
 impl Mem for Empty {}
 
 pub struct Bus {
@@ -27,13 +26,13 @@ pub struct Bus {
     io: IORegs,
     ie: IOReg,
     status: MemStatus,
-    last: Option<Op>
+    last: Option<Op>,
 }
 
 pub struct Builder<'a> {
     skip: bool,
     cgb: bool,
-    rom: &'a Rom
+    rom: &'a Rom,
 }
 
 impl<'a> Builder<'a> {
@@ -49,7 +48,8 @@ impl<'a> Builder<'a> {
 
     pub fn build(mut self) -> Bus {
         let mut bus = Bus::new(self.cgb).with_mbc(mbc::Controller::new(self.rom, self.cgb));
-        if self.skip { bus.skip_boot(self.rom.raw()[0x143]); }
+        let compat = if self.cgb { self.rom.raw()[0x143] } else { 0 };
+        if self.skip { bus.skip_boot(compat); }
         bus
     }
 }
@@ -75,7 +75,7 @@ impl Bus {
             hram: Hram::new(),
             un_1: Empty {},
             ie: IOReg::with_access(IO::IE.access()),
-            status: MemStatus::ReqRead(0x0)
+            status: MemStatus::ReqRead(0x0),
         }
     }
 
@@ -124,7 +124,7 @@ impl Bus {
                 let v = self.read(addr);
                 self.last = Some(Op::Read(addr, v));
                 MemStatus::Read(v)
-            },
+            }
             MemStatus::ReqWrite(addr) => MemStatus::Write(addr),
             st => st
         };
@@ -196,19 +196,19 @@ impl shared::cpu::Bus for Bus {
                     0xFF50 if self.io.writable(IO::POST) => {
                         self.io.post();
                         self.mbc.inner_mut().post();
-                    },
+                    }
                     0xFF4C if self.io.writable(IO::KEY0) => {
                         self.io.compat_mode();
-                    },
+                    }
                     0xFF70 if self.io.writable(IO::SVBK) => {
                         self.ram.inner_mut().switch_bank(value);
-                    },
+                    }
                     0xFF4F if self.io.writable(IO::VBK) => {
                         self.vram.inner_mut().switch_bank(value);
-                    },
+                    }
                     _ => {}
                 }
-            },
+            }
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
             END => { self.ie.write(0, value, addr) }
         };
