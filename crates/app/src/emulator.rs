@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use winit::event::{VirtualKeyCode, WindowEvent};
 
-use apu::SoundConfig;
 use bus::Devices;
 use mem::{Oam, Vram};
 use serial::com::Serial;
@@ -159,8 +158,7 @@ impl Render for Screen {
                 if let Some(raw) = &rom.raw {
                     window.set_window_icon(raw.icon());
                 }
-                let title = rom.header.title.replace(char::from(0), "");
-                window.set_title(&title);
+                window.set_title(&rom.header.title);
             }
             Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); }
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {

@@ -1,6 +1,9 @@
+use std::io::Read;
 use std::path::PathBuf;
-use shared::{mem::*, rom::{Rom, Mbc as Mbcs}};
+
+use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
 use shared::io::{IO, IODevice};
+
 use crate::boot::Boot;
 
 pub mod mbc0;
@@ -20,23 +23,27 @@ pub trait MemoryController {
 pub(crate) trait Mbc: MemoryController + Mem {
     fn is_boot(&self) -> bool { false }
     fn unmap(&mut self) -> Box<dyn Mbc> { unreachable!() }
-    fn tick(&mut self) { }
+    fn tick(&mut self) {}
 }
 
-pub struct Unplugged { }
-impl Mem for Unplugged { }
-impl Mbc for Unplugged { }
+pub struct Unplugged {}
+
+impl Mem for Unplugged {}
+
+impl Mbc for Unplugged {}
 
 impl MemoryController for Unplugged {
     fn new(_rom: &Rom, _ram: Vec<u8>) -> Self where Self: Sized {
-        Self { }
+        Self {}
     }
     fn ram_dump(&self) -> Vec<u8> { vec![] }
 }
 
 pub struct Controller {
     sav: Option<PathBuf>,
-    inner: Box<dyn Mbc>
+    autosave: Option<PathBuf>,
+    inner: Box<dyn Mbc>,
+    rom: String,
 }
 
 impl Default for Controller {
@@ -45,19 +52,22 @@ impl Default for Controller {
 
 impl Controller {
     pub fn new(rom: &Rom, cgb: bool) -> Self {
-        let (sav, ram) = if rom.header.cartridge.capabilities().save() {
+        let (sav, autosave, ram) = if rom.header.cartridge.capabilities().save() {
             let sav = rom.location.clone().join(&rom.filename).with_extension("sav");
+            let auto = rom.location.clone().join(&rom.filename).with_extension("autosav");
             log::info!("Trying to load save data...");
             let ram = if let Some(mut f) = std::fs::File::open(&sav).ok() {
                 use std::io::Read;
                 let mut v = Vec::with_capacity(rom.header.ram_size.size());
                 f.read_to_end(&mut v).expect("failed to read save");
                 v
-            } else { vec![0xAF; rom.header.ram_size.size()] };
-            (Some(sav), ram)
+            } else {
+                log::info!("No save detected, fresh file");
+                vec![0xAF; rom.header.ram_size.size()]
+            };
+            (Some(sav), Some(auto), ram)
         } else {
-            log::info!("No save detected, fresh file");
-            (None, vec![0xAF; rom.header.ram_size.size()])
+            (None, None, vec![0xAF; rom.header.ram_size.size()])
         };
         let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
             Mbcs::MBC0 => Box::new(Boot::<mbc0::Mbc0>::new(rom, ram, cgb)),
@@ -70,7 +80,9 @@ impl Controller {
 
         Self {
             sav,
-            inner
+            autosave,
+            inner,
+            rom: rom.header.title.clone(),
         }
     }
 
@@ -79,15 +91,36 @@ impl Controller {
         self
     }
 
+    pub fn save(&self) {
+        let ram = self.inner.ram_dump();
+        if ram.is_empty() { return; }
+        if let Some(auto) = &self.autosave {
+            log::info!("autosave...");
+            let mut file = vec![];
+            use std::io::Write;
+            if std::fs::File::open(&auto)
+                .and_then(|mut x| x.read_to_end(&mut file)).is_ok() {
+                std::fs::File::create(auto)
+                    .and_then(|mut x| x.write_all(&ram))
+                    .unwrap_or_else(|x| {
+                        log::warn!("autosave failed: {e:?}");
+                        std::fs::File::create(format!("backup_{}.autosav", self.rom))
+                            .and_then(|mut x| x.write_all(&file))
+                            .expect("backup failed.");
+                    });
+            }
+        }
+    }
+
     pub fn unplugged() -> Self {
-        Self { sav: None, inner: Box::new(Unplugged { }) }
+        Self { sav: None, autosave: None, rom: "no_rom".to_string(), inner: Box::new(Unplugged {}) }
     }
 }
 
 impl Drop for Controller {
     fn drop(&mut self) {
         let ram = self.inner.ram_dump();
-        if ram.is_empty() { return }
+        if ram.is_empty() { return; }
         if let Some(sav) = &self.sav {
             log::info!("dumping ram to save file {:?}", sav);
             use std::io::Write;

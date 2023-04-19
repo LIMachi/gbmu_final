@@ -1,4 +1,5 @@
 use std::ops::BitXor;
+
 use log::warn;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -6,7 +7,7 @@ pub enum Console {
     GBC,
     DMG,
     All,
-    Other(u8)
+    Other(u8),
 }
 
 impl Console {
@@ -30,7 +31,7 @@ impl From<u8> for Console {
 pub enum Gameboy {
     DMG,
     Super,
-    Other
+    Other,
 }
 
 impl From<u8> for Gameboy {
@@ -47,12 +48,15 @@ impl From<u8> for Gameboy {
 }
 
 mod capability {
-    pub const NONE: u8 = 0b00000; // always
-    pub const RAM: u8  = 0b00001;
+    pub const NONE: u8 = 0b00000;
+    // always
+    pub const RAM: u8 = 0b00001;
     pub const SRAM: u8 = 0b00011;
-    pub const BATT: u8 = 0b00100; // battery = save
-    pub const TMR: u8  = 0b01000; // timer
-    pub const MR: u8   = 0b10000; // rumble
+    pub const BATT: u8 = 0b00100;
+    // battery = save
+    pub const TMR: u8 = 0b01000;
+    // timer
+    pub const MR: u8 = 0b10000; // rumble
 }
 
 pub struct Capabilities(u8);
@@ -104,7 +108,7 @@ pub enum Cartridge {
     RomMbc5Mr,
     RomMbc5MrSram,
     RomMbc5MrSramBatt,
-    UNSUPPORTED
+    UNSUPPORTED,
 }
 
 pub enum Mbc {
@@ -113,11 +117,10 @@ pub enum Mbc {
     MBC2,
     MBC3,
     MBC5,
-    Unknown
+    Unknown,
 }
 
 impl Cartridge {
-
     pub fn capabilities(&self) -> Capabilities {
         use capability::*;
         match self {
@@ -143,7 +146,7 @@ impl Cartridge {
             Cartridge::RomMbc5Mr => Capabilities(MR),
             Cartridge::RomMbc5MrSram => Capabilities(MR | SRAM),
             Cartridge::RomMbc5MrSramBatt => Capabilities(MR | SRAM | BATT),
-            Cartridge::UNSUPPORTED             => Capabilities(NONE)
+            Cartridge::UNSUPPORTED => Capabilities(NONE)
         }
     }
 
@@ -171,7 +174,7 @@ impl Cartridge {
             Cartridge::RomMbc5Mr => Mbc::MBC5,
             Cartridge::RomMbc5MrSram => Mbc::MBC5,
             Cartridge::RomMbc5MrSramBatt => Mbc::MBC5,
-            Cartridge::UNSUPPORTED             => Mbc::Unknown
+            Cartridge::UNSUPPORTED => Mbc::Unknown
         }
     }
 }
@@ -218,11 +221,14 @@ impl RomSize {
     pub fn new(v: u8) -> Self { Self(v) }
     pub fn banks(&self) -> usize {
         match self.0 {
-            n @0..=8 => 2usize.pow((n + 1) as u32),
+            n @ 0..=8 => 2usize.pow((n + 1) as u32),
             0x52 => 72,
             0x53 => 80,
             0x54 => 96,
-            n => { warn!("invalid rom size {n}"); 0 }
+            n => {
+                warn!("invalid rom size {n}");
+                0
+            }
         }
     }
 
@@ -242,7 +248,10 @@ impl RamSize {
             3 => 4,
             4 => 16,
             5 => 8,
-            n => { warn!("invalid ram size {n}"); 0 }
+            n => {
+                warn!("invalid ram size {n}");
+                0
+            }
         }
     }
 
@@ -265,7 +274,7 @@ pub struct Header {
     pub lcode: u8,
     pub rom_v: u8,
     pub check: u8,
-    pub checksum: u16
+    pub checksum: u16,
 }
 
 impl Header {
@@ -273,7 +282,7 @@ impl Header {
         let cs = &mem[0x14E..=0x14F];
         Self {
             logo: mem[0x104..0x134].to_vec(),
-            title: String::from_utf8_lossy(&mem[0x134..=0x142]).to_string(),
+            title: String::from_utf8_lossy(&mem[0x134..=0x142]).to_string().replace(char::from(0), ""),
             kind: Console::from(mem[0x143]),
             license: [mem[0x144], mem[0x145]],
             funcs: Gameboy::from(mem[0x146]),
@@ -284,7 +293,7 @@ impl Header {
             lcode: mem[0x14B],
             rom_v: mem[0x14C],
             check: mem[0x14D],
-            checksum: u16::from_le_bytes([cs[1], cs[0]])
+            checksum: u16::from_le_bytes([cs[1], cs[0]]),
         }
     }
 }
