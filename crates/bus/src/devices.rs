@@ -1,40 +1,43 @@
 use apu::Apu;
+use joy::Joypad;
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
-use shared::input::Keybindings;
 use shared::io::{IO, IODevice};
 use shared::mem::IOBus;
+
 use crate::Timer;
 
 #[derive(Default)]
 pub struct ConsoleBuilder {
     apu: Option<Apu>,
     serial: Option<serial::Port>,
-    joypad: Option<joy::Joypad>,
     skip: bool,
-    cgb: bool
+    cgb: bool,
 }
 
 impl ConsoleBuilder {
-
     pub fn with_link(mut self, cable: serial::com::Serial) -> Self {
-        self.serial = Some(serial::Port::new(cable)); self
+        self.serial = Some(serial::Port::new(cable));
+        self
     }
 
     pub fn with_apu(mut self, apu: Apu) -> Self {
-        self.apu = Some(apu); self
+        self.apu = Some(apu);
+        self
     }
 
-    pub fn with_keybinds(mut self, keybinds: Keybindings) -> Self {
-        self.joypad = Some(joy::Joypad::new(keybinds)); self
-    }
+    // pub fn with_keybinds(mut self) -> Self {
+    //     self.joypad = Some(joy::Joypad::new()); self
+    // }
 
     pub fn skip_boot(mut self, skip: bool) -> Self {
-        self.skip = skip; self
+        self.skip = skip;
+        self
     }
 
     pub fn set_cgb(mut self, cgb: bool) -> Self {
-        self.cgb = cgb; self
+        self.cgb = cgb;
+        self
     }
 
     pub fn build(self) -> Devices {
@@ -42,6 +45,7 @@ impl ConsoleBuilder {
 
         let lcd = lcd::Lcd::default();
         let ppu = ppu::Controller::new();
+        let joy = Joypad::new();
         if self.skip { cpu.skip_boot(self.cgb); }
 
         Devices {
@@ -53,7 +57,7 @@ impl ConsoleBuilder {
             hdma: ppu::Hdma::default(),
             serial: self.serial.unwrap_or_default(),
             timer: Timer::default(),
-            joy: self.joypad.unwrap_or_default(),
+            joy,
         }
     }
 }

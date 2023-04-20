@@ -1,16 +1,15 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::Formatter;
-use std::rc::Rc;
+use std::fmt::{Display, Formatter, Write};
 
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeStruct;
-use winit::event::VirtualKeyCode;
+use winit::event::{ButtonId, DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent};
+use winit::event_loop::EventLoopProxy;
 
-use crate::utils::Cell;
+use crate::Events;
 
-#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Hash, Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 pub enum Keys {
     A = 0,
@@ -23,18 +22,78 @@ pub enum Keys {
     Down = 7,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
-pub enum Shortcut {
+#[derive(Serialize, Deserialize, Hash, Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Debug {
     Pause,
     Run,
     Step,
     Reset,
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Hash, Copy, Clone, Eq, PartialEq, Debug)]
+pub enum Shortcut {
+    SpeedUp,
+    SpeedDown,
+    Save,
+    Quit,
+}
+
+#[derive(Serialize, Deserialize, Hash, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum KeyCat {
     Joy(Keys),
-    Dbg(Shortcut),
+    Dbg(Debug),
+    Game(Shortcut),
+}
+
+#[derive(Hash, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Input {
+    Keyboard(VirtualKeyCode, ModifiersState),
+    Device(ButtonId),
+}
+
+impl Display for Input {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Input::Keyboard(key, state) => {
+                let prefix = if state.ctrl() { "Ctrl + " } else if state.shift() { "Shift + " } else if state.alt() { "Alt + " } else { "" };
+                f.write_fmt(format_args!("{prefix}{key:?}"))
+            }
+            Input::Device(button) => f.write_fmt(format_args!("Button{button}"))
+        }
+    }
+}
+
+impl Input {
+    pub fn key(code: VirtualKeyCode) -> Self {
+        Self::Keyboard(code, ModifiersState::empty())
+    }
+
+    pub fn pressed(&self, event: &Event<Events>, modifiers: &ModifiersState) -> bool {
+        match (self, event) {
+            (Input::Keyboard(code, state), Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput {
+                        virtual_keycode: Some(key), state: pressed, ..
+                    }, ..
+                }, ..
+            }) if pressed == &ElementState::Pressed && code == key => {
+                let mut mods = *modifiers;
+                match key {
+                    VirtualKeyCode::LShift | VirtualKeyCode::RShift => mods.remove(ModifiersState::SHIFT),
+                    VirtualKeyCode::LControl | VirtualKeyCode::RControl => mods.remove(ModifiersState::CTRL),
+                    VirtualKeyCode::LAlt | VirtualKeyCode::RAlt => mods.remove(ModifiersState::ALT),
+                    _ => {}
+                };
+                state == &mods
+            }
+            (Input::Device(key), Event::DeviceEvent {
+                event: DeviceEvent::Button {
+                    button, state
+                }, ..
+            }) if state == &ElementState::Pressed && key == button => true,
+            _ => false
+        }
+    }
 }
 
 impl KeyCat {
@@ -50,98 +109,130 @@ impl KeyCat {
         ]
     }
 
-    pub fn shortcuts() -> impl IntoIterator<Item=KeyCat> {
-        [KeyCat::Dbg(Shortcut::Pause),
-            KeyCat::Dbg(Shortcut::Run),
-            KeyCat::Dbg(Shortcut::Step),
-            KeyCat::Dbg(Shortcut::Reset),
+    pub const fn debug() -> impl IntoIterator<Item=KeyCat> {
+        [KeyCat::Dbg(Debug::Pause),
+            KeyCat::Dbg(Debug::Run),
+            KeyCat::Dbg(Debug::Step),
+            KeyCat::Dbg(Debug::Reset),
+        ]
+    }
+
+    pub const fn shortcuts() -> impl IntoIterator<Item=KeyCat> {
+        [KeyCat::Game(Shortcut::SpeedDown),
+            KeyCat::Game(Shortcut::SpeedUp),
+            KeyCat::Game(Shortcut::Save),
+            KeyCat::Game(Shortcut::Quit)
         ]
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Keybindings {
-    bindings: Rc<RefCell<HashMap<VirtualKeyCode, KeyCat>>>,
-}
-
-impl Serialize for Keybindings {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        let mut state = serializer.serialize_struct("Keybindings", 1)?;
-        state.serialize_field("bindings", &*self.bindings.as_ref().borrow())?;
-        state.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for Keybindings {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-        #[derive(Deserialize)]
-        #[serde(field_identifier, rename_all = "lowercase")]
-        enum Field { Bindings }
-
-        struct KeybindingsVisitor;
-        impl<'de> Visitor<'de> for KeybindingsVisitor {
-            type Value = Keybindings;
-
-            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result { formatter.write_str("struct Keybindings") }
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
-                let bindings: HashMap<VirtualKeyCode, KeyCat> =
-                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                Ok(Keybindings { bindings: bindings.cell() })
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error> where A: MapAccess<'de> {
-                let mut bindings: Option<HashMap<VirtualKeyCode, KeyCat>> = None;
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        Field::Bindings => {
-                            if bindings.is_some() {
-                                return Err(de::Error::duplicate_field("bindings"));
-                            }
-                            bindings = Some(map.next_value()?);
-                        }
-                    }
-                }
-                let bindings = bindings.ok_or_else(|| de::Error::missing_field("bindings"))?;
-                Ok(Keybindings { bindings: bindings.cell() })
-            }
-        }
-        const FIELDS: &'static [&'static str] = &["bindings"];
-        deserializer.deserialize_struct("Keybindings", FIELDS, KeybindingsVisitor)
-    }
+    bindings: HashMap<Input, KeyCat>,
+    #[serde(skip)]
+    inputs: HashMap<KeyCat, (Input, ElementState)>,
+    #[serde(skip)]
+    modifiers: ModifiersState,
 }
 
 impl Default for Keybindings {
     fn default() -> Self {
         let mut bindings = HashMap::new();
-        bindings.insert(VirtualKeyCode::A, KeyCat::Joy(Keys::Left));
-        bindings.insert(VirtualKeyCode::D, KeyCat::Joy(Keys::Right));
-        bindings.insert(VirtualKeyCode::S, KeyCat::Joy(Keys::Down));
-        bindings.insert(VirtualKeyCode::W, KeyCat::Joy(Keys::Up));
+        bindings.insert(Input::key(VirtualKeyCode::A), KeyCat::Joy(Keys::Left));
+        bindings.insert(Input::key(VirtualKeyCode::D), KeyCat::Joy(Keys::Right));
+        bindings.insert(Input::key(VirtualKeyCode::S), KeyCat::Joy(Keys::Down));
+        bindings.insert(Input::key(VirtualKeyCode::W), KeyCat::Joy(Keys::Up));
 
-        bindings.insert(VirtualKeyCode::Space, KeyCat::Joy(Keys::A));
-        bindings.insert(VirtualKeyCode::LShift, KeyCat::Joy(Keys::B));
-        bindings.insert(VirtualKeyCode::Z, KeyCat::Joy(Keys::Start));
-        bindings.insert(VirtualKeyCode::X, KeyCat::Joy(Keys::Select));
+        bindings.insert(Input::key(VirtualKeyCode::Space), KeyCat::Joy(Keys::A));
+        bindings.insert(Input::key(VirtualKeyCode::LShift), KeyCat::Joy(Keys::B));
+        bindings.insert(Input::key(VirtualKeyCode::Z), KeyCat::Joy(Keys::Start));
+        bindings.insert(Input::key(VirtualKeyCode::X), KeyCat::Joy(Keys::Select));
 
-        bindings.insert(VirtualKeyCode::F2, KeyCat::Dbg(Shortcut::Pause));
-        bindings.insert(VirtualKeyCode::F9, KeyCat::Dbg(Shortcut::Run));
-        bindings.insert(VirtualKeyCode::F3, KeyCat::Dbg(Shortcut::Step));
-        bindings.insert(VirtualKeyCode::F4, KeyCat::Dbg(Shortcut::Reset));
-        Self { bindings: bindings.cell() }
+        bindings.insert(Input::key(VirtualKeyCode::F2), KeyCat::Dbg(Debug::Pause));
+        bindings.insert(Input::key(VirtualKeyCode::F9), KeyCat::Dbg(Debug::Run));
+        bindings.insert(Input::key(VirtualKeyCode::F3), KeyCat::Dbg(Debug::Step));
+        bindings.insert(Input::key(VirtualKeyCode::F4), KeyCat::Dbg(Debug::Reset));
+        Self { bindings, inputs: Default::default(), modifiers: Default::default() }
     }
 }
 
 impl Keybindings {
-    pub fn set(&mut self, key: KeyCat, code: VirtualKeyCode) {
-        self.bindings.as_ref().borrow_mut().drain_filter(|_v, x| &key == x);
-        self.bindings.as_ref().borrow_mut().insert(code, key);
+    pub fn init(&mut self) {
+        for (input, key) in &self.bindings {
+            self.inputs.insert(*key, (*input, ElementState::Released));
+        }
     }
 
-    pub fn get(&self, key: VirtualKeyCode) -> Option<KeyCat> {
-        self.bindings.as_ref().borrow().get(&key).map(|x| *x)
+    pub fn get(&self, key: KeyCat) -> Option<Input> {
+        self.inputs.get(&key).map(|x| x.0)
     }
 
-    pub fn has(&self, key: KeyCat) -> Option<VirtualKeyCode> {
-        self.bindings.as_ref().borrow().iter().find(|(_v, s)| s == &&key).map(|(v, _)| *v)
+    fn set(&mut self, key: KeyCat, code: Input) {
+        self.bindings.get(&code).map(|x| self.inputs.remove(x));
+        self.inputs.get(&key).map(|(x, _)| self.bindings.remove(x));
+        self.bindings.insert(code, key);
+        self.inputs.insert(key, (code, ElementState::Released));
     }
+
+    pub fn pressed(&self, key: KeyCat) -> bool {
+        self.inputs.get(&key).map(|x| x.1 == ElementState::Pressed)
+            .unwrap_or(false)
+    }
+
+    pub fn update_inputs(&mut self, event: &Event<Events>, proxy: &EventLoopProxy<Events>) {
+        match event {
+            Event::WindowEvent { event: WindowEvent::ModifiersChanged(state), .. } => {
+                self.modifiers = *state;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput { virtual_keycode: Some(input), state, .. }, ..
+                }, ..
+            } => {
+                if let Some(&cat) = self.bindings.get(&Input::Keyboard(*input, self.modifiers)) {
+                    proxy.send_event(if state == &ElementState::Pressed { Events::Press(cat) } else { Events::Release(cat) }).ok();
+                    self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
+                }
+            }
+            Event::DeviceEvent { event: DeviceEvent::Button { button, state }, .. } => {
+                if let Some(&cat) = self.bindings.get(&Input::Device(*button)) {
+                    self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn update(&mut self, joypad: &mut impl Joypad, event: &Event<Events>) {
+        match event {
+            Event::UserEvent(Events::Press(key @ KeyCat::Joy(..))) => joypad.update(*key, true),
+            Event::UserEvent(Events::Release(key @ KeyCat::Joy(..))) => joypad.update(*key, false),
+            _ => {}
+        }
+    }
+
+    pub fn try_bind(&mut self, action: Option<KeyCat>, event: &Event<Events>) -> bool {
+        match (action, event) {
+            (Some(key), Event::WindowEvent {
+                event: WindowEvent::KeyboardInput {
+                    input: KeyboardInput { virtual_keycode: Some(input), state, .. }, ..
+                }, ..
+            }) if state == &ElementState::Released => {
+                log::info!("binding to {input:?}, modifiers: {:?}", self.modifiers);
+                self.set(key, Input::Keyboard(*input, self.modifiers));
+                true
+            }
+            (Some(key), Event::DeviceEvent {
+                event: DeviceEvent::Button { button, state }, ..
+            }) if state == &ElementState::Pressed => {
+                self.set(key, Input::Device(*button));
+                true
+            }
+            _ => { false }
+        }
+    }
+}
+
+pub trait Joypad {
+    fn update(&mut self, key: KeyCat, pressed: bool);
 }

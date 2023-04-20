@@ -1,9 +1,17 @@
 use wgpu::Instance;
-use winit::window::Window;
 use winit::dpi::PhysicalSize;
 use winit::event_loop::EventLoopWindowTarget;
+use winit::window::Window;
 use winit::window::WindowBuilder;
+
 use dbg::Ninja;
+pub use egui_context::EguiContext;
+pub use raw_context::RawContext;
+use shared::{Events, Handle};
+
+use crate::app::Menu;
+use crate::emulator::{Emulator, Screen};
+use crate::settings::Settings;
 
 mod egui_context;
 mod raw_context;
@@ -26,20 +34,12 @@ pub trait Context<Ctx> {
 }
 
 pub trait Render {
-
     fn init(&mut self, window: &Window, emu: &mut Emulator);
     fn render(&mut self, emu: &mut Emulator);
     fn resize(&mut self, w: u32, h: u32, emu: &mut Emulator);
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator);
     fn should_redraw(&self, _: &mut Emulator) -> bool { true }
 }
-
-pub use egui_context::EguiContext;
-pub use raw_context::RawContext;
-use shared::{Events, Handle};
-use crate::app::Menu;
-use crate::emulator::{Emulator, Screen};
-use crate::settings::Settings;
 
 pub struct WindowType(Handle);
 
@@ -63,7 +63,7 @@ impl WindowType {
                 .with_inner_size(PhysicalSize::new(1280, 720)),
             Handle::Settings => WindowBuilder::new()
                 .with_title("GBMU - settings")
-                .with_inner_size(PhysicalSize::<u32>::from((270, 400)))
+                .with_inner_size(PhysicalSize::<u32>::from((270, 550)))
                 .with_resizable(false),
         }.build(evt).unwrap()
     }

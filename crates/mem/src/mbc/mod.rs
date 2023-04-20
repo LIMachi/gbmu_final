@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
@@ -88,19 +88,18 @@ impl Controller {
         let ram = self.inner.ram_dump();
         if ram.is_empty() { return; }
         if let Some(path) = &self.sav {
+            use std::fs::File;
+            use std::io::Write;
             let file = path.with_extension(if autosave { "autosav" } else { "sav" });
             log::info!("Saving... ({path:?})");
             let mut backup = vec![];
-            use std::io::Write;
-            std::fs::File::open(&file).and_then(|mut x| x.read_to_end(&mut backup)).ok();
-            std::fs::File::create(&file)
+            File::open(&file).and_then(|mut x| x.read_to_end(&mut backup)).ok();
+            File::create(path.with_extension("bak"))
+                .and_then(|mut x| x.write_all(&backup))
+                .unwrap_or_else(|e| log::warn!("Failed to save backup ({e:?})"));
+            File::create(&file)
                 .and_then(|mut x| x.write_all(&ram))
-                .unwrap_or_else(|e| {
-                    log::warn!("autosave failed: {e:?}");
-                    std::fs::File::create(path.with_extension("bak"))
-                        .and_then(|mut x| x.write_all(&backup))
-                        .expect("backup failed.");
-                });
+                .unwrap_or_else(|e| { log::warn!("save failed: {e:?}"); });
         }
     }
 

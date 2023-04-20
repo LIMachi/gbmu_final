@@ -1,15 +1,17 @@
 use std::any::Any;
 use std::collections::HashMap;
-use winit::event::{WindowEvent};
-use winit::event_loop::{ControlFlow};
-use winit::window::{WindowId};
+
+use winit::event::WindowEvent;
+use winit::event_loop::ControlFlow;
+use winit::window::WindowId;
+
 use super::*;
 
 pub struct Windows {
     instance: Instance,
     proxy: Proxy,
     handles: HashMap<Handle, WindowId>,
-    windows: HashMap<WindowId, Box<dyn Context<Emulator>>>
+    windows: HashMap<WindowId, Box<dyn Context<Emulator>>>,
 }
 
 impl Windows {
@@ -18,7 +20,7 @@ impl Windows {
             instance: Instance::new(wgpu::Backends::PRIMARY),
             proxy,
             handles: Default::default(),
-            windows: Default::default()
+            windows: Default::default(),
         }
     }
 
@@ -46,7 +48,7 @@ impl Windows {
             win.handle(event, emu);
         }
         match event {
-            Event::WindowEvent { event: WindowEvent::CloseRequested, window_id }  => {
+            Event::WindowEvent { event: WindowEvent::CloseRequested, window_id } => {
                 if let Some((&h, &_id)) = self.handles.iter().find(|(_, v)| v == &window_id) {
                     if self.windows.contains_key(window_id) && self.windows.len() == 1 || h == Handle::Main {
                         self.proxy.send_event(Events::Close).ok();
@@ -56,14 +58,14 @@ impl Windows {
                         self.windows.remove(window_id);
                     }
                 }
-            },
+            }
             Event::WindowEvent { event: WindowEvent::Resized(sz), window_id } => {
                 self.windows.get_mut(&window_id).unwrap().resize(*sz, emu);
-            },
+            }
             Event::RedrawRequested(id) => {
                 self.windows.get_mut(&id).unwrap().redraw(emu);
-            },
-            _ => {}
+            }
+            e => emu.bindings.update_inputs(e, &self.proxy)
         }
     }
 
@@ -76,7 +78,7 @@ impl Windows {
     pub fn create<'a>(&mut self, handle: Handle, emu: &mut Emulator, event_loop: &EventLoopWindowTarget<Events>) {
         if self.handles.contains_key(&handle) {
             log::warn!("window {handle:?} already opened. Please don't do that.");
-            return ;
+            return;
         }
         let proxy = self.proxy.clone();
         let kind = WindowType(handle);

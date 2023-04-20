@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
-use winit::event::{Event, KeyboardInput, WindowEvent};
+use winit::event::Event;
 
-use shared::Events;
 use shared::egui::{CentralPanel, Context, Ui};
+use shared::Events;
 use shared::input::KeyCat;
 use shared::widgets::tabs;
 use shared::widgets::tabs::Tab;
@@ -32,6 +32,7 @@ pub struct Settings {
     tab: Tabs,
     devices: Vec<String>,
     key: Option<KeyCat>,
+    autosave: String,
 }
 
 impl Default for Settings {
@@ -40,6 +41,7 @@ impl Default for Settings {
             tab: Tabs::Keybinds,
             devices: apu::Controller::devices().collect(),
             key: None,
+            autosave: "".to_string(),
         }
     }
 }
@@ -68,7 +70,9 @@ impl Mode {
 impl shared::Ui for Settings {
     type Ext = Emulator;
 
-    fn init(&mut self, _ctx: &mut Context, _ext: &mut Emulator) {}
+    fn init(&mut self, _ctx: &mut Context, ext: &mut Emulator) {
+        self.autosave = (ext.settings.timer / 60).to_string();
+    }
 
     //TODO bouger les keybinds
     fn draw(&mut self, ctx: &mut Context, emu: &mut Emulator) {
@@ -77,23 +81,14 @@ impl shared::Ui for Settings {
                 tabs::Tabs::new(&mut self.tab, ui, &[Tabs::Keybinds, Tabs::Device, Tabs::Audio, Tabs::Video])
                     .with_tab(Tabs::Keybinds, keybinds::Keybinds::new(self, emu))
                     .with_tab(Tabs::Audio, audio::Audio::new(self, emu))
-                    .with_tab(Tabs::Device, device::Device::new(emu))
+                    .with_tab(Tabs::Device, device::Device::new(emu, &mut self.autosave))
                     .with_tab(Tabs::Video, video::Video::new(emu));
             });
     }
 
     fn handle(&mut self, event: &Event<Events>, emu: &mut Emulator) {
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::KeyboardInput {
-                    input: KeyboardInput { virtual_keycode: Some(input), .. }, ..
-                }, ..
-            } => {
-                if let Some(key) = self.key.take() {
-                    emu.bindings.set(key, *input);
-                }
-            }
-            _ => {}
+        if emu.bindings.try_bind(self.key, event) {
+            self.key.take();
         }
     }
 }

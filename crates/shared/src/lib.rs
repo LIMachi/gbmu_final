@@ -7,6 +7,8 @@ pub use egui;
 pub use serde;
 pub use winit;
 
+use crate::input::KeyCat;
+
 pub mod events {
     pub use super::winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
 }
@@ -48,6 +50,8 @@ pub enum Events {
     Loaded,
     Open(Handle),
     AudioSwitch,
+    Press(KeyCat),
+    Release(KeyCat),
     Close,
 }
 

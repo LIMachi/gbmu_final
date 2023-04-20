@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoint;
-use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, TextureHandle, TextureId, Ui, Vec2, Widget};
+use shared::egui::{self, Align, Color32, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, Separator, TextureHandle, TextureId, Ui, Vec2, Widget};
 use shared::input::Keybindings;
 use shared::rom::Rom;
 use shared::serde::{Deserialize, Serialize};
@@ -21,6 +21,8 @@ enum Texture {
     Spritesheet,
     Debug,
     Add,
+    Save,
+    Nosave,
     Cover(String),
 }
 
@@ -195,6 +197,8 @@ impl shared::Ui for Menu {
         self.textures.insert(Texture::Debug, ctx.load_svg::<40, 40>("debug", "assets/icons/debug.svg"));
         self.textures.insert(Texture::Settings, ctx.load_svg::<40, 40>("settings", "assets/icons/settings.svg"));
         self.textures.insert(Texture::Spritesheet, ctx.load_svg::<40, 40>("spritesheet", "assets/icons/palette.svg"));
+        self.textures.insert(Texture::Save, ctx.load_svg::<40, 40>("save", "assets/icons/save.svg"));
+        self.textures.insert(Texture::Nosave, ctx.load_svg::<40, 40>("nosave", "assets/icons/stop.svg"));
         for path in &emu.roms.paths {
             self.search(path);
             println!("looking at path {path}");
@@ -226,6 +230,8 @@ impl shared::Ui for Menu {
                     let spritesheet = egui::ImageButton::new(self.tex(Texture::Spritesheet), (28., 28.)).frame(false);
                     let setting = egui::ImageButton::new(self.tex(Texture::Settings), (24., 24.)).frame(false);
                     let add = egui::ImageButton::new(self.tex(Texture::Add), (32., 32.)).frame(false);
+                    let save = egui::ImageButton::new(self.tex(Texture::Save), (32., 32.)).frame(false);
+                    let nosave = egui::ImageButton::new(self.tex(Texture::Nosave), (32., 32.)).frame(false);
                     l.with_layout(Layout::default(), |ui| {
                         if ui.add(add).clicked() {
                             if let Some(file) = rfd::FileDialog::new().set_directory("/").pick_folder() {
@@ -237,6 +243,11 @@ impl shared::Ui for Menu {
                         if ui.add(debug).clicked() { emu.proxy.send_event(Events::Open(Handle::Debug)).ok(); };
                         if ui.add(spritesheet).clicked() { emu.proxy.send_event(Events::Open(Handle::Sprites)).ok(); };
                         if ui.add(setting).clicked() { emu.proxy.send_event(Events::Open(Handle::Settings)).ok(); };
+                        ui.add(Separator::default().vertical().spacing(4.));
+                        if emu.is_running() {
+                            if ui.add(save).clicked() { emu.console.bus.save(false); }
+                            if ui.add(nosave).clicked() { emu.stop(false); }
+                        }
                     });
                 })
             });
