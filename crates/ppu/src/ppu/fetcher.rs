@@ -1,8 +1,10 @@
 use mem::oam::Sprite;
 use shared::io::{CGB_MODE, IO, IORegs, LCDC};
 use shared::mem::Source;
+
 use crate::ppu::pixel::Attributes;
-use super::{Pixel, Ppu, fifo::*};
+
+use super::{fifo::*, Pixel, Ppu};
 
 #[derive(Debug)]
 enum State {
@@ -10,19 +12,20 @@ enum State {
     DataLow,
     DataHigh,
     Sleep,
-    Push
+    Push,
 }
 
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum Mode {
     Bg,
     Window,
-    Sprite(Sprite, u8)
+    Sprite(Sprite, u8),
 }
 
 pub struct Fetcher {
     clock: u8,
     x: u8,
+    ly: u8,
     attrs: Attributes,
     tile: u16,
     mode: Mode,
@@ -33,17 +36,18 @@ pub struct Fetcher {
 }
 
 impl Fetcher {
-    pub fn new() -> Self {
+    pub fn new(ly: u8) -> Self {
         Fetcher {
             clock: 0,
             state: State::Tile,
             x: 0,
+            ly,
             attrs: Attributes::default(),
             tile: 0,
             mode: Mode::Bg,
             prev: Mode::Bg,
             low: None,
-            high: None
+            high: None,
         }
     }
 
@@ -53,11 +57,11 @@ impl Fetcher {
             self.state = State::Tile;
             changed = true;
         }
-        if let Mode::Sprite(Sprite { tile, flags, .. }, .. ) = mode {
+        if let Mode::Sprite(Sprite { tile, flags, .. }, ..) = mode {
             self.tile = tile as u16;
             self.state = State::DataLow;
             self.attrs = Attributes(flags);
-            if let Mode::Sprite(..) = self.mode { } else { self.prev = self.mode };
+            if let Mode::Sprite(..) = self.mode {} else { self.prev = self.mode };
         }
         self.mode = mode;
         changed
@@ -79,7 +83,7 @@ impl Fetcher {
         let scy = io.io(IO::SCY).value();
         let lcdc = io.io(IO::LCDC).value();
         let (offset, y, x) = match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
-            (false, n , _) => (n, ly.wrapping_add(scy) as u16 / 8, (self.x + scx / 8) & 0x1F), //bg tile (LCDC.3)
+            (false, n, _) => (n, ly.wrapping_add(scy) as u16 / 8, (self.x + scx / 8) & 0x1F), //bg tile (LCDC.3)
             (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6) TODO INVESTIGATE THIS, IT STINKS (self.x)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
@@ -92,20 +96,18 @@ impl Fetcher {
 
     fn get_tile_data(&self, ppu: &Ppu, io: &IORegs, high: bool) -> u8 {
         let scy = io.io(IO::SCY).value();
-        let ly = io.io(IO::LY).value();
-        let lcdc = io.io(IO::LCDC).value();
         let (wrap, tile) = if let Mode::Sprite(..) = self.mode {
-            if lcdc.obj_tall() { (0xF, self.tile & 0xFE)  } else { (0x7, self.tile) }
+            if ppu.lcdc.obj_tall() { (0xF, self.tile & 0xFE) } else { (0x7, self.tile) }
         } else { (0x7, self.tile) };
         let y = (match self.mode {
-            Mode::Bg => ly.wrapping_add(scy),
+            Mode::Bg => self.ly.wrapping_add(scy),
             Mode::Window => ppu.win.y,
-            Mode::Sprite(s, ..) => ly.wrapping_sub(s.y),
+            Mode::Sprite(s, ..) => self.ly.wrapping_sub(s.y),
         } & wrap) as u16;
         let y = if self.attrs.flip_y() { wrap as u16 - y } else { y };
         let addr = (match self.mode {
-            Mode::Bg | Mode::Window => !(!lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
-            Mode::Sprite( .. ) => 0
+            Mode::Bg | Mode::Window => !(!ppu.lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
+            Mode::Sprite(..) => 0
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
         ppu.vram().get(Source::Ppu, |v| v.read_bank(addr, self.attrs.bank()))
     }
@@ -120,7 +122,7 @@ impl Fetcher {
         State::DataHigh
     }
 
-    fn data_high(&mut self, ppu: &Ppu, io: &IORegs,  fifo: &mut BgFifo, oam: &mut ObjFifo) -> State {
+    fn data_high(&mut self, ppu: &Ppu, io: &IORegs, fifo: &mut BgFifo, oam: &mut ObjFifo) -> State {
         if self.clock == 0 {
             self.clock = 1;
             return State::DataHigh;
@@ -130,7 +132,7 @@ impl Fetcher {
         match self.push(ppu, io, fifo, oam) {
             State::Push => State::Sleep,
             State::Tile => State::Tile,
-            _ =>unreachable!()
+            _ => unreachable!()
         }
     }
 
@@ -145,7 +147,7 @@ impl Fetcher {
             if let Mode::Sprite(sp, n) = self.mode {
                 let s = 8u8.saturating_sub(sp.x) as usize;
                 colors.rotate_left(s);
-                colors[8-s..].iter_mut().for_each(|x| *x = 0);
+                colors[8 - s..].iter_mut().for_each(|x| *x = 0);
                 oam.merge(colors.iter().map(|x| Pixel::sprite(*x, n, self.attrs)));
                 self.set_mode(self.prev);
                 bg.enable();
@@ -156,7 +158,7 @@ impl Fetcher {
             } else {
                 self.low = Some(low);
                 self.high = Some(high);
-                return State::Push
+                return State::Push;
             }
         }
         State::Tile

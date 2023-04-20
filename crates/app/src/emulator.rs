@@ -7,12 +7,12 @@ use bus::Devices;
 use mem::{Oam, Vram};
 use serial::com::Serial;
 use serial::Link;
+use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
 use shared::cpu::Bus;
 use shared::emulator::{ReadAccess, Schedule};
 use shared::emulator::BusWrapper;
-use shared::Events;
 use shared::input::{Keybindings, KeyCat, Shortcut};
 use shared::mem::{IOBus, MBCController};
 use shared::rom::Rom;
@@ -76,6 +76,8 @@ pub struct Emulator {
 }
 
 impl Emulator {
+    const AUTOSAVE_CHECK: usize = Console::CLOCK_PER_SECOND as usize * 10;
+
     pub fn new(proxy: Proxy, conf: AppConfig) -> Self {
         let link = Link::new();
         let port = link.port;
@@ -127,9 +129,18 @@ impl Emulator {
                 breakpoints: &mut self.breakpoints,
                 sound: &mut self.audio_settings,
             });
-            if self.settings.autosave && self.timer.elapsed().as_secs() > self.settings.timer {
-                self.timer = Instant::now();
-                self.console.bus.save(true);
+            if self.settings.autosave {
+                static mut CYCLES: usize = 0;
+                if unsafe {
+                    CYCLES += 1;
+                    if CYCLES > Emulator::AUTOSAVE_CHECK {
+                        CYCLES = 0;
+                        true
+                    } else { false }
+                } && self.timer.elapsed().as_secs() > self.settings.timer {
+                    self.timer = Instant::now();
+                    self.console.bus.save(true);
+                }
             }
         }
     }
@@ -198,7 +209,10 @@ impl Render for Screen {
             }
             Event::UserEvent(Events::Press(KeyCat::Game(key))) => {
                 match key {
-                    Shortcut::Quit => emu.stop(false),
+                    Shortcut::Quit => {
+                        emu.stop(false);
+                        emu.proxy.send_event(Events::Close(Handle::Game)).ok();
+                    }
                     Shortcut::Save => emu.console.bus.save(false),
                     Shortcut::SpeedUp => emu.speedup(),
                     Shortcut::SpeedDown => emu.speeddown(),
@@ -206,10 +220,6 @@ impl Render for Screen {
             }
             e => emu.bindings.update(&mut emu.console.gb.joy, e, emu.console.bus.io_regs()),
         }
-    }
-
-    fn should_redraw(&self, emu: &mut Emulator) -> bool {
-        emu.console.gb.lcd.request()
     }
 }
 
@@ -246,7 +256,7 @@ impl Schedule for Emulator {
     fn speed(&self) -> i32 { self.console.speed }
     fn speedup(&mut self) {
         let speed = self.console.speed + 1;
-        if speed <= 5 { self.console.set_speed(speed); }
+        if speed <= 10 { self.console.set_speed(speed); }
     }
 
     fn speeddown(&mut self) {
@@ -290,7 +300,7 @@ impl Console {
     fn speed_mult(&self) -> f64 {
         match self.speed {
             0 => 1.,
-            n @ 1..=5 => 1. / (1. + 0.2 * n as f64),
+            n @ 1..=10 => 1. / (1. + 0.2 * n as f64),
             n if n < 0 => (1 << -n) as f64,
             _ => unimplemented!()
         }

@@ -197,7 +197,8 @@ impl Keybindings {
                     VirtualKeyCode::LAlt | VirtualKeyCode::RAlt => mods.remove(ModifiersState::ALT),
                     _ => {}
                 }
-                if let Some(&cat) = self.bindings.get(&Input::Keyboard(*input, mods)) {
+                if let Some(&cat) = self.bindings.get(&Input::Keyboard(*input, mods))
+                    .or_else(|| self.bindings.get(&Input::Keyboard(*input, ModifiersState::empty()))) {
                     proxy.send_event(if state == &ElementState::Pressed { Events::Press(cat) } else { Events::Release(cat) }).ok();
                     self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
                 }

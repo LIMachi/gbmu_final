@@ -52,7 +52,8 @@ pub enum Events {
     AudioSwitch,
     Press(KeyCat),
     Release(KeyCat),
-    Close,
+    Close(Handle),
+    Quit,
 }
 
 pub enum Target {

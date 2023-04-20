@@ -14,14 +14,14 @@ impl Joypad {
 
     pub fn update(&mut self, io: &mut IORegs) {
         let joy = io.io_mut(IO::JOYP);
-        let p = joy.value() & 0xF;
-        let mut v = 0;
         let p4 = joy.bit(4);
         let p5 = joy.bit(5);
-        if p4 != 0 { v |= self.state >> 4; }
-        if p5 != 0 { v |= self.state & 0xF; }
+        let dir = if p4 == 0 { self.state >> 4 } else { 0 };
+        let act = if p5 == 0 { self.state & 0xF } else { 0 };
+        let p = joy.value() & 0xF;
+        let v = 0xF ^ (dir | act);
         let int = (p ^ v) & p != 0;
-        joy.direct_write(v | (p4 << 4) | (p5 << 5));
+        joy.direct_write((p4 << 4) | (p5 << 5) | v);
         if int { io.int_set(4); }
     }
 }

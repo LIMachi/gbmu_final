@@ -51,7 +51,7 @@ impl Windows {
             Event::WindowEvent { event: WindowEvent::CloseRequested, window_id } => {
                 if let Some((&h, &_id)) = self.handles.iter().find(|(_, v)| v == &window_id) {
                     if self.windows.contains_key(window_id) && self.windows.len() == 1 || h == Handle::Main {
-                        self.proxy.send_event(Events::Close).ok();
+                        self.proxy.send_event(Events::Quit).ok();
                         flow.set_exit();
                     } else {
                         self.handles.remove(&h);
@@ -89,5 +89,11 @@ impl Windows {
 
         self.handles.insert(handle, id);
         self.windows.insert(id, ctx);
+    }
+
+    pub fn close(&mut self, handle: Handle) {
+        if let Some(id) = self.handles.remove(&handle) {
+            self.windows.remove(&id);
+        }
     }
 }

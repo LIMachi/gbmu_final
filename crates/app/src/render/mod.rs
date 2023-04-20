@@ -38,7 +38,6 @@ pub trait Render {
     fn render(&mut self, emu: &mut Emulator);
     fn resize(&mut self, w: u32, h: u32, emu: &mut Emulator);
     fn handle(&mut self, event: &Event, window: &Window, emu: &mut Emulator);
-    fn should_redraw(&self, _: &mut Emulator) -> bool { true }
 }
 
 pub struct WindowType(Handle);

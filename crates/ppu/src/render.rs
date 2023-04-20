@@ -159,6 +159,4 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
                     .with_tab(Tabs::Tilemap, tilemap::Tilemap(self))
                     .response());
     }
-
-    fn handle(&mut self, _event: &shared::Event, _emu: &mut E) {}
 }

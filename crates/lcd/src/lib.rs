@@ -1,27 +1,36 @@
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
+
 use shared::io::IORegs;
 use shared::winit as winit;
 
-#[derive(Default)]
 pub struct Lcd {
     enabled: bool,
     refresh: bool,
-    pixels: Option<Pixels>
+    frame: Vec<u8>,
+    pixels: Option<Pixels>,
+}
+
+impl Default for Lcd {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            refresh: false,
+            frame: vec![0; (4 * Lcd::WIDTH * Lcd::HEIGHT) as usize],
+            pixels: None,
+        }
+    }
 }
 
 impl LCD for Lcd {
     fn set(&mut self, x: usize, y: usize, color: [u8; 3]) {
         if !self.enabled {
-            return ;
+            return;
         }
-        if let Some(pixels) = self.pixels.as_mut() {
-            let frame = pixels.get_frame_mut();
-            let f = (Lcd::WIDTH * 4) as usize;
-            frame[x * 4 + 0 + y * f] = color[0];
-            frame[x * 4 + 1 + y * f] = color[1];
-            frame[x * 4 + 2 + y * f] = color[2];
-            frame[x * 4 + 3 + y * f] = 0xFF;
-        }
+        let f = (Lcd::WIDTH * 4) as usize;
+        self.frame[x * 4 + 0 + y * f] = color[0];
+        self.frame[x * 4 + 1 + y * f] = color[1];
+        self.frame[x * 4 + 2 + y * f] = color[2];
+        self.frame[x * 4 + 3 + y * f] = 0xFF;
     }
 
     fn enable(&mut self) {
@@ -40,7 +49,12 @@ impl LCD for Lcd {
     }
 
     fn vblank(&mut self) {
-        self.refresh = true;
+        if let Some(pixels) = self.pixels.as_mut() {
+            pixels.get_frame_mut()
+                .iter_mut()
+                .zip(self.frame.iter_mut())
+                .for_each(|(d, s)| *d = *s);
+        }
     }
 }
 
@@ -51,7 +65,9 @@ impl Lcd {
     pub fn init(&mut self, window: &winit::window::Window) {
         let sz = window.inner_size();
         let surf = SurfaceTexture::new(sz.width, sz.height, window);
-        self.pixels.replace( PixelsBuilder::new(Lcd::WIDTH, Lcd::HEIGHT, surf).build().unwrap());
+        let pixels = PixelsBuilder::new(Lcd::WIDTH, Lcd::HEIGHT, surf)
+            .enable_vsync(false).build().unwrap();
+        self.pixels.replace(pixels);
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -60,16 +76,8 @@ impl Lcd {
         }
     }
 
-    pub fn request(&mut self) -> bool {
-        let req = self.refresh;
-        self.refresh = false;
-        req
-    }
-
     pub fn render(&mut self) {
-        if let Some(pixels) = self.pixels.as_mut() {
-            pixels.render().ok();
-        }
+        if let Some(pixels) = self.pixels.as_mut() { pixels.render().ok(); }
     }
 }
 

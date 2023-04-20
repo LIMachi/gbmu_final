@@ -65,6 +65,9 @@ impl App {
                     self.open(handle, target);
                 }
             }
+            Event::UserEvent(Events::Close(handle)) => {
+                self.windows.close(*handle);
+            }
             _ => {}
         }
         self.windows.handle_events(event, flow, &mut self.emu);
@@ -80,7 +83,7 @@ impl App {
                     handler(&mut self);
                     self.windows.update(&mut self.emu);
                 }
-                Event::UserEvent(Events::Close) => {
+                Event::UserEvent(Events::Quit) => {
                     self.emu.stop(true);
                     let conf = AppConfig {
                         sound_device: self.emu.audio.config(),

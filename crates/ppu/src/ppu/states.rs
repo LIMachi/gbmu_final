@@ -100,7 +100,7 @@ impl TransferState {
             lx: 0,
             ly,
             scx,
-            fetcher: Fetcher::new(),
+            fetcher: Fetcher::new(ly),
             bg: BgFifo::new(),
             oam: ObjFifo::new(io.io(IO::OPRI).bit(0) != 0),
         }
