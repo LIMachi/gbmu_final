@@ -8,6 +8,7 @@ use winit::event::{ButtonId, DeviceEvent, ElementState, Event, KeyboardInput, Mo
 use winit::event_loop::EventLoopProxy;
 
 use crate::Events;
+use crate::io::IORegs;
 
 #[derive(Serialize, Deserialize, Hash, Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
@@ -203,10 +204,10 @@ impl Keybindings {
         }
     }
 
-    pub fn update(&mut self, joypad: &mut impl Joypad, event: &Event<Events>) {
+    pub fn update(&mut self, joypad: &mut impl Joypad, event: &Event<Events>, io: &mut IORegs) {
         match event {
-            Event::UserEvent(Events::Press(key @ KeyCat::Joy(..))) => joypad.update(*key, true),
-            Event::UserEvent(Events::Release(key @ KeyCat::Joy(..))) => joypad.update(*key, false),
+            Event::UserEvent(Events::Press(key @ KeyCat::Joy(..))) => joypad.update(*key, true, io),
+            Event::UserEvent(Events::Release(key @ KeyCat::Joy(..))) => joypad.update(*key, false, io),
             _ => {}
         }
     }
@@ -234,5 +235,5 @@ impl Keybindings {
 }
 
 pub trait Joypad {
-    fn update(&mut self, key: KeyCat, pressed: bool);
+    fn update(&mut self, key: KeyCat, pressed: bool, io: &mut IORegs);
 }

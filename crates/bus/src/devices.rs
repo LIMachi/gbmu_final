@@ -90,6 +90,7 @@ impl Devices {
             self.hdma.write(io, v, bus);
             self.apu.write(io, v, bus);
             self.serial.write(io, v, bus);
+            self.joy.write(io, v, bus);
         }
     }
 }

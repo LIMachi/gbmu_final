@@ -124,7 +124,6 @@ impl Bus {
             self.mbc.inner_mut().tick();
             self.clock = 0;
         } else { self.clock += 1; }
-        devices.joy.tick(&mut self.io);
 
         let ds = self.io.io(IO::KEY1).bit(7) != 0;
         self.status = match self.status {

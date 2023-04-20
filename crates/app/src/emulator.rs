@@ -204,8 +204,7 @@ impl Render for Screen {
                     Shortcut::SpeedDown => emu.speeddown(),
                 }
             }
-            e => emu.bindings.update(&mut emu.console.gb.joy, e),
-            _ => {}
+            e => emu.bindings.update(&mut emu.console.gb.joy, e, emu.console.bus.io_regs()),
         }
     }
 
