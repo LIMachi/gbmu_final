@@ -189,7 +189,14 @@ impl Keybindings {
                     input: KeyboardInput { virtual_keycode: Some(input), state, .. }, ..
                 }, ..
             } => {
-                if let Some(&cat) = self.bindings.get(&Input::Keyboard(*input, self.modifiers)) {
+                let mut mods = self.modifiers;
+                match input {
+                    VirtualKeyCode::LShift | VirtualKeyCode::RShift => mods.remove(ModifiersState::SHIFT),
+                    VirtualKeyCode::LControl | VirtualKeyCode::RControl => mods.remove(ModifiersState::CTRL),
+                    VirtualKeyCode::LAlt | VirtualKeyCode::RAlt => mods.remove(ModifiersState::ALT),
+                    _ => {}
+                }
+                if let Some(&cat) = self.bindings.get(&Input::Keyboard(*input, mods)) {
                     proxy.send_event(if state == &ElementState::Pressed { Events::Press(cat) } else { Events::Release(cat) }).ok();
                     self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
                 }
@@ -218,7 +225,6 @@ impl Keybindings {
                     input: KeyboardInput { virtual_keycode: Some(input), state, .. }, ..
                 }, ..
             }) if state == &ElementState::Released => {
-                log::info!("binding to {input:?}, modifiers: {:?}", self.modifiers);
                 self.set(key, Input::Keyboard(*input, self.modifiers));
                 true
             }

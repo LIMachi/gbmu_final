@@ -13,3 +13,5 @@ roms/lsdj9_3_9.gb
 
 perf.data*
 flamegraph*
+*.bak
+*.autosav
