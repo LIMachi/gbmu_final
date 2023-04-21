@@ -81,8 +81,10 @@ impl Port {
         }
 
         if let Some(o) = self.cable.recv() {
-            log::info!("recv {o:#02X}");
+            log::info!("recv {o:#02X}, took {}", self.cycles);
             self.data = Some(o);
+        } else if self.ready {
+            self.cycles += 1;
         }
         if self.ready && self.data.is_some() {
             if io.io(IO::SC).bit(0) == 0 {
@@ -109,6 +111,7 @@ impl IODevice for Port {
             log::info!("sending {v:#02X}");
             self.cable.send(v);
             self.ready = true;
+            self.cycles = 0;
         }
         if io == IO::SB { self.ready = true; }
     }
