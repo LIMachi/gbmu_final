@@ -44,6 +44,9 @@ impl Link {
 
 pub struct Port {
     cable: Serial,
+    ready: bool,
+    timer: u8,
+    recv: Option<u8>,
 }
 
 impl Default for Port {
@@ -52,7 +55,7 @@ impl Default for Port {
 
 impl Port {
     pub fn new(cable: Serial) -> Self {
-        Self { cable }
+        Self { cable, recv: None, timer: 0, ready: false }
     }
 
     pub fn link(&mut self) -> &mut Serial { &mut self.cable }
@@ -75,13 +78,23 @@ impl Port {
                 }
             }
         }
-        if let Some(o) = self.cable.recv() {
+        if let Some(o) = self.cable.recv() { self.recv = Some(o); }
+        if !self.ready && self.recv.is_some() {
+            self.timer += 1;
+            if self.timer == 128 {
+                self.timer = 0;
+                self.ready = true;
+            } else { return; }
+        };
+        if let Some(o) = self.recv.take() {
             log::info!("recv {o:02X}");
             if io.io(IO::SC).bit(0) == 0 {
                 let v = io.io(IO::SB).value();
                 log::info!("sending back {v:02X}");
                 self.cable.send(v);
             }
+            self.ready = false;
+            self.timer = 0;
             io.io_mut(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(o);
             io.int_set(3);
@@ -101,6 +114,7 @@ impl IODevice for Port {
         }
         if io == IO::SB {
             log::info!("serial data {:#02X}", v);
+            self.ready = true;
         }
     }
 }
