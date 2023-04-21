@@ -56,7 +56,7 @@ impl Default for Port {
 
 impl Port {
     pub fn new(cable: Serial) -> Self {
-        Self { cable, recv: None, timer: 0, ready: false }
+        Self { send: None, cable, recv: None, timer: 0, ready: false }
     }
 
     pub fn link(&mut self) -> &mut Serial { &mut self.cable }
