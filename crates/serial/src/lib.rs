@@ -45,7 +45,7 @@ impl Link {
 pub struct Port {
     cable: Serial,
     ready: bool,
-    timer: u8,
+    timer: usize,
     recv: Option<u8>,
     send: Option<u8>,
 }
@@ -79,23 +79,19 @@ impl Port {
                 }
             }
         }
-        if let Some(o) = self.send {
-            self.timer += 1;
-            if self.timer >= 128 {
-                self.cable.send(o);
-                self.send.take();
-            }
-        }
         if let Some(o) = self.cable.recv() {
-            log::info!("recv {o:02X}");
+            log::info!("recv {o:#02X}");
+            self.recv = Some(o);
+        }
+        if self.recv.is_some() && self.ready {
             if io.io(IO::SC).bit(0) == 0 {
                 let v = io.io(IO::SB).value();
-                log::info!("sending back {v:02X}");
+                log::info!("sending back {v:#02X}");
                 self.cable.send(v);
             }
-            self.timer = 0;
+            self.ready = false;
             io.io_mut(IO::SC).reset(7);
-            io.io_mut(IO::SB).direct_write(o);
+            io.io_mut(IO::SB).direct_write(self.recv.take().unwrap());
             io.int_set(3);
         }
     }
@@ -109,10 +105,11 @@ impl IODevice for Port {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
         if io == IO::SC && v & 0x81 == 0x81 {
             log::info!("starting exchange");
-            self.send = Some(bus.io(IO::SB).value());
+            self.cable.send(bus.io(IO::SB).value());
             self.timer = 0;
         }
         if io == IO::SB {
+            self.ready = true;
             log::info!("serial data {:#02X}", v);
         }
     }
