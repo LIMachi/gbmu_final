@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use serde::{Deserialize, Serialize};
+
 pub mod image;
 pub mod clock;
 pub mod rtc;
@@ -39,4 +41,3 @@ impl FEdge {
         r
     }
 }
-

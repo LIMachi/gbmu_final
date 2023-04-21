@@ -16,6 +16,7 @@ use shared::emulator::BusWrapper;
 use shared::input::{Keybindings, KeyCat, Shortcut};
 use shared::mem::{IOBus, MBCController};
 use shared::rom::Rom;
+use shared::utils::clock::Clock;
 use shared::utils::palette::Palette;
 use shared::winit::window::Window;
 
@@ -73,6 +74,7 @@ pub struct Emulator {
     pub link: Link,
     pub link_port: u16,
     pub timer: Instant,
+    clock: Clock,
 }
 
 impl Emulator {
@@ -95,6 +97,7 @@ impl Emulator {
             cgb: conf.mode,
             bios: conf.bios,
             timer: Instant::now(),
+            clock: Clock::new(4),
         };
         emu.bindings.init();
         emu
@@ -123,8 +126,9 @@ impl Emulator {
         }
     }
 
-    pub fn cycle(&mut self, clock: u8) {
+    pub fn cycle(&mut self) {
         if self.is_running() {
+            let clock = self.clock.tick();
             self.console.cycle(clock, bus::Settings {
                 breakpoints: &mut self.breakpoints,
                 sound: &mut self.audio_settings,

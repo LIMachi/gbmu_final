@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
+use shared::{mem::*, rom::{Mbc as Mbcs, Rom}, rom};
 
 use crate::boot::Boot;
 
@@ -39,6 +39,7 @@ impl MemoryController for Unplugged {
 }
 
 pub struct Controller {
+    header: shared::rom::Header,
     sav: Option<PathBuf>,
     inner: Box<dyn Mbc>,
 }
@@ -76,6 +77,7 @@ impl Controller {
         Self {
             sav,
             inner,
+            header: rom.header.clone(),
         }
     }
 
@@ -104,7 +106,7 @@ impl Controller {
     }
 
     pub fn unplugged() -> Self {
-        Self { sav: None, inner: Box::new(Unplugged {}) }
+        Self { sav: None, header: rom::Header::default(), inner: Box::new(Unplugged {}) }
     }
 }
 

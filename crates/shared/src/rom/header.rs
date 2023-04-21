@@ -10,6 +10,10 @@ pub enum Console {
     Other(u8),
 }
 
+impl Default for Console {
+    fn default() -> Self { Console::DMG }
+}
+
 impl Console {
     pub fn cgb_mode(&self, on_gbc: bool) -> bool {
         on_gbc && matches!(self, Console::GBC | Console::All)
@@ -32,6 +36,10 @@ pub enum Gameboy {
     DMG,
     Super,
     Other,
+}
+
+impl Default for Gameboy {
+    fn default() -> Self { Self::DMG }
 }
 
 impl From<u8> for Gameboy {
@@ -60,6 +68,10 @@ mod capability {
 }
 
 pub struct Capabilities(u8);
+
+impl Default for Capabilities {
+    fn default() -> Self { Self(capability::NONE) }
+}
 
 impl Capabilities {
     pub fn ram(&self) -> bool {
@@ -111,6 +123,11 @@ pub enum Cartridge {
     UNSUPPORTED,
 }
 
+impl Default for Cartridge {
+    fn default() -> Self { Cartridge::Rom }
+}
+
+
 pub enum Mbc {
     MBC0,
     MBC1,
@@ -118,6 +135,10 @@ pub enum Mbc {
     MBC3,
     MBC5,
     Unknown,
+}
+
+impl Default for Mbc {
+    fn default() -> Self { Mbc::MBC0 }
 }
 
 impl Cartridge {
@@ -209,10 +230,10 @@ impl From<u8> for Cartridge {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct RomSize(u8);
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct RamSize(u8);
 
 impl RomSize {
@@ -260,7 +281,7 @@ impl RamSize {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Header {
     pub logo: Vec<u8>,
     pub title: String,

@@ -9,7 +9,7 @@ use winit::event_loop::EventLoopBuilder;
 
 use render::windows::Windows;
 use shared::{Events, Handle};
-use shared::utils::clock::{Chrono, Clock};
+use shared::utils::clock::Chrono;
 
 use crate::app::{AppConfig, DbgConfig};
 use crate::render::{Event, EventLoop, Proxy};
@@ -117,7 +117,6 @@ fn main() {
     let mut current = std::time::Instant::now();
     let mut acc = 0.0;
     let mut cycles = 0;
-    let mut clock = Clock::new(4);
     let mut run = false;
     let mut dt = Duration::from_secs(0);
     app.create(Handle::Main)
@@ -130,7 +129,7 @@ fn main() {
                     let cy = app.emu.cycle_time();
                     while acc >= cy {
                         cycles += 1;
-                        app.emu.cycle(clock.tick());
+                        app.emu.cycle();
                         acc -= cy;
                     }
                     dt += current.elapsed();

@@ -1,11 +1,12 @@
 use std::fs::File;
-use std::path::{Path, PathBuf};
 use std::io::{Read, Result};
+use std::path::{Path, PathBuf};
+
+pub use header::{Capabilities, Header, Mbc};
+
+use crate::utils::image::RawData;
 
 mod header;
-
-pub use header::{Capabilities, Mbc};
-use crate::utils::image::RawData;
 
 #[derive(Debug, Clone)]
 pub struct Rom {
@@ -33,7 +34,7 @@ impl Rom {
             header: h,
             content: v,
             cover: None,
-            raw: None
+            raw: None,
         })
     }
 

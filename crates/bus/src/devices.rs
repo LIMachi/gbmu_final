@@ -99,3 +99,24 @@ pub struct Settings<'a> {
     pub breakpoints: &'a mut Breakpoints,
     pub sound: &'a mut AudioSettings,
 }
+//
+// #[derive(Serialize, Deserialize)]
+// struct DevicesState {
+//     cpu: <cpu::Cpu as shared::emulator::State>::Storage,
+// }
+//
+// impl shared::emulator::State for Devices {
+//     type Storage = DevicesState;
+//
+//     fn load_state(data: shared::emulator::Storage, ctx: &mut impl Emulator) -> Self {
+//         Self {
+//             cpu: Cpu::load_state(data.cpu, ctx)
+//         }
+//     }
+//
+//     fn save_state(&self) -> shared::emulator::Storage {
+//         Self {
+//             cpu: self.cpu.save_state()
+//         }
+//     }
+// }

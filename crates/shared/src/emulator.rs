@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use super::breakpoints::Breakpoints;
 use super::cpu::{self, Reg, Value};
 use super::mem::{IOBus, MBCController};
@@ -30,4 +32,11 @@ pub trait ReadAccess {
     fn get_range(&self, st: u16, len: u16) -> Vec<u8>;
     fn bus(&self) -> Box<&dyn Bus>;
     fn mbc(&self) -> Box<&dyn MBCController>;
+}
+
+pub trait State {
+    type Storage: Serialize + for<'a> Deserialize<'a> + Sized;
+
+    fn load_state(data: <Self as State>::Storage, ctx: &mut impl Emulator) -> Self;
+    fn save_state(&self) -> <Self as State>::Storage;
 }

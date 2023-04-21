@@ -76,8 +76,11 @@ impl Port {
             }
         }
         if let Some(o) = self.cable.recv() {
+            log::info!("recv {o:02X}");
             if io.io(IO::SC).bit(0) == 0 {
-                self.cable.send(io.io(IO::SB).value());
+                let v = io.io(IO::SB).value();
+                log::info!("sending back {v:02X}");
+                self.cable.send(v);
             }
             io.io_mut(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(o);
@@ -93,7 +96,11 @@ impl Port {
 impl IODevice for Port {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
         if io == IO::SC && v & 0x81 == 0x81 {
+            log::info!("starting exchange");
             self.cable.send(bus.io(IO::SB).value());
+        }
+        if io == IO::SB {
+            log::info!("serial data {:#02X}", v);
         }
     }
 }
