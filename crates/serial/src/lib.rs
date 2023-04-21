@@ -78,13 +78,13 @@ impl Port {
                 }
             }
         }
-        if let Some(o) = self.cable.recv() { self.recv = Some(o); }
-        if !self.ready && self.recv.is_some() {
-            self.timer += 1;
-            if self.timer == 128 {
-                self.timer = 0;
-                self.ready = true;
-            } else { return; }
+        if let Some(o) = self.cable.recv() {
+            log::info!("received data");
+            self.recv = Some(o);
+        }
+        if self.recv.is_some() && !self.ready {
+            log::warn!("data in pipe but not ready yet !");
+            return;
         };
         if let Some(o) = self.recv.take() {
             log::info!("recv {o:02X}");
@@ -111,6 +111,7 @@ impl IODevice for Port {
         if io == IO::SC && v & 0x81 == 0x81 {
             log::info!("starting exchange");
             self.cable.send(bus.io(IO::SB).value());
+            self.ready = true;
         }
         if io == IO::SB {
             log::info!("serial data {:#02X}", v);
