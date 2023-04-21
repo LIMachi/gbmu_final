@@ -131,7 +131,7 @@ impl State for TransferState {
                     .unwrap_or_else(|| Sprite::unavailable());
                 if sprite.screen_x() == self.lx || (sprite.x != 0 && sprite.x < 8 && self.lx == 0) {
                     self.sprite = Some(i);
-                    self.fetcher.set_mode(fetcher::Mode::Sprite(sprite, self.lx));
+                    self.fetcher.set_mode(fetcher::Mode::Sprite(sprite, i as u8));
                     self.bg.disable();
                     break;
                 }

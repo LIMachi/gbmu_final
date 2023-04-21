@@ -38,13 +38,13 @@ impl Pixel {
     }
 
     /// sprite priority mix
-    pub fn mix(&mut self, rhs: Pixel, opri: bool) {
+    pub fn mix(&mut self, rhs: Pixel, oam_priority: bool) {
         *self = match (self.color, rhs.color, self.index, rhs.index) {
             (_, _, None, Some(_)) => rhs,
             (_, _, Some(_), None) => *self,
             (_, 0, ..) => *self,
             (0, ..) => rhs,
-            (_, _, Some(x1), Some(x2)) if !opri && x1 > x2 => rhs,
+            (_, _, Some(x1), Some(x2)) if oam_priority && x1 > x2 => rhs,
             _ => *self,
         }
     }

@@ -25,13 +25,14 @@ impl ObjFifo {
     }
 
     pub fn merge(&mut self, data: impl Iterator<Item=Pixel>) -> bool {
+        let same_x = self.inner.len() == 8;
         for _ in self.inner.len()..8 {
             self.inner.push_back(Pixel::bg(0, Attributes::default()));
         }
         self.inner
             .iter_mut()
             .zip(data)
-            .for_each(|(obj, p)| { obj.mix(p, self.opri); });
+            .for_each(|(obj, p)| { obj.mix(p, same_x || !self.opri); });
         true
     }
 }

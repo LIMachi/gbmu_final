@@ -38,18 +38,21 @@ impl IORegs {
             self.io_mut(IO::BCPD).direct_write(0).set_access(IORegs::DISABLED);
             self.io_mut(IO::SVBK).direct_write(0).set_access(IORegs::DISABLED);
             self.io_mut(IO::VBK).direct_write(0).set_access(IORegs::DISABLED);
-            self.io_mut(IO::OPRI).direct_write(0xFF).set_access(IORegs::DISABLED);
         }
     }
 
     pub fn post(&mut self) {
-        log::info!("compat mode: {:#04X}", self.io(IO::KEY0).value());
         self.io_mut(IO::POST).set_access(IORegs::DISABLED);
         self.io_mut(IO::KEY0).set_access(IORegs::DISABLED);
+        self.io_mut(IO::OPRI).set_access(IORegs::DISABLED);
     }
 
-    pub fn skip_boot(&mut self, console: u8) {
-        self.set(IO::KEY0, console);
+    pub fn skip_boot(&mut self, mut console: u8) {
+        log::info!("DMG compat mode: {:#02X}", console);
+        if console & 0x80 == 0 {
+            self.set(IO::KEY0, DMG_MODE);
+            self.set(IO::OPRI, 0x1);
+        }
         self.set(IO::POST, 0x1);
         self.set(IO::BGP, 0xFC);
         self.set(IO::OBP0, 0xFF);

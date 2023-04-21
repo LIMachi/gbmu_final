@@ -56,8 +56,7 @@ impl<'a> Builder<'a> {
     pub fn build(self) -> Bus {
         let mut bus = Bus::new(self.cgb, self.palette.unwrap_or(Palette::GrayScale))
             .with_mbc(mbc::Controller::new(self.rom, self.cgb));
-        let compat = if self.cgb { self.rom.raw()[0x143] } else { 0 };
-        if self.skip { bus.skip_boot(compat); }
+        if self.skip { bus.skip_boot(self.rom.raw()[0x143]); }
         bus
     }
 }
