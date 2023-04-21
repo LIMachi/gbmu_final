@@ -47,6 +47,7 @@ pub struct Port {
     ready: bool,
     timer: u8,
     recv: Option<u8>,
+    send: Option<u8>,
 }
 
 impl Default for Port {
@@ -66,7 +67,7 @@ impl Port {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        if !self.cable.connected() && io.io(IO::SC).value() & 0x81 == 0x81 {
+        if !self.cable.connected() && io.io(IO::SC).value() & 0x80 == 0x80 {
             let sb = io.io_mut(IO::SB);
             let v = sb.value();
             if v != 0xFF {
@@ -78,22 +79,20 @@ impl Port {
                 }
             }
         }
-        if let Some(o) = self.cable.recv() {
-            log::info!("received data");
-            self.recv = Some(o);
+        if let Some(o) = self.send {
+            self.timer += 1;
+            if self.timer >= 128 {
+                self.cable.send(o);
+                self.send.take();
+            }
         }
-        if self.recv.is_some() && !self.ready {
-            log::warn!("data in pipe but not ready yet !");
-            return;
-        };
-        if let Some(o) = self.recv.take() {
+        if let Some(o) = self.cable.recv() {
             log::info!("recv {o:02X}");
             if io.io(IO::SC).bit(0) == 0 {
                 let v = io.io(IO::SB).value();
                 log::info!("sending back {v:02X}");
                 self.cable.send(v);
             }
-            self.ready = false;
             self.timer = 0;
             io.io_mut(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(o);
@@ -110,12 +109,11 @@ impl IODevice for Port {
     fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
         if io == IO::SC && v & 0x81 == 0x81 {
             log::info!("starting exchange");
-            self.cable.send(bus.io(IO::SB).value());
-            self.ready = true;
+            self.send = Some(bus.io(IO::SB).value());
+            self.timer = 0;
         }
         if io == IO::SB {
             log::info!("serial data {:#02X}", v);
-            self.ready = true;
         }
     }
 }
