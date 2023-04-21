@@ -44,6 +44,7 @@ impl Windows {
     }
 
     pub fn handle_events(&mut self, event: &Event, flow: &mut ControlFlow, emu: &mut Emulator) {
+        emu.bindings.update_inputs(event, &emu.proxy);
         for (_, win) in &mut self.windows {
             win.handle(event, emu);
         }
@@ -65,7 +66,7 @@ impl Windows {
             Event::RedrawRequested(id) => {
                 self.windows.get_mut(&id).unwrap().redraw(emu);
             }
-            e => emu.bindings.update_inputs(e, &self.proxy)
+            _ => {}
         }
     }
 

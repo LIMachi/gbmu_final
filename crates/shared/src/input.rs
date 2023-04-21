@@ -205,6 +205,7 @@ impl Keybindings {
             }
             Event::DeviceEvent { event: DeviceEvent::Button { button, state }, .. } => {
                 if let Some(&cat) = self.bindings.get(&Input::Device(*button)) {
+                    proxy.send_event(if state == &ElementState::Pressed { Events::Press(cat) } else { Events::Release(cat) }).ok();
                     self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
                 }
             }
@@ -232,7 +233,7 @@ impl Keybindings {
             }
             (Some(key), Event::DeviceEvent {
                 event: DeviceEvent::Button { button, state }, ..
-            }) if state == &ElementState::Pressed => {
+            }) if state == &ElementState::Released => {
                 self.set(key, Input::Device(*button));
                 true
             }
