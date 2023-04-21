@@ -83,13 +83,13 @@ impl Port {
         if let Some(o) = self.cable.recv() {
             log::info!("recv {o:#02X}");
             self.data = Some(o);
+        }
+        if self.ready && self.data.is_some() {
             if io.io(IO::SC).bit(0) == 0 {
                 let v = io.io(IO::SB).value();
                 log::info!("sending back {v:#02X}");
                 self.cable.send(v);
             }
-        }
-        if self.ready && self.data.is_some() {
             self.ready = false;
             io.io_mut(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(self.data.take().unwrap());
