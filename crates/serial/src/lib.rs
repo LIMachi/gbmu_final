@@ -1,6 +1,8 @@
 use std::net::Ipv4Addr;
+
 use shared::io::{IO, IODevice, IORegs};
 use shared::mem::IOBus;
+
 use crate::com::Serial;
 
 pub mod com;
@@ -16,7 +18,7 @@ impl Link {
         let port = serial.port;
         Self {
             port,
-            cable: Some(serial)
+            cable: Some(serial),
         }
     }
 
@@ -61,7 +63,7 @@ impl Port {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        if !self.cable.connected() && io.io(IO::SC).bit(0) & 0x81 == 0x81 {
+        if !self.cable.connected() && io.io(IO::SC).value() & 0x81 == 0x81 {
             let sb = io.io_mut(IO::SB);
             let v = sb.value();
             if v != 0xFF {

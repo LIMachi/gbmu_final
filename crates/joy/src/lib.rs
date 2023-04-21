@@ -1,28 +1,18 @@
-use shared::events::*;
-use shared::input::{Keybindings, KeyCat};
-use shared::io::{IO, IORegs};
+use shared::input::KeyCat;
+use shared::io::{IO, IODevice, IORegs};
+use shared::mem::IOBus;
 
 #[derive(Default)]
 pub struct Joypad {
     state: u8,
-    bindings: Keybindings,
 }
 
 impl Joypad {
-    pub fn new(bindings: Keybindings) -> Self {
-        Self { bindings, ..Default::default() }
+    pub fn new() -> Self {
+        Self { state: 0 }
     }
 
-    pub fn handle(&mut self, event: KeyboardInput) {
-        if let Some(keycode) = event.virtual_keycode {
-            if let Some(KeyCat::Joy(key)) = self.bindings.get(keycode) {
-                let mask = 1u8 << (key as u8);
-                self.state = (self.state & !mask) | if event.state == ElementState::Pressed { mask } else { 0 };
-            }
-        }
-    }
-
-    pub fn tick(&mut self, io: &mut IORegs) {
+    pub fn update(&mut self, io: &mut IORegs) {
         let joy = io.io_mut(IO::JOYP);
         let p4 = joy.bit(4);
         let p5 = joy.bit(5);
@@ -33,5 +23,21 @@ impl Joypad {
         let int = (p ^ v) & p != 0;
         joy.direct_write((p4 << 4) | (p5 << 5) | v);
         if int { io.int_set(4); }
+    }
+}
+
+impl shared::input::Joypad for Joypad {
+    fn update(&mut self, key: KeyCat, pressed: bool, io: &mut IORegs) {
+        if let KeyCat::Joy(key) = key {
+            let mask = 1 << (key as u8);
+            self.state = (self.state & !mask) | if pressed { mask } else { 0 };
+            self.update(io);
+        }
+    }
+}
+
+impl IODevice for Joypad {
+    fn write(&mut self, io: IO, _: u8, bus: &mut dyn IOBus) {
+        if io == IO::JOYP { self.update(bus.io_regs()) }
     }
 }

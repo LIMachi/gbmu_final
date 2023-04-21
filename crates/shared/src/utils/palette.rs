@@ -12,7 +12,7 @@ pub enum Palette {
 
 impl PartialEq for Palette {
     fn eq(&self, other: &Self) -> bool {
-        for i in 0..3 {
+        for i in 0..4 {
             if self.color(i) != other.color(i) { return false; }
         }
         true

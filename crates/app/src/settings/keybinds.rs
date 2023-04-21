@@ -1,8 +1,6 @@
-use winit::event::VirtualKeyCode;
-
 use shared::egui;
 use shared::egui::{Align, Button, Response, Ui, Vec2, Widget};
-use shared::input::KeyCat;
+use shared::input::{Input, KeyCat};
 use shared::widgets::section::Section;
 
 use crate::emulator::Emulator;
@@ -10,14 +8,14 @@ use crate::settings::Settings;
 
 struct Keybind<'a> {
     key: KeyCat,
-    bind: Option<VirtualKeyCode>,
+    bind: Option<Input>,
     value: &'a mut Option<KeyCat>,
 }
 
 impl<'a> Keybind<'a> {
     pub fn new(key: KeyCat, settings: &'a mut Settings, emu: &'a mut Emulator) -> Self {
         Self {
-            bind: emu.bindings.has(key),
+            bind: emu.bindings.get(key),
             key,
             value: &mut settings.key,
         }
@@ -31,7 +29,7 @@ impl<'a> egui::Widget for Keybind<'a> {
             ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
                 let button = Button::new(match (&self.value, self.bind) {
                     (Some(v), _) if v == &self.key => "...".to_string(),
-                    (_, Some(keycode)) => format!("{keycode:?}"),
+                    (_, Some(keycode)) => format!("{keycode}"),
                     _ => "Unbound".to_string()
                 }).min_size(Vec2::new(48., 0.));
                 if ui.add(button).clicked() {
@@ -81,10 +79,11 @@ impl<'a> Keybinds<'a> {
 
 impl<'a> Widget for Keybinds<'a> {
     fn ui(self, ui: &mut Ui) -> Response {
-        let res = ui.section("JOYPAD", |ui| {
+        ui.section("JOYPAD", |ui| {
             ui.add(KeybindSection::new(self.settings, self.emu, KeyCat::joypad()))
-        });
-        res | ui.section("DEBUG", |ui| {
+        }) | ui.section("DEBUG", |ui| {
+            ui.add(KeybindSection::new(self.settings, self.emu, KeyCat::debug()))
+        }) | ui.section("SHORTCUT", |ui| {
             ui.add(KeybindSection::new(self.settings, self.emu, KeyCat::shortcuts()))
         })
     }

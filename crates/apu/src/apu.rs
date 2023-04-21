@@ -15,7 +15,7 @@ pub struct Apu {
     div_apu: u8,
     sample: f64,
     sample_rate: u32,
-    base_tick: f64,
+    speed: f64,
     tick: f64,
     input: Input,
     dsg: dsg::DSG,
@@ -31,7 +31,7 @@ impl Default for Apu {
             div_apu: 0,
             sample: 0.,
             sample_rate,
-            base_tick: TICK_RATE / sample_rate as f64,
+            speed: 1.,
             tick: TICK_RATE / sample_rate as f64,
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
@@ -48,7 +48,8 @@ impl Apu {
     }
 
     pub fn set_speed(&mut self, speed: f64) {
-        self.tick = self.base_tick / speed;
+        self.speed = speed;
+        self.tick = (TICK_RATE / self.sample_rate as f64) / speed;
         self.sample = 0.;
     }
 
@@ -64,7 +65,7 @@ impl Apu {
             div_apu: 0,
             sample: 0.,
             sample_rate,
-            base_tick: TICK_RATE / sample_rate as f64,
+            speed: 1.,
             tick: TICK_RATE / sample_rate as f64,
             input,
             dsg: dsg::DSG::new(1.),
@@ -78,7 +79,7 @@ impl Apu {
     pub(crate) fn switch(&mut self, new_rate: u32, input: Input) {
         self.input = input;
         self.sample = 0.;
-        self.base_tick = TICK_RATE / (new_rate as f64);
+        self.tick = TICK_RATE / (new_rate as f64) / self.speed;
         self.sample_rate = new_rate;
         self.dsg.set_charge_factor(self.charge_factor());
     }

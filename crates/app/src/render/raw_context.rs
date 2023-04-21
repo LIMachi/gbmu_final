@@ -1,9 +1,10 @@
 use std::any::Any;
+
 use super::*;
 
 pub struct RawContext<Data: 'static + Render> {
     inner: Data,
-    window: Window
+    window: Window,
 }
 
 impl<Data: 'static + Render + Default> RawContext<Data> {
@@ -26,9 +27,7 @@ impl<Data: 'static + Render> Context<Emulator> for RawContext<Data> {
     }
 
     fn request_redraw(&mut self, emu: &mut Emulator) {
-        if self.inner.should_redraw(emu) {
-            self.window.request_redraw();
-        }
+        self.window.request_redraw();
     }
 
     fn resize(&mut self, physical: PhysicalSize<u32>, emu: &mut Emulator) {

@@ -1,8 +1,5 @@
-use winit::event::VirtualKeyCode;
-
 use super::breakpoints::Breakpoints;
 use super::cpu::{self, Reg, Value};
-use super::input::KeyCat;
 use super::mem::{IOBus, MBCController};
 
 pub trait Emulator: ReadAccess + Schedule {}
@@ -24,7 +21,8 @@ pub trait Schedule {
     fn reset(&mut self);
 
     fn speed(&self) -> i32;
-    fn set_speed(&mut self, speed: i32);
+    fn speedup(&mut self);
+    fn speeddown(&mut self);
 }
 
 pub trait ReadAccess {
@@ -32,5 +30,4 @@ pub trait ReadAccess {
     fn get_range(&self, st: u16, len: u16) -> Vec<u8>;
     fn bus(&self) -> Box<&dyn Bus>;
     fn mbc(&self) -> Box<&dyn MBCController>;
-    fn binding(&self, key: VirtualKeyCode) -> Option<KeyCat>;
 }

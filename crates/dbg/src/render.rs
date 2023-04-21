@@ -9,11 +9,11 @@ use shared::breakpoints::Breakpoint;
 use shared::cpu::{Flags, Opcode, Reg, Value};
 use shared::egui::{Margin, ScrollArea, SidePanel, Vec2};
 use shared::emulator::Bus;
-use shared::input::{KeyCat, Shortcut};
+use shared::input::{Debug, KeyCat};
 use shared::io::IO;
 use shared::utils::convert::Converter;
 use shared::utils::image::ImageLoader;
-use shared::winit::event::{ElementState, KeyboardInput, WindowEvent};
+use shared::winit::event::WindowEvent;
 
 use crate::{Context, Debugger, Texture};
 
@@ -236,14 +236,14 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     let into = egui::ImageButton::new(self.tex(Texture::Into), sz).frame(false);
                                     ui.allocate_ui_with_layout(Vec2::splat(64.), Layout::top_down(Align::Center), |ui| {
                                         let sp = ext.speed();
-                                        if ui.add(egui::Button::new("+")).clicked() { ext.set_speed((sp + 1).min(5)); }
+                                        if ui.add(egui::Button::new("+")).clicked() { ext.speedup(); }
                                         let text = match sp {
                                             0 => egui::Label::new("Normal"),
                                             n @ 1..=5 => egui::Label::new(format!("{}x", 1. + n as f32 / 5.)),
                                             n => egui::Label::new(format!("1/{}", (1 << -n)))
                                         };
                                         ui.add(text);
-                                        if ui.add(egui::Button::new("-")).clicked() { ext.set_speed((sp - 1).max(-15)); }
+                                        if ui.add(egui::Button::new("-")).clicked() { ext.speeddown(); }
                                     });
                                     if ui.add(into).clicked() { ext.step_into(&mut self.disassembly); };
                                     if ui.add(pause).clicked() {
@@ -353,27 +353,12 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
         match event {
             Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
             Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&ext),
-            Event::WindowEvent {
-                event: WindowEvent::KeyboardInput {
-                    input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Released, .. }, ..
-                }, ..
-            } => {
-                self.keys.remove(input);
-            }
-            Event::WindowEvent {
-                event: WindowEvent::KeyboardInput {
-                    input: KeyboardInput { virtual_keycode: Some(input), state: ElementState::Pressed, .. }, ..
-                }, ..
-            } => {
-                if self.keys.contains(input) { return; }
-                self.keys.insert(*input);
-                if let Some(KeyCat::Dbg(key)) = ext.binding(*input) {
-                    match key {
-                        Shortcut::Step => ext.step(&mut self.disassembly),
-                        Shortcut::Run => Debugger::<E>::play(ext, &mut self.disassembly),
-                        Shortcut::Pause => ext.pause(),
-                        Shortcut::Reset => ext.reset()
-                    }
+            Event::UserEvent(Events::Press(KeyCat::Dbg(key))) => {
+                match key {
+                    Debug::Pause => ext.pause(),
+                    Debug::Reset => ext.reset(),
+                    Debug::Step => ext.step(&mut self.disassembly),
+                    Debug::Run => Debugger::play(ext, &mut self.disassembly)
                 }
             }
             _ => {}

@@ -1,17 +1,19 @@
+use std::time::Instant;
+
 use serde::{Deserialize, Serialize};
-use winit::event::{VirtualKeyCode, WindowEvent};
+use winit::event::WindowEvent;
 
 use bus::Devices;
 use mem::{Oam, Vram};
 use serial::com::Serial;
 use serial::Link;
+use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
 use shared::cpu::Bus;
 use shared::emulator::{ReadAccess, Schedule};
 use shared::emulator::BusWrapper;
-use shared::Events;
-use shared::input::{Keybindings, KeyCat};
+use shared::input::{Keybindings, KeyCat, Shortcut};
 use shared::mem::{IOBus, MBCController};
 use shared::rom::Rom;
 use shared::utils::palette::Palette;
@@ -31,12 +33,18 @@ pub struct Console {
     running: bool,
 }
 
+fn autosave_default() -> u64 { 900 }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EmuSettings {
     pub host: String,
     pub port: String,
     #[serde(default)]
     pub palette: Palette,
+    #[serde(default = "autosave_default")]
+    pub timer: u64,
+    #[serde(default)]
+    pub autosave: bool,
 }
 
 impl Default for EmuSettings {
@@ -45,6 +53,8 @@ impl Default for EmuSettings {
             host: "127.0.0.1".to_string(),
             port: "27542".to_string(),
             palette: Palette::GrayScale,
+            timer: 900,
+            autosave: false,
         }
     }
 }
@@ -62,13 +72,16 @@ pub struct Emulator {
     pub bios: bool,
     pub link: Link,
     pub link_port: u16,
+    pub timer: Instant,
 }
 
 impl Emulator {
+    const AUTOSAVE_CHECK: usize = Console::CLOCK_PER_SECOND as usize * 10;
+
     pub fn new(proxy: Proxy, conf: AppConfig) -> Self {
         let link = Link::new();
         let port = link.port;
-        Self {
+        let mut emu = Self {
             link,
             link_port: port,
             proxy,
@@ -81,7 +94,10 @@ impl Emulator {
             breakpoints: Breakpoints::new(conf.debug.breaks),
             cgb: conf.mode,
             bios: conf.bios,
-        }
+            timer: Instant::now(),
+        };
+        emu.bindings.init();
+        emu
     }
 
     pub fn mode(&self) -> Mode { self.cgb }
@@ -108,10 +124,25 @@ impl Emulator {
     }
 
     pub fn cycle(&mut self, clock: u8) {
-        self.console.cycle(clock, bus::Settings {
-            breakpoints: &mut self.breakpoints,
-            sound: &mut self.audio_settings,
-        });
+        if self.is_running() {
+            self.console.cycle(clock, bus::Settings {
+                breakpoints: &mut self.breakpoints,
+                sound: &mut self.audio_settings,
+            });
+            if self.settings.autosave {
+                static mut CYCLES: usize = 0;
+                if unsafe {
+                    CYCLES += 1;
+                    if CYCLES > Emulator::AUTOSAVE_CHECK {
+                        CYCLES = 0;
+                        true
+                    } else { false }
+                } && self.timer.elapsed().as_secs() > self.settings.timer {
+                    self.timer = Instant::now();
+                    self.console.bus.save(true);
+                }
+            }
+        }
     }
 
     pub fn is_running(&self) -> bool { self.console.running }
@@ -134,17 +165,23 @@ impl Emulator {
         self.console.bus.save(false);
         self.console = Console::new(self, rom, running);
         self.proxy.send_event(Events::Reload).ok();
+        self.timer = Instant::now();
     }
 }
 
 #[derive(Default)]
-pub struct Screen;
+pub struct Screen {
+    focus: bool,
+}
 
 impl Render for Screen {
     fn init(&mut self, window: &Window, emu: &mut Emulator) {
         log::info!("init LCD");
         emu.console.gb.lcd.init(window);
+        window.focus_window();
+        self.focus = true;
     }
+
     fn render(&mut self, emu: &mut Emulator) {
         emu.console.gb.lcd.render();
     }
@@ -164,17 +201,25 @@ impl Render for Screen {
             }
             Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); }
             Event::WindowEvent { window_id, event } if window_id == &window.id() => {
-                if event == &WindowEvent::CloseRequested { emu.stop(true); }
-                if let WindowEvent::KeyboardInput { input, .. } = event {
-                    emu.console.gb.joy.handle(*input);
+                match event {
+                    WindowEvent::CloseRequested => emu.stop(true),
+                    WindowEvent::Focused(focus) => self.focus = *focus,
+                    _ => {}
                 }
             }
-            _ => {}
+            Event::UserEvent(Events::Press(KeyCat::Game(key))) => {
+                match key {
+                    Shortcut::Quit => {
+                        emu.stop(false);
+                        emu.proxy.send_event(Events::Close(Handle::Game)).ok();
+                    }
+                    Shortcut::Save => emu.console.bus.save(false),
+                    Shortcut::SpeedUp => emu.speedup(),
+                    Shortcut::SpeedDown => emu.speeddown(),
+                }
+            }
+            e => emu.bindings.update(&mut emu.console.gb.joy, e, emu.console.bus.io_regs()),
         }
-    }
-
-    fn should_redraw(&self, emu: &mut Emulator) -> bool {
-        emu.console.gb.lcd.request()
     }
 }
 
@@ -194,10 +239,6 @@ impl ReadAccess for Emulator {
     fn mbc(&self) -> Box<&dyn MBCController> {
         self.console.bus.mbc()
     }
-
-    fn binding(&self, key: VirtualKeyCode) -> Option<KeyCat> {
-        self.bindings.get(key)
-    }
 }
 
 impl Schedule for Emulator {
@@ -213,11 +254,14 @@ impl Schedule for Emulator {
     }
 
     fn speed(&self) -> i32 { self.console.speed }
-    fn set_speed(&mut self, speed: i32) {
-        self.console.speed = speed;
-        self.console.gb.apu.set_speed(self.console.speed_mult());
-        let time = self.cycle_time();
-        log::info!("CY: {time} / CPS: {}", 1f64 / time);
+    fn speedup(&mut self) {
+        let speed = self.console.speed + 1;
+        if speed <= 10 { self.console.set_speed(speed); }
+    }
+
+    fn speeddown(&mut self) {
+        let speed = self.console.speed - 1;
+        if speed >= -6 { self.console.set_speed(speed); }
     }
 }
 
@@ -235,7 +279,6 @@ impl Console {
         let gb = Devices::builder()
             .skip_boot(skip)
             .set_cgb(cgb)
-            .with_keybinds(controller.bindings.clone())
             .with_apu(controller.audio.apu())
             .with_link(controller.serial_port())
             .build();
@@ -257,14 +300,18 @@ impl Console {
     fn speed_mult(&self) -> f64 {
         match self.speed {
             0 => 1.,
-            n @ 1..=5 => 1. / (1. + 0.2 * n as f64),
+            n @ 1..=10 => 1. / (1. + 0.2 * n as f64),
             n if n < 0 => (1 << -n) as f64,
             _ => unimplemented!()
         }
     }
 
+    fn set_speed(&mut self, speed: i32) {
+        self.speed = speed;
+        self.gb.apu.set_speed(self.speed_mult());
+    }
+
     pub fn cycle(&mut self, clock: u8, settings: bus::Settings) {
-        if !self.running { return; }
         self.running = self.bus.tick(&mut self.gb, clock, settings);
     }
 
