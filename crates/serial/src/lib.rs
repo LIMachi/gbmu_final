@@ -88,19 +88,8 @@ impl Port {
                 log::info!("sending back {v:#02X}");
                 self.cable.send(v);
             }
-            self.bits = 8;
-            self.cycles = 0;
         }
-        if self.bits > 0 {
-            self.cycles += 1;
-            if self.cycles == 128 {
-                self.cycles = 0;
-                self.bits -= 1;
-                if self.bits == 0 { self.ready = true; }
-            }
-        }
-        if self.data.is_some() && self.ready {
-            log::info!("serial interrupt");
+        if self.ready && self.data.is_some() {
             self.ready = false;
             io.io_mut(IO::SC).reset(7);
             io.io_mut(IO::SB).direct_write(self.data.take().unwrap());
@@ -119,8 +108,8 @@ impl IODevice for Port {
             let v = bus.io(IO::SB).value();
             log::info!("sending {v:#02X}");
             self.cable.send(v);
-            self.bits = 8;
-            self.cycles = 0;
+            self.ready = true;
         }
+        if io == IO::SB { self.ready = true; }
     }
 }
