@@ -221,21 +221,17 @@ impl Breakpoints {
     pub fn tick(&mut self, cpu: &impl Cpu, last: Option<Op>) -> bool {
         let mut stop = false;
         if self.and {
-            stop = true;
-            let to_remove: Vec<usize> = self.breakpoints.iter_mut().enumerate().filter_map(|(i, bp)| {
+            let mut all_match = true;
+            self.breakpoints.drain_filter(|bp| {
                 let (once, res) = bp.tick(cpu, last);
-                stop &= res;
-                if once && res {
-                    Some(i)
+                if once {
+                    stop |= res;
                 } else {
-                    None
+                    all_match &= res;
                 }
-            }).rev().collect();
-            if stop {
-                for i in to_remove {
-                    self.breakpoints.remove(i);
-                }
-            }
+                once && res
+            });
+            stop |= all_match
         } else {
             self.breakpoints.drain_filter(|bp| {
                 let (once, res) = bp.tick(cpu, last);
