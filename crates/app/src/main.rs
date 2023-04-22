@@ -92,7 +92,8 @@ impl App {
                         debug: DbgConfig {
                             breaks: self.emu.breakpoints.take().into_iter()
                                 .filter(|x| !x.temp())
-                                .collect()
+                                .collect(),
+                            and: self.emu.breakpoints.and()
                         },
                         emu: self.emu.settings.clone(),
                         keys: self.emu.bindings.clone(),

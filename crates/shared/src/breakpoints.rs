@@ -8,17 +8,23 @@ use crate::{
 
 #[derive(Default)]
 pub struct Breakpoints {
-    breakpoints: Vec<Breakpoint>
+    breakpoints: Vec<Breakpoint>,
+    and: bool,
 }
 
 impl Breakpoints {
-    pub fn new(breaks: Vec<Breakpoint>) -> Self {
-        Self { breakpoints: breaks }
+    pub fn new(breakpoints: Vec<Breakpoint>, and: bool) -> Self {
+        Self {
+            breakpoints,
+            and,
+        }
     }
 
     pub fn take(&mut self) -> Vec<Breakpoint> {
         std::mem::take(&mut self.breakpoints)
     }
+
+    pub fn and(&self) -> bool { self.and }
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -214,11 +220,29 @@ impl Breakpoint {
 impl Breakpoints {
     pub fn tick(&mut self, cpu: &impl Cpu, last: Option<Op>) -> bool {
         let mut stop = false;
-        self.breakpoints.drain_filter(|bp| {
-            let (once, res) = bp.tick(cpu, last);
-            stop |= res;
-            once && res
-        });
+        if self.and {
+            stop = true;
+            let to_remove: Vec<usize> = self.breakpoints.iter_mut().enumerate().filter_map(|(i, bp)| {
+                let (once, res) = bp.tick(cpu, last);
+                stop &= res;
+                if once && res {
+                    Some(i)
+                } else {
+                    None
+                }
+            }).rev().collect();
+            if stop {
+                for i in to_remove {
+                    self.breakpoints.remove(i);
+                }
+            }
+        } else {
+            self.breakpoints.drain_filter(|bp| {
+                let (once, res) = bp.tick(cpu, last);
+                stop |= res;
+                once && res
+            });
+        }
         !stop
     }
 
@@ -233,5 +257,9 @@ impl Breakpoints {
 
     pub fn schedule(&mut self, bp: Breakpoint) {
         self.breakpoints.push(bp);
+    }
+
+    pub fn set_and(&mut self, state: bool) {
+        self.and = state;
     }
 }

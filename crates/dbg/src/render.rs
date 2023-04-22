@@ -276,6 +276,9 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     if ui.button("BREAK").clicked() {
                                         ext.schedule(self.render_data.breakpoint());
                                     }
+                                    let mut and = ext.breakpoints().and();
+                                    ui.toggle_value(&mut and, "And");
+                                    ext.breakpoints().set_and(and);
                                 });
                                 egui_extras::TableBuilder::new(ui)
                                     .columns(Column::remainder(), 3)

@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter, Write};
+use std::fmt::{Display, Formatter};
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::{MapAccess, SeqAccess, Visitor};
-use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize};
 use winit::event::{ButtonId, DeviceEvent, ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent};
 use winit::event_loop::EventLoopProxy;
 
@@ -200,13 +198,13 @@ impl Keybindings {
                 if let Some(&cat) = self.bindings.get(&Input::Keyboard(*input, mods))
                     .or_else(|| self.bindings.get(&Input::Keyboard(*input, ModifiersState::empty()))) {
                     proxy.send_event(if state == &ElementState::Pressed { Events::Press(cat) } else { Events::Release(cat) }).ok();
-                    self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
+                    self.inputs.entry(cat).and_modify(|(_, x)| { *x = *state; });
                 }
             }
             Event::DeviceEvent { event: DeviceEvent::Button { button, state }, .. } => {
                 if let Some(&cat) = self.bindings.get(&Input::Device(*button)) {
                     proxy.send_event(if state == &ElementState::Pressed { Events::Press(cat) } else { Events::Release(cat) }).ok();
-                    self.inputs.entry(cat).and_modify(|(_, mut x)| { x = *state; });
+                    self.inputs.entry(cat).and_modify(|(_, x)| { *x = *state; });
                 }
             }
             _ => {}

@@ -47,7 +47,7 @@ impl IORegs {
         self.io_mut(IO::OPRI).set_access(IORegs::DISABLED);
     }
 
-    pub fn skip_boot(&mut self, mut console: u8) {
+    pub fn skip_boot(&mut self, console: u8) {
         log::info!("DMG compat mode: {:#02X}", console);
         if console & 0x80 == 0 {
             self.set(IO::KEY0, DMG_MODE);
