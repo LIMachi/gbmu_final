@@ -26,7 +26,7 @@ impl<Data: 'static + Render> Context<Emulator> for RawContext<Data> {
         self.inner.render(emu);
     }
 
-    fn request_redraw(&mut self, emu: &mut Emulator) {
+    fn request_redraw(&mut self, _emu: &mut Emulator) {
         self.window.request_redraw();
     }
 

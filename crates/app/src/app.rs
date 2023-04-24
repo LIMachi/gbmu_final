@@ -39,6 +39,8 @@ pub struct RomConfig {
 #[serde(rename = "debug")]
 pub struct DbgConfig {
     pub breaks: Vec<Breakpoint>,
+    #[serde(default)]
+    pub and: bool,
 }
 
 #[derive(Default, Serialize, Deserialize)]

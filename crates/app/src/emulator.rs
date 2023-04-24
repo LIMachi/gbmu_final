@@ -93,7 +93,7 @@ impl Emulator {
             console: Console::default(),
             audio_settings: conf.audio_settings,
             audio: apu::Controller::new(&conf.sound_device),
-            breakpoints: Breakpoints::new(conf.debug.breaks),
+            breakpoints: Breakpoints::new(conf.debug.breaks, conf.debug.and),
             cgb: conf.mode,
             bios: conf.bios,
             timer: Instant::now(),

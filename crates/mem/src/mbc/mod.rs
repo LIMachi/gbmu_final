@@ -91,7 +91,6 @@ impl Controller {
         if ram.is_empty() { return; }
         if let Some(path) = &self.sav {
             use std::fs::File;
-            use std::io::Write;
             let file = path.with_extension(if autosave { "autosav" } else { "sav" });
             log::info!("Saving... ({path:?})");
             let mut backup = vec![];
