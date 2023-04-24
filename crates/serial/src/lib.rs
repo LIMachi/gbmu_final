@@ -67,7 +67,7 @@ impl Port {
     }
 
     pub fn tick(&mut self, io: &mut IORegs) {
-        if !self.cable.connected() && io.io(IO::SC).value() & 0x80 == 0x80 {
+        if !self.cable.connected() && io.io(IO::SC).value() & 0x81 == 0x81 {
             let sb = io.io_mut(IO::SB);
             let v = sb.value();
             if v != 0xFF {
@@ -83,8 +83,6 @@ impl Port {
         if let Some(o) = self.cable.recv() {
             log::info!("recv {o:#02X}, took {}", self.cycles);
             self.data = Some(o);
-        } else if self.ready {
-            self.cycles += 1;
         }
         if self.ready && self.data.is_some() {
             if io.io(IO::SC).bit(0) == 0 {
