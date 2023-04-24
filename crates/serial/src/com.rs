@@ -71,10 +71,11 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn connect(&mut self, stream: TcpStream, addr: SocketAddr) {
+    pub fn connect(&mut self, mut stream: TcpStream, addr: SocketAddr) {
         let (tx, rec_x) = channel();
         let (td, rec_d) = channel();
         self.data = Some(rec_x);
+        stream.set_nodelay(true).expect("nagle bad");
         self.client.as_ref().map(|x| x.shutdown(Shutdown::Both).ok());
         self.client = Some(stream.try_clone().expect("failed to clone socket"));
         log::info!("client connected from {addr:?}");

@@ -81,7 +81,6 @@ impl Port {
         }
 
         if let Some(o) = self.cable.recv() {
-            log::info!("recv {o:#02X}, took {}", self.cycles);
             self.data = Some(o);
         }
         if self.ready && self.data.is_some() {

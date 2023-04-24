@@ -1,9 +1,11 @@
 use std::fmt::Formatter;
-use serde::{Serialize, Deserialize};
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    value,
     cpu::{Cpu, Op, Opcode, Reg},
-    utils::{convert::Converter}
+    utils::convert::Converter,
+    value,
 };
 
 #[derive(Default)]
@@ -32,7 +34,7 @@ pub enum Value {
     Any,
     Eq(u8),
     And(u8),
-    Not(u8)
+    Not(u8),
 }
 
 impl PartialEq for Value {
@@ -98,7 +100,7 @@ impl std::fmt::Display for Value {
 pub struct Access {
     addr: u16,
     kind: super::io::Access,
-    value: Value
+    value: Value,
 }
 
 impl Access {
@@ -132,17 +134,23 @@ pub enum Break {
     Cycles(usize),
     Instructions(usize),
     Instruction(Opcode),
-    Register(Reg, value::Value)
+    Register(Reg, value::Value),
 }
 
 impl Break {
     pub fn tick(&mut self, runner: &impl Cpu, last: Option<Op>) -> bool {
         match self {
             Break::Cycles(n) if *n == 0 => true,
-            Break::Cycles(n) => { *n = *n - 1; false },
+            Break::Cycles(n) => {
+                *n = *n - 1;
+                false
+            }
             Break::Instruction(op) if runner.done() && runner.previous() == *op => true,
             Break::Instructions(n) if runner.done() && *n == 0 => true,
-            Break::Instructions(n) if runner.done() => { *n = *n - 1; *n == 0 },
+            Break::Instructions(n) if runner.done() => {
+                *n = *n - 1;
+                *n == 0
+            }
             Break::Register(r, v) if runner.done() && runner.register(*r) == *v => true,
             Break::Access(access) if let Some(last) = last => access.matches(last),
             _ => false
@@ -158,7 +166,7 @@ impl Break {
 pub struct Breakpoint {
     kind: Break,
     once: bool,
-    pub enabled: bool
+    pub enabled: bool,
 }
 
 impl Breakpoint {
@@ -221,14 +229,11 @@ impl Breakpoints {
     pub fn tick(&mut self, cpu: &impl Cpu, last: Option<Op>) -> bool {
         let mut stop = false;
         if self.and {
-            let mut all_match = true;
+            let mut all_match = !self.breakpoints.is_empty();
             self.breakpoints.drain_filter(|bp| {
                 let (once, res) = bp.tick(cpu, last);
-                if once {
-                    stop |= res;
-                } else {
-                    all_match &= res;
-                }
+                if once { stop |= res; }
+                all_match &= res;
                 once && res
             });
             stop |= all_match
