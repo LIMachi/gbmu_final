@@ -123,7 +123,6 @@ impl Ppu {
         self.lcdc = lcdc;
         self.dots += 1;
         if self.lcdc.enabled() {
-            if io.io(IO::LY).value() == 0 { log::info!("{}", self.dots); }
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
