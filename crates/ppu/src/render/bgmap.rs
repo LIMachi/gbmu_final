@@ -2,6 +2,7 @@ use shared::egui;
 use shared::egui::{Color32, Image, Response, Stroke, Ui, Vec2, Widget};
 use shared::emulator::Emulator;
 use shared::io::{IO, LCDC};
+
 use crate::render::PpuAccess;
 use crate::VramViewer;
 
@@ -21,10 +22,16 @@ impl<E: Emulator + PpuAccess> Widget for BgMap<'_, E> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.spacing_mut().item_spacing.x = 1.;
         ui.spacing_mut().item_spacing.y = 1.;
-        let lcdc = self.1.bus().io(IO::LCDC).value();
-        let ppu = self.1.ppu();
+        let (lcdc, scx, scy) = {
+            let bus = self.1.bus();
+            (
+                bus.io(IO::LCDC).value(),
+                bus.io(IO::SCX).value(),
+                bus.io(IO::SCY).value(),
+            )
+        };
         egui::Area::new("scrolled_area")
-            .fixed_pos([ppu.sc.x as f32 + ui.available_rect_before_wrap().min.x, ppu.sc.y as f32 + ui.available_rect_before_wrap().min.y])
+            .fixed_pos([scx as f32 + ui.available_rect_before_wrap().min.x, scy as f32 + ui.available_rect_before_wrap().min.y])
             .movable(false)
             .interactable(false)
             .show(self.2, |ui| {
@@ -32,7 +39,7 @@ impl<E: Emulator + PpuAccess> Widget for BgMap<'_, E> {
                     .stroke(Stroke::new(2., Color32::BLACK))
                     .fill(Color32::TRANSPARENT)
                     .show(ui, |ui| {
-                       ui.allocate_space(Vec2::new(500., 450.));
+                        ui.allocate_space(Vec2::new(500., 450.));
                     });
             });
         ui.horizontal(|ui| {
@@ -52,13 +59,13 @@ impl<E: Emulator + PpuAccess> Widget for BgMap<'_, E> {
                             let tex = self.0.get(tile).id();
                             let ret = ui.add(Image::new(tex, [24., 24.]));
                             if ret.hovered() {
-                                self.0.bg_data = Some(TileData{
+                                self.0.bg_data = Some(TileData {
                                     x: i as usize,
                                     y: j as usize,
                                     tile,
                                     attribute,
                                     map_addr: addr,
-                                    tile_addr: 0
+                                    tile_addr: 0,
                                 })
                             }
                         }

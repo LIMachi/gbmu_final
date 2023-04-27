@@ -84,7 +84,7 @@ impl Fetcher {
         let lcdc = io.io(IO::LCDC).value();
         let (offset, y, x) = match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
             (false, n, _) => (n, ly.wrapping_add(scy) as u16 / 8, (self.x + scx / 8) & 0x1F), //bg tile (LCDC.3)
-            (true, _, n) => (n, ppu.win.y as u16 / 8, ppu.win.x) //window tile (LCDC.6) TODO INVESTIGATE THIS, IT STINKS (self.x)
+            (true, _, n) => (n, ppu.win.y as u16 / 8, ppu.win.x) //window tile (LCDC.6)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
         self.tile = ppu.vram().get(Source::Ppu, |vram| vram.read_bank(addr, 0)) as u16;
@@ -111,7 +111,7 @@ impl Fetcher {
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
         ppu.vram().get(Source::Ppu, |v| v.read_bank(addr, self.attrs.bank()))
     }
-    
+
     fn data_low(&mut self, ppu: &Ppu, io: &IORegs) -> State {
         if self.clock == 0 {
             self.clock = 1;

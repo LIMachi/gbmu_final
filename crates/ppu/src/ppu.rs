@@ -6,6 +6,8 @@ use shared::mem::*;
 use shared::utils::ToBox;
 use states::*;
 
+use crate::ppu::states::Mode::VBlank;
+
 mod fetcher;
 mod cram;
 mod pixel;
@@ -85,12 +87,6 @@ impl Ppu {
         stat.reset(1);
         if (mode as u8 & 0x1) != 0 { stat.set(0); }
         if (mode as u8 & 0x2) != 0 { stat.set(1); }
-        let input = stat.bit(3) != 0 && mode == Mode::HBlank;
-        let input = input || (stat.bit(4) != 0 && mode == Mode::VBlank);
-        let input = input || (stat.bit(5) != 0 && mode == Mode::Search);
-        let input = input || (stat.bit(6) != 0 && stat.bit(2) != 0);
-        if self.stat.tick(input) { regs.int_set(1); }
-
         match mode {
             Mode::Search => self.oam_mut().lock(Source::Ppu),
             Mode::Transfer => self.vram_mut().lock(Source::Ppu),
@@ -127,22 +123,29 @@ impl Ppu {
         self.lcdc = lcdc;
         self.dots += 1;
         if self.lcdc.enabled() {
+            if io.io(IO::LY).value() == 0 { log::info!("{}", self.dots); }
+            if let Some(next) = state.tick(self, io, lcd) {
+                let mode = next.mode();
+                if mode == Mode::VBlank {
+                    lcd.vblank();
+                    lcd.enable();
+                } else if state.mode() == VBlank {
+                    self.dots = 0;
+                }
+                self.set_state(io, state, next);
+            }
             if io.io(IO::LY).value() == io.io(IO::LYC).value() {
                 io.io_mut(IO::STAT).set(2);
             } else {
                 io.io_mut(IO::STAT).reset(2);
             }
-            if let Some(next) = state.tick(self, io, lcd) {
-                let mode = next.mode();
-                if mode == Mode::VBlank {
-                    self.dots = 0;
-                    lcd.vblank();
-                    lcd.enable();
-                }
-                self.set_state(io, state, next);
-            }
-        } else if self.dots == 65664 {
-            self.set_state(io, state, VState::immediate().boxed());
+            let mode = state.mode();
+            let stat = io.io(IO::STAT);
+            let input = stat.bit(3) != 0 && mode == Mode::HBlank;
+            let input = input || (stat.bit(4) != 0 && mode == Mode::VBlank);
+            let input = input || (stat.bit(5) != 0 && mode == Mode::Search);
+            let input = input || (stat.bit(6) != 0 && stat.bit(2) != 0);
+            if self.stat.tick(input) { io.int_set(1); }
         }
     }
 
