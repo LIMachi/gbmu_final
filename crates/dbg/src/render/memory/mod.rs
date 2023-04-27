@@ -1,16 +1,16 @@
 use std::ops::Range;
-use shared::breakpoints::{Breakpoint, Breakpoints, Value};
-use shared::emulator::Emulator;
 
+use shared::breakpoints::{Breakpoint, Breakpoints, Value};
 use shared::egui;
 use shared::egui::{Color32, Label, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
 use shared::egui::RichText;
+use shared::emulator::Emulator;
 use shared::mem::*;
-use crate::render::DARK_BLACK;
+use shared::utils::DARK_BLACK;
 
 struct View {
     mem: &'static str,
-    range: Range<u16>
+    range: Range<u16>,
 }
 
 impl View {
@@ -25,7 +25,7 @@ struct ViewerOptions {
     address_color: Color32,
     highlight_color: Color32,
     text_style: TextStyle,
-    address_text_style: TextStyle
+    address_text_style: TextStyle,
 }
 
 impl Default for ViewerOptions {
@@ -35,7 +35,7 @@ impl Default for ViewerOptions {
             address_color: Color32::LIGHT_BLUE,
             highlight_color: Color32::GREEN,
             text_style: TextStyle::Monospace,
-            address_text_style: TextStyle::Monospace
+            address_text_style: TextStyle::Monospace,
         }
     }
 }
@@ -46,7 +46,7 @@ pub struct Viewer {
     current: usize,
     hover: Option<u16>,
     input: String,
-    value: Value
+    value: Value,
 }
 
 impl Default for Viewer {
@@ -65,7 +65,7 @@ impl Default for Viewer {
             current: 0,
             hover: None,
             input: String::new(),
-            value: Value::Any
+            value: Value::Any,
         }
     }
 }
@@ -76,7 +76,7 @@ struct ContextMenu<'a> {
     value: &'a mut Value,
     input: &'a mut String,
     breaks: &'a mut Breakpoints,
-    addr: u16
+    addr: u16,
 }
 
 impl<'a> Widget for ContextMenu<'a> {
@@ -100,10 +100,7 @@ impl<'a> Widget for ContextMenu<'a> {
         let rr = ui.button("Read");
         let rw = ui.button("Write");
         let rrw = ui.button("R/W");
-        let access = if rr.clicked() { Access::read(self.addr, *self.value) }
-        else if rw.clicked() { Access::write(self.addr, *self.value) }
-        else if rrw.clicked() { Access::rw(self.addr, *self.value) }
-        else { return rr | rw | rrw };
+        let access = if rr.clicked() { Access::read(self.addr, *self.value) } else if rw.clicked() { Access::write(self.addr, *self.value) } else if rrw.clicked() { Access::rw(self.addr, *self.value) } else { return rr | rw | rrw; };
         ui.close_menu();
         self.breaks.schedule(Breakpoint::access(access));
         rr | rw | rrw
@@ -127,11 +124,11 @@ impl Viewer {
                 ui.horizontal(|ui| {
                     ui.label("View: ");
                     ui.menu_button(self.current(), |ui| {
-                       for i in 0..self.ranges.len() {
-                           if ui.button(self.ranges[i].mem).clicked() {
-                               self.current = i;
-                           }
-                       }
+                        for i in 0..self.ranges.len() {
+                            if ui.button(self.ranges[i].mem).clicked() {
+                                self.current = i;
+                            }
+                        }
                     });
                 });
                 let ViewerOptions {
@@ -162,13 +159,16 @@ impl Viewer {
                                 let mut print = addr;
                                 let mut color = address_color;
                                 if let Some(h) = self.hover {
-                                    if h & 0xFFF0 == addr { print = h; color = Color32::GREEN }
+                                    if h & 0xFFF0 == addr {
+                                        print = h;
+                                        color = Color32::GREEN
+                                    }
                                 }
                                 let text = RichText::new(format!("0x{:04X}:", print)).color(color)
                                     .text_style(address_text_style.clone());
                                 ui.label(text);
                                 for col in 0..2 {
-                                    let st =  addr + 8 * col;
+                                    let st = addr + 8 * col;
                                     ui.horizontal(|ui| {
                                         for c in 0..8 {
                                             let addr = st + c;
@@ -185,7 +185,7 @@ impl Viewer {
                                                     value: &mut self.value,
                                                     input: &mut self.input,
                                                     breaks: &mut emu.breakpoints(),
-                                                    addr
+                                                    addr,
                                                 });
                                             });
                                         }

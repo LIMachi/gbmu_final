@@ -3,6 +3,7 @@ use mem::{oam::{Oam, Sprite}, Vram};
 use pixel::Pixel;
 use shared::io::{IO, IODevice, IORegs, LCDC};
 use shared::mem::*;
+use shared::utils::ToBox;
 use states::*;
 
 mod fetcher;
@@ -34,12 +35,13 @@ pub(crate) struct Window {
     pub scan_enabled: bool,
     pub enabled: bool,
     pub y: u8,
+    pub x: u8,
 }
 
 #[derive(Default)]
 pub(crate) struct Scroll {
     pub x: u8,
-    pub y: u8
+    pub y: u8,
 }
 
 pub struct Ppu {
@@ -66,7 +68,7 @@ impl Ppu {
             win: Default::default(),
             stat: REdge::new(),
             oam: None,
-            vram: None
+            vram: None,
         }
     }
 
@@ -119,7 +121,7 @@ impl Ppu {
         if self.lcdc.enabled() && !lcdc.enabled() {
             self.dots = 0;
             io.io_mut(IO::LY).direct_write(0);
-            self.set_state(io, state, Box::new(HState::last()));
+            self.set_state(io, state, VState::immediate().boxed());
             lcd.disable(io);
         }
         self.lcdc = lcdc;

@@ -6,6 +6,7 @@ use shared::mem::IOBus;
 use crate::com::Serial;
 
 pub mod com;
+mod protocol;
 
 pub struct Link {
     pub port: u16,

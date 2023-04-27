@@ -1,11 +1,15 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use egui::Color32;
+
 pub mod image;
 pub mod clock;
 pub mod rtc;
 pub mod convert;
 pub mod palette;
+
+pub const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 pub trait ToBox {
     fn boxed(&self) -> Box<&Self> where Self: Sized;

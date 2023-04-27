@@ -1,6 +1,6 @@
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 
-use shared::io::IORegs;
+use shared::io::{IO, IORegs};
 use shared::winit as winit;
 
 pub struct Lcd {
@@ -39,7 +39,7 @@ impl LCD for Lcd {
 
     fn disable(&mut self, io: &IORegs) {
         self.enabled = false;
-        let white = io.palette().color(0);
+        let white = if io.io(IO::CGB).bit(0) != 0 { [0xFF; 3] } else { io.palette().color(0) };
         if let Some(pixels) = self.pixels.as_mut() {
             let pixels = pixels.get_frame_mut();
             for i in 0..(4 * Lcd::WIDTH * Lcd::HEIGHT) as usize {

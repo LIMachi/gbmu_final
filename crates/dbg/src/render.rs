@@ -12,6 +12,7 @@ use shared::emulator::Bus;
 use shared::input::{Debug, KeyCat};
 use shared::io::IO;
 use shared::utils::convert::Converter;
+use shared::utils::DARK_BLACK;
 use shared::utils::image::ImageLoader;
 use shared::winit::event::WindowEvent;
 
@@ -91,7 +92,6 @@ impl Default for Data {
     }
 }
 
-pub const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
 pub struct Register(&'static str, Value);
 

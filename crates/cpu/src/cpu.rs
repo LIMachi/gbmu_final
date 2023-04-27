@@ -8,6 +8,7 @@ use super::{decode::decode, ops::*, Registers, State};
 pub(crate) enum Mode {
     Running,
     Halt,
+    Stop,
 }
 
 pub struct Cpu {
@@ -22,6 +23,8 @@ pub struct Cpu {
     prefixed: bool,
     finished: bool,
     ime: bool,
+    doctor: Option<std::fs::File>,
+    stop: usize,
 }
 
 impl shared::cpu::Cpu for Cpu {
@@ -32,6 +35,10 @@ impl shared::cpu::Cpu for Cpu {
 
 impl Default for Cpu {
     fn default() -> Self {
+        #[cfg(feature = "log_opcode")]
+            let doctor = std::fs::File::open("opcodes.log").ok();
+        #[cfg(not(feature = "log_opcode"))]
+            let doctor = None;
         Self {
             mode: Mode::Running,
             prev: Opcode::Nop,
@@ -44,6 +51,8 @@ impl Default for Cpu {
             finished: false,
             ime: false,
             at: 0,
+            doctor,
+            stop: 0,
         }
     }
 }
@@ -71,6 +80,8 @@ impl Cpu {
         }
     }
 
+    pub fn stopped(&self) -> bool { self.mode == Mode::Stop }
+
     pub fn cycle(&mut self, bus: &mut dyn Bus) {
         let prefixed = self.prefixed;
         self.prefixed = false;
@@ -78,21 +89,26 @@ impl Cpu {
         if self.mode == Mode::Halt {
             return;
         }
-        let mut state = State::new(bus, (&mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime, &mut self.mode));
+        if self.mode == Mode::Stop {
+            if self.stop == 0 {
+                return;
+            } else {
+                self.stop -= 1;
+                if self.stop == 0 {
+                    self.mode = Mode::Running;
+                    bus.toggle_ds();
+                }
+            }
+        }
+        let mut state = State::new(bus, (
+            &mut self.regs, &mut self.cache, &mut self.prefixed, &mut self.ime, &mut self.mode, &mut self.stop),
+        );
         if self.ins >= self.count {
             let opcode = state.read();
             let Ok(opcode) = Opcode::try_from((opcode, prefixed)) else { unreachable!(); };
 
-            #[cfg(feature = "log_opcode")]
-            {
+            self.doctor.as_mut().map(|x| {
                 use std::io::Write;
-                static mut OUT: Option<std::fs::File> = None;
-                let file = unsafe {
-                    OUT.as_mut().unwrap_or_else(|| {
-                        OUT = Some(std::fs::File::create("out.log").unwrap());
-                        OUT.as_mut().unwrap()
-                    })
-                };
                 if !prefixed {
                     let (a, f, b, c, d, e, h, l, sp, pc) = (
                         state.register(Reg::A).u8(), state.register(Reg::F).u8(), state.register(Reg::B).u8(), state.register(Reg::C).u8(),
@@ -108,10 +124,9 @@ impl Cpu {
                     SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X} INS: {:?} NEXT: {:?}\n",
                                        a, f, b, c, d, e, h, l, sp, pc, pc0, pc1, pc2, pc3, self.prev, opcode);
                     log::info!("{buff}");
-                    file.write_all(buff.as_bytes());
+                    x.write_all(buff.as_bytes()).ok();
                 }
-            }
-
+            });
             self.instructions = decode(opcode);
             self.ins = 0;
             self.count = self.instructions.len();

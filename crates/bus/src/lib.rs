@@ -138,7 +138,9 @@ impl Bus {
             let tick = devices.hdma.tick(self);
             if clock == 0 || ds {
                 devices.serial.tick(&mut self.io);
-                devices.timer.tick(&mut self.io);
+                if !devices.cpu.stopped() {
+                    devices.timer.tick(&mut self.io);
+                }
                 devices.dma.tick(self);
                 if !tick {
                     devices.cpu.cycle(self);
@@ -243,6 +245,13 @@ impl shared::cpu::Bus for Bus {
 
     fn interrupt(&mut self) -> u8 {
         (self.io.io(IO::IF).read() & self.ie.read()) & 0x1F
+    }
+
+    fn toggle_ds(&mut self) {
+        let ds = self.io.io_mut(IO::KEY1);
+        let v = ds.bit(7) != 0;
+        ds.reset(0);
+        if v { ds.reset(7) } else { ds.set(7) }
     }
 }
 

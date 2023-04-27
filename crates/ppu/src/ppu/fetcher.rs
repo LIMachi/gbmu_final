@@ -84,7 +84,7 @@ impl Fetcher {
         let lcdc = io.io(IO::LCDC).value();
         let (offset, y, x) = match (self.window_active(), lcdc.bg_area(), lcdc.win_area()) {
             (false, n, _) => (n, ly.wrapping_add(scy) as u16 / 8, (self.x + scx / 8) & 0x1F), //bg tile (LCDC.3)
-            (true, _, n) => (n, ppu.win.y as u16 / 8, self.x) //window tile (LCDC.6) TODO INVESTIGATE THIS, IT STINKS (self.x)
+            (true, _, n) => (n, ppu.win.y as u16 / 8, ppu.win.x) //window tile (LCDC.6) TODO INVESTIGATE THIS, IT STINKS (self.x)
         };
         let addr = 0x1800 | (offset as u16) << 10 | y << 5 as u16 | x as u16;
         self.tile = ppu.vram().get(Source::Ppu, |vram| vram.read_bank(addr, 0)) as u16;
@@ -111,7 +111,7 @@ impl Fetcher {
         } << 12) | (tile << 4) | (y << 1) | (high as u16);
         ppu.vram().get(Source::Ppu, |v| v.read_bank(addr, self.attrs.bank()))
     }
-
+    
     fn data_low(&mut self, ppu: &Ppu, io: &IORegs) -> State {
         if self.clock == 0 {
             self.clock = 1;
@@ -122,7 +122,7 @@ impl Fetcher {
         State::DataHigh
     }
 
-    fn data_high(&mut self, ppu: &Ppu, io: &IORegs, fifo: &mut BgFifo, oam: &mut ObjFifo) -> State {
+    fn data_high(&mut self, ppu: &mut Ppu, io: &IORegs, fifo: &mut BgFifo, oam: &mut ObjFifo) -> State {
         if self.clock == 0 {
             self.clock = 1;
             return State::DataHigh;
@@ -136,7 +136,7 @@ impl Fetcher {
         }
     }
 
-    fn push(&mut self, ppu: &Ppu, io: &IORegs, bg: &mut BgFifo, oam: &mut ObjFifo) -> State {
+    fn push(&mut self, ppu: &mut Ppu, io: &IORegs, bg: &mut BgFifo, oam: &mut ObjFifo) -> State {
         if let (Some(low), Some(high)) = (self.low.take(), self.high.take()) {
             let mut colors = [0; 8];
             colors.iter_mut().enumerate().for_each(|(i, c)| {
@@ -155,6 +155,9 @@ impl Fetcher {
                 Pixel::bg(if io.io(IO::KEY0).value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { *x }, self.attrs)
             )) {
                 self.x += 1;
+                if Mode::Window == self.mode {
+                    ppu.win.x += 1;
+                }
             } else {
                 self.low = Some(low);
                 self.high = Some(high);
@@ -178,7 +181,7 @@ impl Fetcher {
         matches!(self.mode, Mode::Sprite( .. ))
     }
 
-    pub(crate) fn tick(&mut self, ppu: &Ppu, io: &IORegs, bg: &mut BgFifo, oam: &mut ObjFifo) {
+    pub(crate) fn tick(&mut self, ppu: &mut Ppu, io: &IORegs, bg: &mut BgFifo, oam: &mut ObjFifo) {
         self.state = match self.state {
             State::Tile => self.get_tile(ppu, io),
             State::DataLow => self.data_low(ppu, io),

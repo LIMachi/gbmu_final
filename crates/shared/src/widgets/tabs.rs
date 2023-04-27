@@ -1,8 +1,8 @@
 use std::hash::Hash;
 
-use egui::{Color32, Margin, Response, Sense, Ui, Vec2, Widget};
+use egui::{Margin, Response, Sense, Ui, Vec2, Widget};
 
-pub const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
+use crate::utils::DARK_BLACK;
 
 pub trait Tab {
     fn name(&self) -> String;

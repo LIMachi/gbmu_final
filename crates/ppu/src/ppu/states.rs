@@ -76,6 +76,7 @@ impl State for OamState {
             ppu.sc = Scroll::default();
             ppu.sprites.clear();
             ppu.win.scan_enabled = io.io(IO::WY).value() <= ly;
+            ppu.win.x = 0;
         }
         let y = ppu.oam().get(Source::Ppu, |oam| oam.sprites[self.sprite].y);
         if ly + if ppu.lcdc.obj_tall() { 0 } else { 8 } < y && ly + 16 >= y && ppu.sprites.len() < 10 {
@@ -172,33 +173,30 @@ impl State for VState {
     fn mode(&self) -> Mode { Mode::VBlank }
 
     fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, _: &mut Lcd) -> Option<Box<dyn State>> {
-        if self.dots == Self::DOTS || self.dots == 0 {
-            ppu.win.y = 0;
+        if self.dots == Self::DOTS {
             io.int_set(0);
+        } else if self.dots == 0 {
+            return Some(OamState::new().boxed());
         }
         let ly = io.io_mut(IO::LY);
-        if self.dots == 0 {
-            ly.direct_write(0);
-        } else {
-            self.dots = self.dots.saturating_sub(1);
-            if self.dots % 456 == 0 {
-                let v = (ly.value() + 1) % 154;
-                ly.direct_write(v);
-            }
+        self.dots = self.dots.saturating_sub(1);
+        if self.dots % 456 == 0 {
+            let v = (ly.value() + 1) % 154;
+            ly.direct_write(v);
         }
         if self.dots == 0 {
+            ppu.win.y = 0;
+            ly.direct_write(0);
             Some(OamState::new().boxed())
-        } else { None }
+        } else {
+            None
+        }
     }
 }
 
 impl HState {
     pub fn new(dots: usize) -> Self {
         Self { dots }
-    }
-
-    pub fn last() -> Self {
-        Self { dots: 0 }
     }
 }
 

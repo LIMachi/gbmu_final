@@ -46,6 +46,8 @@ pub struct EmuSettings {
     pub timer: u64,
     #[serde(default)]
     pub autosave: bool,
+    #[serde(skip)]
+    pub autosave_cycles: usize,
 }
 
 impl Default for EmuSettings {
@@ -56,6 +58,7 @@ impl Default for EmuSettings {
             palette: Palette::GrayScale,
             timer: 900,
             autosave: false,
+            autosave_cycles: 0,
         }
     }
 }
@@ -134,16 +137,13 @@ impl Emulator {
                 sound: &mut self.audio_settings,
             });
             if self.settings.autosave {
-                static mut CYCLES: usize = 0;
-                if unsafe {
-                    CYCLES += 1;
-                    if CYCLES > Emulator::AUTOSAVE_CHECK {
-                        CYCLES = 0;
-                        true
-                    } else { false }
-                } && self.timer.elapsed().as_secs() > self.settings.timer {
-                    self.timer = Instant::now();
-                    self.console.bus.save(true);
+                self.settings.autosave_cycles += 1;
+                if self.settings.autosave_cycles > Emulator::AUTOSAVE_CHECK {
+                    self.settings.autosave_cycles = 0;
+                    if self.timer.elapsed().as_secs() > self.settings.timer {
+                        self.timer = Instant::now();
+                        self.console.bus.save(true);
+                    }
                 }
             }
         }

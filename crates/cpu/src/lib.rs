@@ -1,14 +1,15 @@
 extern crate core;
 
+pub use cpu::Cpu;
+use registers::*;
+use shared::cpu::{Bus, CBOpcode, MemStatus, Opcode, Reg, regs, Value};
+
+use crate::cpu::Mode;
+
 mod cpu;
 mod ops;
 mod registers;
 mod decode;
-
-use registers::*;
-use shared::cpu::{Value, Opcode, CBOpcode, Reg, MemStatus, Bus, regs};
-pub use cpu::Cpu;
-use crate::cpu::Mode;
 
 trait RWStatus {
     fn read(&mut self) -> u8;
@@ -34,14 +35,14 @@ impl RWStatus for MemStatus {
 
     fn req_read(&mut self, addr: u16) {
         match std::mem::replace(self, MemStatus::ReqRead(addr)) {
-            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => {},
+            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => {}
             s => panic!("invalid state {s:?}")
         }
     }
 
     fn req_write(&mut self, addr: u16) {
         match std::mem::replace(self, MemStatus::ReqWrite(addr)) {
-            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => {},
+            MemStatus::Idle | MemStatus::Ready | MemStatus::Read(_) => {}
             s => panic!("invalid state {s:?}")
         }
     }
@@ -52,7 +53,7 @@ pub struct Flags {
     zero: bool,
     half: bool,
     sub: bool,
-    carry: bool
+    carry: bool,
 }
 
 pub struct State<'a> {
@@ -64,17 +65,18 @@ pub struct State<'a> {
     prefix: &'a mut bool,
     ime: &'a mut bool,
     halt: &'a mut cpu::Mode,
+    stop: &'a mut usize,
 }
 
 impl<'a> Drop for State<'a> {
     fn drop(&mut self) {
         match self.mem {
-            MemStatus::ReqRead(_) | MemStatus::ReqWrite(_) => { },
+            MemStatus::ReqRead(_) | MemStatus::ReqWrite(_) => {}
             e => {
-                if e != MemStatus::Idle && e!= MemStatus::Ready { // warn!("{e:?} I/O result wasn't used this cycle")
+                if e != MemStatus::Idle && e != MemStatus::Ready { // warn!("{e:?} I/O result wasn't used this cycle")
                 };
                 self.mem = MemStatus::ReqRead(self.regs.pc());
-            },
+            }
         };
         if let Some(flags) = self.flags {
             self.regs.set_zero(flags.zero);
@@ -92,14 +94,26 @@ impl Flags {
             zero: r.zero(),
             half: r.half(),
             sub: r.sub(),
-            carry: r.carry()
+            carry: r.carry(),
         }
     }
 
-    pub fn set_zero(&mut self, z: bool) -> &mut Self { self.zero = z; self }
-    pub fn set_carry(&mut self, c: bool) -> &mut Self { self.carry = c; self }
-    pub fn set_half(&mut self, h: bool) -> &mut Self { self.half = h; self }
-    pub fn set_sub(&mut self, s: bool) -> &mut Self { self.sub = s; self }
+    pub fn set_zero(&mut self, z: bool) -> &mut Self {
+        self.zero = z;
+        self
+    }
+    pub fn set_carry(&mut self, c: bool) -> &mut Self {
+        self.carry = c;
+        self
+    }
+    pub fn set_half(&mut self, h: bool) -> &mut Self {
+        self.half = h;
+        self
+    }
+    pub fn set_sub(&mut self, s: bool) -> &mut Self {
+        self.sub = s;
+        self
+    }
 
     pub fn carry(&self) -> bool { self.carry }
     pub fn half(&self) -> bool { self.half }
@@ -108,7 +122,7 @@ impl Flags {
 }
 
 impl<'a> State<'a> {
-    pub(crate) fn new(bus: &'a mut dyn Bus, (regs, cache, prefix, ime, mode): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool, &'a mut bool, &'a mut cpu::Mode)) -> Self {
+    pub(crate) fn new(bus: &'a mut dyn Bus, (regs, cache, prefix, ime, mode, stop): (&'a mut Registers, &'a mut Vec<Value>, &'a mut bool, &'a mut bool, &'a mut cpu::Mode, &'a mut usize)) -> Self {
         Self {
             mem: bus.status(),
             bus,
@@ -117,7 +131,8 @@ impl<'a> State<'a> {
             cache,
             prefix,
             ime,
-            halt: mode
+            halt: mode,
+            stop,
         }
     }
 
@@ -127,6 +142,10 @@ impl<'a> State<'a> {
 
     pub(crate) fn halt(&mut self) {
         *self.halt = Mode::Halt;
+    }
+
+    pub(crate) fn stop(&mut self) {
+        *self.halt = Mode::Stop;
     }
 
     pub fn write(&mut self, value: u8) {

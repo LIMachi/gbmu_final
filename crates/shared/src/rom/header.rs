@@ -253,6 +253,17 @@ impl RomSize {
         }
     }
 
+    pub fn mask(&self) -> usize {
+        match self.0 {
+            n @ 0..=8 => 2usize.pow((n + 1) as u32) - 1,
+            0x52 | 0x53 | 0x54 => 0x7F,
+            n => {
+                warn!("invalid rom size {n}");
+                0
+            }
+        }
+    }
+
     pub fn size(&self) -> usize {
         self.banks() as usize * RomSize::BANK_SIZE as usize
     }
@@ -269,6 +280,19 @@ impl RamSize {
             3 => 4,
             4 => 16,
             5 => 8,
+            n => {
+                warn!("invalid ram size {n}");
+                0
+            }
+        }
+    }
+
+    pub fn mask(&self) -> usize {
+        match self.0 {
+            2 => 0x0,
+            3 => 0x3,
+            4 => 0xF,
+            5 => 0x7,
             n => {
                 warn!("invalid ram size {n}");
                 0

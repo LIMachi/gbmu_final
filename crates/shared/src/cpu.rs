@@ -1,5 +1,5 @@
 pub use super::opcodes::*;
-pub use super::registers::{Reg, regs, Flags};
+pub use super::registers::{Flags, Reg, regs};
 pub use super::value::Value;
 
 pub trait Cpu {
@@ -21,6 +21,8 @@ pub trait Bus {
     fn int_reset(&mut self, bit: u8);
     fn int_set(&mut self, bit: u8);
     fn interrupt(&mut self) -> u8;
+
+    fn toggle_ds(&mut self);
 }
 
 #[derive(Copy, Debug, Clone, Eq, PartialEq)]
