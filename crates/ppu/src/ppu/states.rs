@@ -208,8 +208,12 @@ impl State for HState {
         if self.dots == 0 {
             let reg = io.io_mut(IO::LY);
             let ly = reg.value() + 1;
-            reg.direct_write(ly);
-            Some(if ly == 144 { VState::new().boxed() } else { OamState::new().boxed() })
+            Some(if ly == 144 {
+                VState::new().boxed()
+            } else {
+                reg.direct_write(ly);
+                OamState::new().boxed()
+            })
         } else {
             None
         }
