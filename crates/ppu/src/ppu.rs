@@ -121,14 +121,15 @@ impl Ppu {
             lcd.disable(io);
         }
         self.lcdc = lcdc;
-        self.dots += 1;
         if self.lcdc.enabled() {
+            self.dots += 1;
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     lcd.vblank();
                     lcd.enable();
                 } else if state.mode() == VBlank {
+                    log::debug!("ppu frame time: {} dots", self.dots);
                     self.dots = 0;
                 }
                 self.set_state(io, state, next);
