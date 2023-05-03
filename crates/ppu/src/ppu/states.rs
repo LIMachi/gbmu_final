@@ -179,11 +179,11 @@ impl State for VState {
             return Some(OamState::new().boxed());
         }
         let ly = io.io_mut(IO::LY);
+        self.dots = self.dots.saturating_sub(1);
         if self.dots % 456 == 0 {
             let v = (ly.value() + 1) % 154;
             ly.direct_write(v);
         }
-        self.dots = self.dots.saturating_sub(1);
         if self.dots == 0 {
             ppu.win.y = 0;
             ly.direct_write(0);
@@ -208,10 +208,10 @@ impl State for HState {
         if self.dots == 0 {
             let reg = io.io_mut(IO::LY);
             let ly = reg.value() + 1;
+            reg.direct_write(ly);
             Some(if ly == 144 {
                 VState::new().boxed()
             } else {
-                reg.direct_write(ly);
                 OamState::new().boxed()
             })
         } else {
