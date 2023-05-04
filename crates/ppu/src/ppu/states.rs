@@ -180,19 +180,15 @@ impl State for VState {
         }
         let ly = io.io_mut(IO::LY);
         self.dots = self.dots.saturating_sub(1);
-        if self.dots % 456 == 0 {
-            let v = (ly.value() + 1) % 154;
-            if v == 153 {
-                ly.direct_write(0);
-            } else {
-                ly.direct_write(v);
-            }
-        }
         if self.dots == 0 {
             ppu.win.y = 0;
             ly.direct_write(0);
             Some(OamState::new().boxed())
         } else {
+            if self.dots % 456 == 0 {
+                let v = (ly.value() + 1) % 153;
+                ly.direct_write(v);
+            }
             None
         }
     }

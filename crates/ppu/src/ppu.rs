@@ -122,13 +122,6 @@ impl Ppu {
         }
         self.lcdc = lcdc;
         if self.lcdc.enabled() {
-            unsafe {
-                static mut ly: u8 = 0;
-                if self.dots % 456 == 0 {
-                    ly = io.io(IO::LY).value();
-                    log::debug!("[{} - {:?}] - ly: {} ({}/ 456)", self.dots, state.mode(), ly, self.dots % 456);
-                }
-            }
             self.dots += 1;
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
