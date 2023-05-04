@@ -10,7 +10,7 @@ impl Default for CRAM {
     fn default() -> Self {
         Self {
             bgdata: [0xFF; 64],
-            objdata: [0; 64],
+            objdata: [0xFF; 64],
         }
     }
 }
@@ -51,6 +51,29 @@ impl CRAM {
             }
         }
     }
+
+    pub fn dump(&self) {
+        for pal in 0..8 {
+            for c in 0..4usize {
+                let rgb555 = self.bgdata[pal * 8 + c * 2] as u16 | (self.bgdata[pal * 8 + c * 2 + 1] as u16) << 8;
+                if rgb555 & 0x8000 != 0 {
+                    if c != 0 { panic!("well here goes theory"); }
+                    break;
+                }
+                log::debug!("[BGP|PAL-{pal}] {rgb555:#08X} {:#02X?}", rgb555.to_bytes());
+            }
+        }
+        for pal in 0..8 {
+            for c in 0..4usize {
+                let rgb555 = self.objdata[pal * 8 + c * 2] as u16 | (self.objdata[pal * 8 + c * 2 + 1] as u16) << 8;
+                if rgb555 & 0x8000 != 0 {
+                    if c != 0 { panic!("well here goes theory"); }
+                    break;
+                }
+                log::debug!("[OBJ|PAL-{pal}] {rgb555:#08X} {:#02X?}", rgb555.to_bytes());
+            }
+        }
+    }
 }
 
 impl IODevice for CRAM {
@@ -69,6 +92,9 @@ impl IODevice for CRAM {
                 let addr = ocps.value() & 0x3F;
                 if inc { ocps.direct_write(0x80 | ((addr + 1) & 0x3F)); }
                 self.objdata[addr as usize] = v;
+            }
+            IO::POST => {
+                self.dump();
             }
             _ => {}
         }

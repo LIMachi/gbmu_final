@@ -7,7 +7,15 @@ extern crate core;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
+
+pub use dma::Dma;
+pub use hdma::Hdma;
 use lcd::Lcd;
+use mem::{Oam, Vram};
+pub use ppu::Ppu;
+pub use render::{PpuAccess, VramAccess, VramViewer};
+use shared::emulator::Emulator;
+use shared::io::{IO, IODevice, IORegs};
 use shared::mem::{IOBus, Lock};
 
 mod render;
@@ -15,15 +23,6 @@ mod ppu;
 
 mod dma;
 mod hdma;
-
-pub use dma::Dma;
-pub use hdma::Hdma;
-use mem::{Oam, Vram};
-use shared::emulator::Emulator;
-use shared::io::{IO, IODevice, IORegs};
-
-pub use render::{PpuAccess, VramAccess, VramViewer};
-pub use ppu::Ppu;
 
 pub struct Controller {
     ppu: Ppu,
@@ -34,7 +33,7 @@ impl Controller {
     pub fn new() -> Self {
         Self {
             ppu: Ppu::new(),
-            state: Ppu::default_state()
+            state: Ppu::default_state(),
         }
     }
 
