@@ -4,6 +4,10 @@ use shared::mem::IOBus;
 pub struct CRAM {
     bgdata: [u8; 64],
     objdata: [u8; 64],
+    dmgbgpal: [[u8; 3]; 4],
+    dmgobj0pal: [[u8; 3]; 4],
+    dmgobj1pal: [[u8; 3]; 4],
+    posted_in_cgb: bool
 }
 
 impl Default for CRAM {
@@ -11,6 +15,10 @@ impl Default for CRAM {
         Self {
             bgdata: [0xFF; 64],
             objdata: [0xFF; 64],
+            dmgbgpal: [[0xFF; 3]; 4],
+            dmgobj0pal: [[0xFF; 3]; 4],
+            dmgobj1pal: [[0xFF; 3]; 4],
+            posted_in_cgb: false
         }
     }
 }
@@ -33,11 +41,23 @@ impl CRAM {
         match (pixel.color, pixel.attrs, pixel.sprite, io.io(IO::KEY0).value() & CGB_MODE != 0) {
             (c, a, true, false) => {
                 let palette = if a.obp1() { io.io(IO::OBP1) } else { io.io_mut(IO::OBP0) }.read() >> (2 * c);
-                io.palette().color(palette & 3)
+                if self.posted_in_cgb {
+                    if a.obp1() {
+                        self.dmgobj1pal[(palette & 3) as usize]
+                    } else {
+                        self.dmgobj0pal[(palette & 3) as usize]
+                    }
+                } else {
+                    io.palette().color(palette & 3)
+                }
             }
             (c, _, false, false) => {
                 let palette = io.io(IO::BGP).read() >> (2 * c);
-                io.palette().color(palette & 3)
+                if self.posted_in_cgb {
+                    self.dmgbgpal[(palette & 3) as usize]
+                } else {
+                    io.palette().color(palette & 3)
+                }
             }
             (c, a, true, true) => {
                 let palette = a.palette();
@@ -74,6 +94,24 @@ impl CRAM {
             }
         }
     }
+
+    fn palette_from_boot(&mut self) {
+        for c in 0..4 {
+            let rgb555 = self.bgdata[c * 2] as u16 | (self.bgdata[c * 2 + 1] as u16) << 8;
+            self.dmgbgpal[c] = rgb555.to_bytes();
+        }
+        for o in 0..2 {
+            for c in 0..4 {
+                let rgb555 = self.objdata[o * 8 + c * 2] as u16 | (self.objdata[o * 8 + c * 2 + 1] as u16) << 8;
+                if o == 0 {
+                    self.dmgobj0pal[c] = rgb555.to_bytes();
+                } else {
+                    self.dmgobj1pal[c] = rgb555.to_bytes();
+                }
+            }
+        }
+        self.posted_in_cgb = true;
+    }
 }
 
 impl IODevice for CRAM {
@@ -94,7 +132,10 @@ impl IODevice for CRAM {
                 self.objdata[addr as usize] = v;
             }
             IO::POST => {
-                self.dump();
+                // self.dump();
+                if bus.io(IO::CGB).value() != 0 {
+                    self.palette_from_boot();
+                }
             }
             _ => {}
         }

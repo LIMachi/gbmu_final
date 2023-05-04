@@ -47,7 +47,7 @@ pub(crate) struct Scroll {
 }
 
 pub struct Ppu {
-    pub(crate) dots: usize,
+    // pub(crate) dots: usize,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
     pub(crate) win: Window,
@@ -63,7 +63,7 @@ impl Ppu {
         let sprites = Vec::with_capacity(10);
         Self {
             sc: Scroll::default(),
-            dots: 0,
+            // dots: 0,
             cram: cram::CRAM::default(),
             sprites,
             lcdc: 0,
@@ -115,22 +115,22 @@ impl Ppu {
     pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
         let lcdc = io.io(IO::LCDC).value();
         if self.lcdc.enabled() && !lcdc.enabled() {
-            self.dots = 0;
+            // self.dots = 0;
             io.io_mut(IO::LY).direct_write(0);
             self.set_state(io, state, VState::immediate().boxed());
             lcd.disable(io);
         }
         self.lcdc = lcdc;
         if self.lcdc.enabled() {
-            self.dots += 1;
+            // self.dots += 1;
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     lcd.vblank();
                     lcd.enable();
                 } else if state.mode() == VBlank {
-                    log::debug!("ppu frame time: {} dots", self.dots);
-                    self.dots = 0;
+                    // log::debug!("ppu frame time: {} dots", self.dots);
+                    // self.dots = 0;
                 }
                 self.set_state(io, state, next);
             }
