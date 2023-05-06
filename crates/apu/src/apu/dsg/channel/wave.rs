@@ -41,9 +41,22 @@ impl Channel {
     fn frequency(&self, io: &mut IORegs) -> u16 {
         io.io(IO::NR33).value() as u16 | ((io.io(IO::NR34).value() as u16 & 0x7) << 8)
     }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn SoundChannel + 'static> {
+        Box::new(Self {
+            cycle: raw[0] as usize,
+            freq_timer: ((raw[1] as u16) << 8) | (raw[2] as u16),
+            dac: raw[3] == 1,
+            freq: ((raw[4] as u16) << 8) | (raw[5] as u16),
+        })
+    }
 }
 
 impl SoundChannel for Channel {
+    fn raw(&self) -> Vec<u8> {
+        vec![self.cycle as u8, (self.freq_timer & 0xFF) as u8, ((self.freq_timer >> 8) & 0xFF) as u8, if self.dac { 1 } else { 0 }, (self.freq & 0xFF) as u8, ((self.freq >> 8) & 0xFF) as u8]
+    }
+
     fn output(&self, io: &mut IORegs) -> u8 {
         let v = (io.io(IO::NR32).value() >> 5) & 0x3;
         if v == 0 { return 0 }

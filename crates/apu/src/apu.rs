@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use dsg::{Channel, Event};
 use shared::audio_settings::AudioSettings;
 use shared::io::{IO, IODevice, IORegs};
@@ -10,6 +11,7 @@ mod dsg;
 
 pub const TICK_RATE: f64 = 4_194_304.;
 
+#[derive(Serialize, Deserialize)]
 pub struct Apu {
     fedge: FEdge,
     div_apu: u8,
@@ -17,7 +19,8 @@ pub struct Apu {
     sample_rate: u32,
     speed: f64,
     tick: f64,
-    input: Input,
+    #[serde(default, skip)]
+    pub input: Input, //TODO serde: rebind input on deserialize
     dsg: dsg::DSG,
     channels: Vec<Channel>,
     on: bool,
@@ -42,6 +45,12 @@ impl Default for Apu {
 }
 
 impl Apu {
+    pub fn reload(self, load: Self) -> Self {
+        let mut t = load;
+        t.input = self.input;
+        t
+    }
+
     fn charge_factor(&self) -> f32 {
         // TODO match on hypothetical cgb bus (0.998943 for cgb)
         0.999958f32.powf(TICK_RATE as f32 / self.sample_rate as f32)

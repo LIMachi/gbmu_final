@@ -1,10 +1,12 @@
+use serde::{Deserializer, Serializer};
 use shared::{cpu::{Opcode, Reg, Value}};
+use shared::serde::{Deserialize, Serialize};
 
 use crate::Bus;
 
 use super::{decode::decode, ops::*, Registers, State};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum Mode {
     Running,
     Halt,
@@ -23,8 +25,52 @@ pub struct Cpu {
     prefixed: bool,
     finished: bool,
     ime: bool,
-    doctor: Option<std::fs::File>,
+    doctor: Option<std::fs::File>, //TODO serde: rebind
     stop: usize,
+}
+
+#[derive(Serialize, Deserialize)]
+struct InnerCpu {
+    prev: Opcode,
+    at: u16,
+    mode: Mode,
+    ins: usize,
+    count: usize,
+    regs: Registers,
+    cache: Vec<Value>,
+    prefixed: bool,
+    finished: bool,
+    ime: bool,
+    stop: usize,
+}
+
+impl Serialize for Cpu {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        InnerCpu{prev: self.prev, at: self.at, mode: self.mode, ins: self.ins, count: self.count, regs: self.regs, cache: self.cache.clone(), prefixed: self.prefixed, finished: self.finished, ime: self.ime, stop: self.stop}.serialize(serializer)
+    }
+}
+
+impl <'de> Deserialize<'de> for Cpu {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Deserialize::deserialize(deserializer).map(|inner: InnerCpu| {
+            Cpu{
+                prev: inner.prev,
+                at: inner.at,
+                mode: inner.mode,
+                instructions: decode(inner.prev),
+                ins: inner.ins,
+                count: inner.count,
+                regs: inner.regs,
+                cache: inner.cache,
+                prefixed: inner.prefixed,
+                finished: inner.finished,
+                ime: inner.ime,
+                doctor: None,
+                stop: inner.stop
+            }
+        })
+
+    }
 }
 
 impl shared::cpu::Cpu for Cpu {
@@ -58,6 +104,13 @@ impl Default for Cpu {
 }
 
 impl Cpu {
+
+    pub fn reload(self, load: Self) -> Self {
+        let mut t = load;
+        t.doctor = self.doctor;
+        t
+    }
+
     pub fn skip_boot(&mut self, cgb: bool) {
         self.regs = if cgb { Registers::GBC } else { Registers::GB };
     }

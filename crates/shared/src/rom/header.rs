@@ -1,8 +1,9 @@
 use std::ops::BitXor;
 
 use log::warn;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum Console {
     GBC,
     DMG,
@@ -31,7 +32,7 @@ impl From<u8> for Console {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Gameboy {
     DMG,
     Super,
@@ -95,7 +96,7 @@ impl Capabilities {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Cartridge {
     Rom,
@@ -127,7 +128,7 @@ impl Default for Cartridge {
     fn default() -> Self { Cartridge::Rom }
 }
 
-
+#[derive(Serialize, Deserialize)]
 pub enum Mbc {
     MBC0,
     MBC1,
@@ -230,10 +231,10 @@ impl From<u8> for Cartridge {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct RomSize(u8);
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct RamSize(u8);
 
 impl RomSize {
@@ -305,7 +306,7 @@ impl RamSize {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Header {
     pub logo: Vec<u8>,
     pub title: String,

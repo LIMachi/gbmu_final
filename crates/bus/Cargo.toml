@@ -13,6 +13,10 @@ audio = []
 log = "0.4.17"
 thiserror = "1.0.38"
 
+[dependencies.serde]
+version = "1.0.152"
+features = ["derive"]
+
 [dependencies.shared]
 path = "../shared"
 [dependencies.joy]

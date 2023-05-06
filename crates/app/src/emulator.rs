@@ -1,12 +1,15 @@
+use std::fs::File;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
+use winit::dpi::Pixel;
 use winit::event::WindowEvent;
 
 use bus::Devices;
 use mem::{Oam, Vram};
 use serial::com::Serial;
-use serial::Link;
+use serial::{Link, Port};
 use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
@@ -25,13 +28,24 @@ use crate::app::RomConfig;
 use crate::render::{Event, Render};
 use crate::settings::Mode;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Console {
     speed: i32,
     rom: Option<Rom>,
     pub bus: bus::Bus,
     pub gb: Devices,
     running: bool,
+}
+
+impl Console {
+    pub fn save(&self, path: &PathBuf) {
+        let mut h= File::create(path).unwrap_or_else(|_| panic!("cannot open path {path:?}"));
+        bincode::serialize_into(h, self).unwrap_or_else(|_| panic!("cannot serialize Console"));
+    }
+
+    pub fn load_state(path: &PathBuf) -> Option<Self> {
+        File::open(path).ok().and_then(|file| bincode::deserialize_from(file).ok())
+    }
 }
 
 fn autosave_default() -> u64 { 900 }
@@ -104,6 +118,20 @@ impl Emulator {
         };
         emu.bindings.init();
         emu
+    }
+
+    pub fn save_state(&self, path: &PathBuf) {
+        self.console.save(path);
+    }
+
+    pub fn load_state(&mut self, path: &PathBuf) {
+        if let Some(mut console) = Console::load_state(path) {
+            self.serial_claim();
+            console.gb.serial = Port::new(self.link.port());
+            self.audio.reload(&mut console.gb.apu);
+            self.console = console;
+            self.proxy.send_event(Events::Reload).ok();
+        }
     }
 
     pub fn mode(&self) -> Mode { self.cgb }

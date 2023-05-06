@@ -1,4 +1,6 @@
-#[derive(Default, Copy, Clone, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Attributes(pub u8);
 
 impl Attributes {
@@ -10,7 +12,7 @@ impl Attributes {
     pub fn palette(&self) -> usize { (self.0 & 0x7) as usize }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct Pixel {
     pub color: u8,
     pub index: Option<u8>,

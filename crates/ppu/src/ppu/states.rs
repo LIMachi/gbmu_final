@@ -1,15 +1,17 @@
 use std::fmt::{Debug, Formatter};
+use serde::{Deserialize, Serialize};
 
 use lcd::Lcd;
 use mem::oam::Sprite;
 use shared::io::{IO, IORegs, LCDC};
 use shared::mem::Source;
+use crate::ppu::PpuState;
 
 use super::{
     fetcher::{self, Fetcher}, fifo::{BgFifo, ObjFifo}, Ppu, Scroll,
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Mode {
     Search = 2,
@@ -25,6 +27,8 @@ pub(crate) trait State: Debug {
     fn name(&self) -> String {
         format!("{:?}", self.mode())
     }
+    fn first_tick(&self) -> bool { false }
+    fn raw(&self) -> Vec<u8> { vec![] }
 }
 
 #[derive(Debug)]
@@ -35,8 +39,13 @@ pub struct OamState {
 
 impl OamState {
     pub fn new() -> Self { Self { sprite: 0, clock: 0 } }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        Box::new(Self { clock: raw[0], sprite: raw[1] as usize})
+    }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct TransferState {
     dots: usize,
     lx: u8,
@@ -89,6 +98,10 @@ impl State for OamState {
             Some(TransferState::new(ppu, io).boxed())
         } else { None }
     }
+
+    fn raw(&self) -> Vec<u8> {
+        vec![self.clock, self.sprite as u8]
+    }
 }
 
 impl TransferState {
@@ -105,6 +118,11 @@ impl TransferState {
             bg: BgFifo::new(),
             oam: ObjFifo::new(io.io(IO::OPRI).bit(0) != 0),
         }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        let t: Self = bincode::deserialize(&*raw).unwrap();
+        Box::new(t)
     }
 }
 
@@ -157,6 +175,10 @@ impl State for TransferState {
         }
         None
     }
+
+    fn raw(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
 }
 
 impl VState {
@@ -166,6 +188,10 @@ impl VState {
 
     pub fn immediate() -> Self {
         Self { dots: 0 }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8)})
     }
 }
 
@@ -192,11 +218,23 @@ impl State for VState {
             None
         }
     }
+
+    fn first_tick(&self) -> bool {
+        self.dots >= Self::DOTS
+    }
+
+    fn raw(&self) -> Vec<u8> {
+        vec![self.dots as u8, (self.dots >> 8) as u8]
+    }
 }
 
 impl HState {
     pub fn new(dots: usize) -> Self {
         Self { dots }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8)})
     }
 }
 
@@ -217,5 +255,9 @@ impl State for HState {
         } else {
             None
         }
+    }
+
+    fn raw(&self) -> Vec<u8> {
+        vec![self.dots as u8, (self.dots >> 8) as u8]
     }
 }

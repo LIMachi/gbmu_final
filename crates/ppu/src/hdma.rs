@@ -1,13 +1,14 @@
+use serde::{Deserialize, Serialize};
 use shared::io::{CGB_MODE, IO, IODevice};
 use shared::mem::{IOBus, Source};
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 enum Mode {
     General,
     HBlank,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 enum State {
     Wait,
     Transfer,
@@ -21,6 +22,7 @@ impl Mode {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Hdma {
     mode: Option<Mode>,
     state: State,

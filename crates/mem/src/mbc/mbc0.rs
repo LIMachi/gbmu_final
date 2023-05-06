@@ -6,6 +6,14 @@ pub struct Mbc0 {
     ram: Vec<u8>
 }
 
+impl Mbc0 {
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
+        let rom = raw[..=SROM_END as usize].to_vec();
+        let ram = raw[SRAM as usize..].to_vec();
+        Box::new(Self { rom, ram })
+    }
+}
+
 impl Mem for Mbc0 {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         match absolute {
@@ -39,4 +47,10 @@ impl super::MemoryController for Mbc0 {
     }
 }
 
-impl Mbc for Mbc0 { }
+impl Mbc for Mbc0 {
+    fn raw(&self) -> Vec<u8> {
+        let mut out = self.rom.clone();
+        out.extend(&self.ram);
+        out
+    }
+}

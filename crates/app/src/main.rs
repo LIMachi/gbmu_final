@@ -1,5 +1,7 @@
 #![feature(hash_drain_filter)]
 
+extern crate core;
+
 use std::time::Duration;
 
 use winit::{

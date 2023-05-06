@@ -6,16 +6,19 @@ use mem::{Hram, mbc, Oam, Vram, Wram};
 use shared::{cpu::MemStatus, cpu::Op, mem::*};
 use shared::io::{IO, IODevice, IOReg, IORegs};
 use shared::rom::Rom;
+use shared::serde::{Deserialize, Serialize};
 use shared::utils::palette::Palette;
 pub use timer::Timer;
 
 mod timer;
 mod devices;
 
+#[derive(Serialize, Deserialize)]
 pub struct Empty {}
 
 impl Mem for Empty {}
 
+#[derive(Serialize, Deserialize)]
 pub struct Bus {
     clock: u8,
     mbc: Lock<mbc::Controller>,

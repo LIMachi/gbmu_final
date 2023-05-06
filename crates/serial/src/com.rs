@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
+use serde::{Deserialize, Serialize};
 
 pub enum Event { Stop, Connected(SocketAddr), Disconnect }
 
@@ -46,7 +47,6 @@ impl Client {
     }
 }
 
-
 pub struct Serial {
     signal: Sender<Event>,
     events: Receiver<Event>,
@@ -55,6 +55,12 @@ pub struct Serial {
     send: Sender<u8>,
     connected: Arc<AtomicBool>,
     pub(crate) port: u16,
+}
+
+impl Default for Serial {
+    fn default() -> Self {
+        Serial::phantom()
+    }
 }
 
 pub struct Server {

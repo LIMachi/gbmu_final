@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use serde::{Deserialize, Serialize};
 
 use shared::io::{IO, IORegs, LCDC};
 
@@ -6,6 +7,7 @@ use crate::ppu::pixel::Attributes;
 
 use super::pixel::Pixel;
 
+#[derive(Serialize, Deserialize)]
 pub struct ObjFifo {
     inner: VecDeque<Pixel>,
     opri: bool,
@@ -37,6 +39,7 @@ impl ObjFifo {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct BgFifo {
     inner: VecDeque<Pixel>,
     enabled: bool,

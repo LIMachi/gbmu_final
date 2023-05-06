@@ -13,6 +13,19 @@ pub struct Mbc2 {
     ram_enabled: bool
 }
 
+impl Mbc2 {
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
+        let sl = std::mem::size_of::<usize>();
+        let rom_banks = usize::from_le_bytes(raw[..sl].try_into().unwrap());
+        let rom_bank = usize::from_le_bytes(raw[sl..2 * sl].try_into().unwrap());
+        let ram_enabled = raw[2 * sl] == 1;
+        let rom_end = 2 * sl + 1 + 0x4000 * rom_banks;
+        let rom = raw[2 * sl + 1 .. rom_end].to_vec();
+        let ram = raw[rom_end..].to_vec();
+        Box::new(Self { rom_banks, rom_bank, ram_enabled, rom, ram})
+    }
+}
+
 impl super::Mem for Mbc2 {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         match absolute {
@@ -95,4 +108,17 @@ impl super::MemoryController for Mbc2 {
     fn rom_bank(&self) -> usize { self.rom_bank }
 }
 
-impl Mbc for Mbc2 { }
+impl Mbc for Mbc2 {
+    fn kind(&self) -> u8 {
+        2
+    }
+
+    fn raw(&self) -> Vec<u8> {
+        let mut out = self.rom_banks.to_le_bytes().to_vec();
+        out.extend(self.rom_bank.to_le_bytes());
+        out.push(if self.ram_enabled { 1 } else { 0 });
+        out.extend(&self.rom);
+        out.extend(&self.ram);
+        out
+    }
+}

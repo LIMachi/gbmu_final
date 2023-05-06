@@ -38,4 +38,18 @@ impl Envelope {
         if self.timer == 0 { self.timer = 8 }
         self.value = self.base;
     }
+
+    pub fn raw(&self) -> Vec<u8> {
+        vec![self.base, self.value, self.timer, self.period, if self.increase { 1 } else { 0 }]
+    }
+
+    pub fn from_raw(raw: &[u8]) -> Self {
+        Self {
+            base: raw[0],
+            value: raw[1],
+            timer: raw[2],
+            period: raw[3],
+            increase: raw[4] == 1
+        }
+    }
 }

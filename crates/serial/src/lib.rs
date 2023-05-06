@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 
 use shared::io::{IO, IODevice, IORegs};
 use shared::mem::IOBus;
+use shared::serde::{Deserialize, Serialize};
 
 use crate::com::Serial;
 
@@ -44,7 +45,7 @@ impl Link {
 }
 
 pub struct Port {
-    cable: Serial,
+    pub cable: Serial,
     ready: bool,
     bits: u8,
     cycles: usize,
@@ -56,6 +57,7 @@ impl Default for Port {
 }
 
 impl Port {
+
     pub fn new(cable: Serial) -> Self {
         Self { data: None, cable, bits: 0, cycles: 0, ready: false }
     }

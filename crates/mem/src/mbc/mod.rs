@@ -1,7 +1,12 @@
+use std::fmt::Formatter;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use serde::ser::SerializeStruct;
+use serde::{de, Deserializer, Serializer};
+use serde::de::{MapAccess, SeqAccess, Visitor};
 
 use shared::{mem::*, rom::{Mbc as Mbcs, Rom}, rom};
+use shared::serde::{Deserialize, Serialize};
 
 use crate::boot::Boot;
 
@@ -21,10 +26,13 @@ pub trait MemoryController {
 
 pub(crate) trait Mbc: MemoryController + Mem {
     fn is_boot(&self) -> bool { false }
+    fn kind(&self) -> u8 { 0 }
+    fn raw(&self) -> Vec<u8> { vec![] }
     fn unmap(&mut self) -> Box<dyn Mbc> { unreachable!() }
     fn tick(&mut self) {}
 }
 
+#[derive(Default, Clone)]
 pub struct Unplugged {}
 
 impl Mem for Unplugged {}
@@ -39,9 +47,96 @@ impl MemoryController for Unplugged {
 }
 
 pub struct Controller {
-    header: shared::rom::Header,
+    header: rom::Header,
     sav: Option<PathBuf>,
     inner: Box<dyn Mbc>,
+}
+
+impl Serialize for Controller {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let mut s = serializer.serialize_struct("Controller", 3)?;
+        s.serialize_field("sav", &self.sav)?;
+        s.serialize_field("mbc", &self.inner.kind())?;
+        s.serialize_field("raw", &self.inner.raw())?;
+        s.end()
+    }
+}
+
+impl <'de> Deserialize<'de> for Controller {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field { Sav, Mbc, Raw }
+
+        struct ControllerVisitor;
+
+        impl <'de> Visitor<'de> for ControllerVisitor {
+            type Value = Controller;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                formatter.write_str("struct Controller")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                let sav: Option<PathBuf> = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let mbc: u8 = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let raw: Vec<u8> = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let header = rom::Header::new(raw[..0x150].try_into().unwrap());
+                let inner = match mbc {
+                    0 => mbc0::Mbc0::from_raw(raw),
+                    1 => mbc1::Mbc1::from_raw(raw),
+                    2 => mbc2::Mbc2::from_raw(raw),
+                    3 => mbc3::Mbc3::from_raw(raw),
+                    5 => mbc5::Mbc5::from_raw(raw),
+                    _ => Box::new(Unplugged::default())
+                };
+                Ok(Controller{header, sav, inner})
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error> where A: MapAccess<'de> {
+                let mut sav: Option<Option<PathBuf>> = None;
+                let mut mbc: Option<u8> = None;
+                let mut raw: Option<Vec<u8>> = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Sav => {
+                            if sav.is_some() {
+                                return Err(de::Error::duplicate_field("sav"));
+                            }
+                            sav = Some(map.next_value()?);
+                        },
+                        Field::Mbc => {
+                            if mbc.is_some() {
+                                return Err(de::Error::duplicate_field("mbc"));
+                            }
+                            mbc = Some(map.next_value()?);
+                        },
+                        Field::Raw => {
+                            if raw.is_some() {
+                                return Err(de::Error::duplicate_field("raw"));
+                            }
+                            raw = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let sav = sav.ok_or_else(|| de::Error::missing_field("sav"))?;
+                let mbc = mbc.ok_or_else(|| de::Error::missing_field("mbc"))?;
+                let raw = raw.ok_or_else(|| de::Error::missing_field("raw"))?;
+                let header = rom::Header::new(raw[..0x150].try_into().unwrap());
+                let inner = match mbc {
+                    0 => mbc0::Mbc0::from_raw(raw),
+                    1 => mbc1::Mbc1::from_raw(raw),
+                    2 => mbc2::Mbc2::from_raw(raw),
+                    3 => mbc3::Mbc3::from_raw(raw),
+                    5 => mbc5::Mbc5::from_raw(raw),
+                    _ => Box::new(Unplugged::default())
+                };
+                Ok(Controller{header, sav, inner})
+            }
+        }
+
+        deserializer.deserialize_struct("Controller", &["sav", "mbc", "raw"], ControllerVisitor)
+    }
 }
 
 impl Default for Controller {

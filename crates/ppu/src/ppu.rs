@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use pixel::Pixel;
 use shared::io::{IO, IODevice, IORegs, LCDC};
 use shared::mem::*;
-use shared::utils::ToBox;
 use states::*;
 
 use crate::ppu::states::Mode::VBlank;
@@ -12,10 +12,11 @@ mod fetcher;
 mod cram;
 mod pixel;
 mod fifo;
-mod states;
+pub(crate) mod states;
 
 pub(crate) type PpuState = Box<dyn State>;
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct REdge {
     inner: bool,
 }
@@ -32,7 +33,7 @@ impl REdge {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(crate) struct Window {
     pub scan_enabled: bool,
     pub enabled: bool,
@@ -40,12 +41,13 @@ pub(crate) struct Window {
     pub x: u8,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(crate) struct Scroll {
     pub x: u8,
     pub y: u8,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Ppu {
     // pub(crate) dots: usize,
     pub(crate) cram: cram::CRAM,
@@ -54,8 +56,10 @@ pub struct Ppu {
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
     pub(crate) lcdc: u8,
-    pub(crate) oam: Option<&'static mut Lock<Oam>>,
-    pub(crate) vram: Option<&'static mut Lock<Vram>>,
+    #[serde(default,skip)]
+    pub(crate) oam: Option<&'static mut Lock<Oam>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
+    #[serde(default,skip)]
+    pub(crate) vram: Option<&'static mut Lock<Vram>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
 }
 
 impl Ppu {

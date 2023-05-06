@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 shared = { path = "../shared" }
 log = "0.4.17"
+
+[dependencies.serde]
+version = "1.0.152"
+features = ["derive"]

@@ -1,6 +1,7 @@
 mod channel;
 
 
+use serde::{Deserialize, Serialize};
 pub(crate) use channel::{Event, Channel};
 use shared::io::{AccessMode, IO, IORegs};
 
@@ -10,6 +11,7 @@ enum Panning {
     Left = 4,
 }
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct DSG {
     output: [f32; 2],
     capacitor: [f32; 2],

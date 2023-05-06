@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 use shared::io::{IO, IODevice};
 use shared::mem::{IOBus, OAM, Source};
 
+#[derive(Serialize, Deserialize)]
 pub struct Dma {
     st: u16,
     p: usize

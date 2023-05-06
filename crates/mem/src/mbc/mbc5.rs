@@ -1,7 +1,8 @@
 use shared::mem::*;
 use shared::rom::Rom;
+use shared::utils::rtc::Rtc;
 
-use crate::mbc::MemoryController;
+use crate::mbc::{Mbc, MemoryController};
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE: usize = 0x2000;
@@ -23,6 +24,21 @@ pub struct Mbc5 {
     ram_bank: usize,
     rom_banks: usize,
     ram_banks: usize,
+}
+
+impl Mbc5 {
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
+        let sl = std::mem::size_of::<usize>();
+        let rom_banks = usize::from_le_bytes(raw[..sl].try_into().unwrap());
+        let ram_banks = usize::from_le_bytes(raw[sl..2 * sl].try_into().unwrap());
+        let rom_bank = usize::from_le_bytes(raw[2 * sl..3 * sl].try_into().unwrap());
+        let ram_bank = usize::from_le_bytes(raw[3 * sl..4 * sl].try_into().unwrap());
+        let enabled_ram = raw[4 * sl] == 1;
+        let rom_end = 4 * sl + 1 + rom_banks * 0x4000;
+        let rom = raw[4 * sl + 1 .. rom_end].to_vec();
+        let ram = raw[rom_end ..].to_vec();
+        Box::new(Self { rom_banks, ram_banks, rom_bank, ram_bank, enabled_ram, rom, ram})
+    }
 }
 
 impl Mem for Mbc5 {
@@ -96,4 +112,19 @@ impl MemoryController for Mbc5 {
     }
 }
 
-impl super::Mbc for Mbc5 {}
+impl super::Mbc for Mbc5 {
+    fn kind(&self) -> u8 {
+        5
+    }
+
+    fn raw(&self) -> Vec<u8> {
+        let mut out = self.rom_banks.to_le_bytes().to_vec();
+        out.extend(self.ram_banks.to_le_bytes());
+        out.extend(self.rom_bank.to_le_bytes());
+        out.extend(self.ram_bank.to_le_bytes());
+        out.push(if self.enabled_ram { 1 } else { 0 });
+        out.extend(&self.rom);
+        out.extend(&self.ram);
+        out
+    }
+}

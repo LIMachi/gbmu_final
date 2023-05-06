@@ -1,8 +1,9 @@
 use shared::input::KeyCat;
 use shared::io::{IO, IODevice, IORegs};
 use shared::mem::IOBus;
+use shared::serde::{Deserialize, Serialize};
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Joypad {
     state: u8,
 }
