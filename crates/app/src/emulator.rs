@@ -1,4 +1,5 @@
-use std::fs::File;
+use std::fs;
+use std::fs::{DirEntry, File};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -120,12 +121,27 @@ impl Emulator {
         emu
     }
 
-    pub fn save_state(&self, path: &PathBuf) {
-        self.console.save(path);
+    pub fn save_state(&self, path: Option<PathBuf>) {
+        let path = if path.is_some() { path.unwrap() } else {
+            PathBuf::from("./save_states/test.save_state") //FIXME: generate path from rom name + date / change save_state folder location
+        };
+        self.console.save(&path); //FIXME: use clone of console in another thread for serialization (because it takes a long time)
     }
 
-    pub fn load_state(&mut self, path: &PathBuf) {
-        if let Some(mut console) = Console::load_state(path) {
+    pub fn load_state(&mut self, path: Option<PathBuf>) {
+        let path = if path.is_some() { path.unwrap() } else {
+            fs::read_dir("./save_states").expect("Missing local save_states directory").flatten().fold(None, |a: Option<DirEntry>, e: DirEntry| { //FIXME: change save_state folder location
+                if let Some(t) = &a {
+                    let pt = t.metadata().unwrap().modified().unwrap();
+                    if e.metadata().is_ok_and(|m| m.is_file() && m.modified().is_ok_and(|l| l < pt)) {
+                        return Some(e);
+                    }
+                    return a;
+                }
+                Some(e)
+            }).expect("no save states to load").path()
+        };
+        if let Some(mut console) = Console::load_state(&path) { //FIXME: deserialization too long + corrupted
             self.serial_claim();
             console.gb.serial = Port::new(self.link.port());
             self.audio.reload(&mut console.gb.apu);

@@ -23,6 +23,8 @@ enum Texture {
     Add,
     Save,
     Nosave,
+    SaveState,
+    LoadState,
     Cover(String),
 }
 
