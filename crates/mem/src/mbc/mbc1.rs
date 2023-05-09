@@ -78,15 +78,23 @@ impl Mem for Mbc1 {
                 if self.rom_reg_1 == 0 { bank = 1; }
                 bank |= (self.rom_reg_2 as usize) << 5;
                 bank &= self.rom_banks;
-                let st = bank << 14;
+                let mut st = bank << 14;
                 let end = st + 0x4000;
-                self.rom[st..end].to_vec()
+                if end > self.rom.len() {
+                    vec![0; 0x4000]
+                } else {
+                    self.rom[st..(st + 0x4000)].to_vec()
+                }
             }
             SRAM => {
                 let bank = if self.bank_mode { self.rom_reg_2 as usize & self.ram_banks } else { 0 };
                 let st = bank << 13;
                 let end = st + 0x2000;
-                self.ram[st..end].to_vec()
+                if end > self.ram.len() {
+                    vec![0; 0x2000]
+                } else {
+                    self.ram[st..end].to_vec()
+                }
             }
             _ => vec![]
         }
