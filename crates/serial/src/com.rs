@@ -5,26 +5,64 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
 
+use shared::serde::{Deserialize, Serialize};
+
 pub enum Event { Stop, Connected(SocketAddr), Disconnect }
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum Msg {
+    Transfer(u8),
+    Respond(u8),
+    Ack,
+}
+
+impl From<&[u8; 2]> for Msg {
+    fn from(&[op, v]: &[u8; 2]) -> Self {
+        match op {
+            0 => Msg::Transfer(v),
+            1 => Msg::Respond(v),
+            2 => Msg::Ack,
+            _ => panic!("out of range")
+        }
+    }
+}
+
+impl Msg {
+    pub fn serialize(&self, target: &mut [u8; 2]) {
+        match self {
+            Msg::Transfer(v) => {
+                target[0] = 0;
+                target[1] = *v;
+            }
+            Msg::Respond(v) => {
+                target[0] = 1;
+                target[1] = *v;
+            }
+            Msg::Ack => {
+                target[0] = 2;
+            }
+        }
+    }
+}
 
 struct Client {
     inner: TcpStream,
-    data: Sender<u8>,
+    data: Sender<Msg>,
     done: Sender<()>,
     connected: Arc<AtomicBool>,
 }
 
 impl Client {
-    pub fn spawn(client: TcpStream, data: Sender<u8>, done: Sender<()>, connected: Arc<AtomicBool>) -> Self {
+    pub fn spawn(client: TcpStream, data: Sender<Msg>, done: Sender<()>, connected: Arc<AtomicBool>) -> Self {
         Self { inner: client, data, done, connected }
     }
     pub fn run(mut self) {
         std::thread::spawn(move || {
             self.inner.set_nonblocking(false).expect("block");
-            let mut buf = [0; 1];
+            let mut buf = [0; 2];
             loop {
                 match self.inner.read_exact(&mut buf) {
-                    Ok(()) => match self.data.send(buf[0]) {
+                    Ok(()) => match self.data.send(Msg::from(&buf)) {
                         Err(_) => {
                             log::warn!("client: failed to send down recv data");
                             break;
@@ -46,13 +84,12 @@ impl Client {
     }
 }
 
-
 pub struct Serial {
     signal: Sender<Event>,
     events: Receiver<Event>,
     connect: Sender<(Ipv4Addr, u16)>,
-    recv: Receiver<u8>,
-    send: Sender<u8>,
+    recv: Receiver<Msg>,
+    send: Sender<Msg>,
     connected: Arc<AtomicBool>,
     pub(crate) port: u16,
 }
@@ -62,9 +99,9 @@ pub struct Server {
     connected: Arc<AtomicBool>,
     client: Option<TcpStream>,
     signal: Option<Receiver<()>>,
-    data: Option<Receiver<u8>>,
-    recv: Receiver<u8>,
-    send: Sender<u8>,
+    data: Option<Receiver<Msg>>,
+    recv: Receiver<Msg>,
+    send: Sender<Msg>,
     events: Sender<Event>,
     connect: Receiver<(Ipv4Addr, u16)>,
     stop: Receiver<Event>,
@@ -100,14 +137,13 @@ impl Server {
         } { self.send.send(v).ok(); }
     }
 
-    fn send(&mut self, data: u8) {
-        match self.client.as_mut().map(|x| x.write(&[data])) {
-            Some(Ok(0)) => {
-                self.client = None;
-                self.data = None;
+    fn send(&mut self) {
+        if let (Ok(msg), Some(client)) = (self.recv.try_recv(), self.client.as_mut()) {
+            let mut buf = [0; 2];
+            msg.serialize(&mut buf);
+            if let Err(e) = client.write_all(&buf) {
+                log::warn!("error client send: {e:?}");
             }
-            Some(Err(e)) => { log::warn!("error client send: {e:?}") }
-            _ => {}
         }
     }
 
@@ -136,7 +172,7 @@ impl Server {
                 _ => {}
             };
             self.recv();
-            if let Some(data) = self.recv.try_recv().ok() { self.send(data); }
+            self.send();
             if let Some((addr, port)) = self.connect.try_recv().ok() {
                 if let Ok(stream) = TcpStream::connect((addr, port)) {
                     self.connect(stream, SocketAddr::new(IpAddr::V4(addr), port));
@@ -219,8 +255,8 @@ impl Serial {
         self.signal.send(Event::Disconnect).ok();
     }
 
-    pub fn send(&self, data: u8) { self.send.send(data).ok(); }
-    pub fn recv(&self) -> Option<u8> {
+    pub fn send(&self, msg: Msg) { self.send.send(msg).ok(); }
+    pub fn recv(&self) -> Option<Msg> {
         self.recv.try_recv().ok()
     }
 }
