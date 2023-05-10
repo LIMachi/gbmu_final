@@ -22,8 +22,8 @@ impl Serialize for Storage {
             Storage::CGB(banks, selected) => {
                 let mut v = banks[0].to_vec();
                 v.insert(0, 1);
+                v.insert(1, *selected as u8);
                 v.extend(banks[1]);
-                v.push(*selected as u8);
                 v
             }
         }.serialize(serializer)

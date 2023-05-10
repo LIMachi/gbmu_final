@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
 use shared::serde::{Deserialize, Serialize};
 
