@@ -1,5 +1,6 @@
 use shared::egui::*;
 use shared::egui::epaint::ImageDelta;
+use shared::Events;
 use shared::widgets::tabs;
 
 use crate::ppu::Ppu;
@@ -14,7 +15,6 @@ pub struct VramViewer<E> {
     tab: Tabs,
     storage: HashMap<Textures, TextureHandle>,
     bg_data: Option<bgmap::TileData>,
-    init: bool,
     emu: PhantomData<E>,
 }
 
@@ -23,7 +23,6 @@ impl<E> Default for VramViewer<E> {
         VramViewer {
             tab: Tabs::Oam,
             storage: Default::default(),
-            init: false,
             emu: Default::default(),
             bg_data: None,
         }
@@ -128,6 +127,7 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
     fn init(&mut self, ctx: &mut Context, emu: &mut E) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
         let count = if emu.bus().is_cgb() { 768 } else { 384 };
+        println!("{:?}", emu.bus().is_cgb());
         for n in 0..count {
             let s = Textures::Tile(n);
             self.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
@@ -136,14 +136,9 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
         self.insert(Textures::None, ctx.load_texture("None", ColorImage::new([8, 8], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
         self.insert(Textures::Placeholder, ctx.load_texture("Placeholder", base, TextureOptions::NEAREST));
         self.insert(Textures::Miniature, ctx.load_texture("Miniature", ColorImage::new([160, 144], Color32::from_black_alpha(0)), TextureOptions::NEAREST));
-        self.init = true;
     }
 
     fn draw(&mut self, ctx: &mut Context, emu: &mut E) {
-        if !self.init {
-            self.init(ctx, emu);
-            self.init = true;
-        }
         let tiles: Vec<usize> = emu.vram_mut().tile_cache.drain().collect();
         let vram = emu.vram();
         for n in tiles {
@@ -158,5 +153,14 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
                     .with_tab(Tabs::Tiledata, bgmap::BgMap(self, emu, ctx))
                     .with_tab(Tabs::Tilemap, tilemap::Tilemap(self))
                     .response());
+    }
+
+    fn handle(&mut self, event: &shared::winit::event::Event<Events>, ctx: &mut Context, ext: &mut <Self as shared::Ui>::Ext) {
+        match event {
+            shared::winit::event::Event::UserEvent(Events::Reload) => {
+                self.init(ctx, ext);
+            },
+            _ => {}
+        }
     }
 }

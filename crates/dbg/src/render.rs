@@ -352,7 +352,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
             });
     }
 
-    fn handle(&mut self, event: &Event, ext: &mut E) {
+    fn handle(&mut self, event: &Event, _ctx: &mut Context, ext: &mut E) {
         match event {
             Event::UserEvent(Events::Loaded) => self.disassembly.reload(),
             Event::WindowEvent { event: WindowEvent::MouseWheel { .. }, .. } => self.disassembly.fixed(&ext),

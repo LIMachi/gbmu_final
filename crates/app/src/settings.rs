@@ -86,7 +86,7 @@ impl shared::Ui for Settings {
             });
     }
 
-    fn handle(&mut self, event: &Event<Events>, emu: &mut Emulator) {
+    fn handle(&mut self, event: &Event<Events>, _ctx: &mut Context, emu: &mut Emulator) {
         if emu.bindings.try_bind(self.key, event) {
             self.key.take();
         }

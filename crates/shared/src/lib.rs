@@ -66,7 +66,7 @@ pub trait Ui {
 
     fn init(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) {}
     fn draw(&mut self, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) {}
-    fn handle(&mut self, _event: &winit::event::Event<Events>, _ext: &mut <Self as Ui>::Ext) {}
+    fn handle(&mut self, _event: &winit::event::Event<Events>, _ctx: &mut egui::Context, _ext: &mut <Self as Ui>::Ext) {}
 }
 
 impl Ui for () {

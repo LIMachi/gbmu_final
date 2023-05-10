@@ -77,7 +77,11 @@ impl<M: Mem> Mem for Lock<M> {
     }
 
     fn write_with(&mut self, addr: u16, value: u8, absolute: u16, access: Source) {
-        self.get_mut(access).map(|a| a.write_with(addr, value, absolute, access));
+        self.get_mut(access)
+            .map(|a| a.write_with(addr, value, absolute, access))
+            .unwrap_or_else(|| {
+                log::warn!("failed to access {:#04X} with level {access:?}, region locked {:?}", addr, self.lock);
+            });
     }
 
     fn lock(&mut self, access: Source) { self.lock(access); }

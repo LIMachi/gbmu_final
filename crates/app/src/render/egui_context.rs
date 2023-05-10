@@ -142,9 +142,9 @@ impl<Ctx, U: 'static + Ui<Ext=Ctx> + Default> Context<Ctx> for EguiContext<Ctx, 
         match event {
             Event::WindowEvent { window_id, .. } if window_id == &self.window.id() => {
                 self.platform.handle_event(event);
-                self.data.handle(event, ctx);
+                self.data.handle(event, &mut self.inner, ctx);
             }
-            Event::UserEvent(_) => self.data.handle(event, ctx),
+            Event::UserEvent(_) => self.data.handle(event, &mut self.inner, ctx),
             Event::WindowEvent { event: wevent, .. } => {
                 match wevent {
                     WindowEvent::CursorEntered { .. } | WindowEvent::CursorLeft { .. } | WindowEvent::CursorMoved { .. } => {
