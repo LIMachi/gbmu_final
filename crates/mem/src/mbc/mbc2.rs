@@ -1,11 +1,13 @@
+use serde::{Deserialize, Serialize};
 use shared::mem::*;
 use shared::rom::Rom;
+use crate::mbc::mbc1::Mbc1;
 use super::Mbc;
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE : usize = 0x0200;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Mbc2 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -16,14 +18,7 @@ pub struct Mbc2 {
 
 impl Mbc2 {
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
-        let sl = std::mem::size_of::<usize>();
-        let rom_banks = usize::from_le_bytes(raw[..sl].try_into().unwrap());
-        let rom_bank = usize::from_le_bytes(raw[sl..2 * sl].try_into().unwrap());
-        let ram_enabled = raw[2 * sl] == 1;
-        let rom_end = 2 * sl + 1 + 0x4000 * rom_banks;
-        let rom = raw[2 * sl + 1 .. rom_end].to_vec();
-        let ram = raw[rom_end..].to_vec();
-        Box::new(Self { rom_banks, rom_bank, ram_enabled, rom, ram})
+        Box::new(bincode::deserialize::<Self>(raw.as_slice()).unwrap())
     }
 }
 
@@ -115,11 +110,6 @@ impl Mbc for Mbc2 {
     }
 
     fn raw(&self) -> Vec<u8> {
-        let mut out = self.rom_banks.to_le_bytes().to_vec();
-        out.extend(self.rom_bank.to_le_bytes());
-        out.push(if self.ram_enabled { 1 } else { 0 });
-        out.extend(&self.rom);
-        out.extend(&self.ram);
-        out
+        bincode::serialize(self).unwrap()
     }
 }

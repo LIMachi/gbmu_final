@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use shared::mem::*;
 use shared::rom::Rom;
 use shared::utils::rtc::Rtc;
@@ -16,7 +17,7 @@ const RAM_BANK_END: u16 = 0x5FFF;
 const LATCH: u16 = 0x6000;
 const LATCH_END: u16 = 0x7FFF;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Mbc3 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -30,17 +31,7 @@ pub struct Mbc3 {
 
 impl Mbc3 {
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
-        let sl = std::mem::size_of::<usize>();
-        let rom_banks = usize::from_le_bytes(raw[..sl].try_into().unwrap());
-        let rom_bank = usize::from_le_bytes(raw[sl..2 * sl].try_into().unwrap());
-        let ram_bank = usize::from_le_bytes(raw[2 * sl..3 * sl].try_into().unwrap());
-        let enabled_ram = raw[3 * sl] == 1;
-        let latch = raw[3 * sl + 1] == 1;
-        let rom_end = 3 * sl + 2 + 0x4000 * rom_banks;
-        let rom = raw[3 * sl + 2 .. rom_end].to_vec();
-        let rtc = Rtc::deserialize(raw[rom_end..rom_end + 18].to_vec()).unwrap();
-        let ram = raw[rom_end + 18..].to_vec();
-        Box::new(Self { rom_banks, rom_bank, ram_bank, enabled_ram, latch, rom, rtc, ram})
+        Box::new(bincode::deserialize::<Self>(raw.as_slice()).unwrap())
     }
 }
 
@@ -152,15 +143,7 @@ impl super::Mbc for Mbc3 {
     }
 
     fn raw(&self) -> Vec<u8> {
-        let mut out = self.rom_banks.to_le_bytes().to_vec();
-        out.extend(self.rom_bank.to_le_bytes());
-        out.extend(self.ram_bank.to_le_bytes());
-        out.push(if self.enabled_ram { 1 } else { 0 });
-        out.push(if self.latch { 1 } else { 0 });
-        out.extend(&self.rom);
-        out.extend(&self.rtc.serialize());
-        out.extend(&self.ram);
-        out
+        bincode::serialize(self).unwrap()
     }
 }
 

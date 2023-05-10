@@ -1,6 +1,7 @@
 use std::time::SystemTime;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Rtc {
     quartz: u16,
     s: u8,
