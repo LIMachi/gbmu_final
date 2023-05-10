@@ -1,4 +1,5 @@
 use std::fmt::Formatter;
+use dyn_clone::DynClone;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Visitor;
 use shared::io::{AccessMode, IO, IODevice, IORegs};
@@ -29,7 +30,7 @@ pub(crate) enum Channels {
 }
 
 // inner waveform generator
-pub(crate) trait SoundChannel: IODevice {
+pub(crate) trait SoundChannel: IODevice + DynClone {
     fn output(&self, io: &mut IORegs) -> u8;
 
     fn channel(&self) -> Channels;
@@ -61,7 +62,7 @@ impl SoundChannel for () {
     fn length(&self) -> u8 { 0 }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Capacitor {
     factor: f32,
     value: f32
@@ -96,6 +97,22 @@ pub(crate) struct Channel {
     dac: Capacitor,
     inner: Box<dyn SoundChannel + 'static>,
     pcm: IO
+}
+
+impl Clone for Channel {
+    fn clone(&self) -> Self {
+        Self {
+            enabled: self.enabled,
+            length_timer: self.length_timer,
+            nr1: self.nr1,
+            nr2: self.nr2,
+            nr3: self.nr3,
+            nr4: self.nr4,
+            dac: self.dac.clone(),
+            inner: dyn_clone::clone_box(&*self.inner),
+            pcm: self.pcm
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

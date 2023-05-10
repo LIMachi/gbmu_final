@@ -22,7 +22,7 @@ impl Mode {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Hdma {
     mode: Option<Mode>,
     state: State,

@@ -1,11 +1,11 @@
 use std::fmt::{Debug, Formatter};
+use dyn_clone::DynClone;
 use serde::{Deserialize, Serialize};
 
 use lcd::Lcd;
 use mem::oam::Sprite;
 use shared::io::{IO, IORegs, LCDC};
 use shared::mem::Source;
-use crate::ppu::PpuState;
 
 use super::{
     fetcher::{self, Fetcher}, fifo::{BgFifo, ObjFifo}, Ppu, Scroll,
@@ -20,18 +20,16 @@ pub enum Mode {
     VBlank = 1,
 }
 
-pub(crate) trait State: Debug {
+pub(crate) trait State: Debug + DynClone {
     fn mode(&self) -> Mode;
     fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, lcd: &mut Lcd) -> Option<Box<dyn State>>;
-    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized { Box::new(self) }
-    fn name(&self) -> String {
-        format!("{:?}", self.mode())
-    }
+    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized + Clone { Box::new(self) }
+    fn name(&self) -> String { format!("{:?}", self.mode()) }
     fn first_tick(&self) -> bool { false }
     fn raw(&self) -> Vec<u8> { vec![] }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OamState {
     clock: u8,
     sprite: usize,
@@ -43,34 +41,6 @@ impl OamState {
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
         Box::new(Self { clock: raw[0], sprite: raw[1] as usize})
     }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct TransferState {
-    dots: usize,
-    lx: u8,
-    ly: u8,
-    scx: u8,
-    fetcher: Fetcher,
-    bg: BgFifo,
-    oam: ObjFifo,
-    sprite: Option<usize>,
-}
-
-impl Debug for TransferState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("[{} - {}]({}) left {}", self.lx, self.ly, self.scx, self.dots).as_str())
-    }
-}
-
-#[derive(Debug)]
-pub struct HState {
-    dots: usize,
-}
-
-#[derive(Debug)]
-pub struct VState {
-    dots: usize,
 }
 
 impl State for OamState {
@@ -101,6 +71,24 @@ impl State for OamState {
 
     fn raw(&self) -> Vec<u8> {
         vec![self.clock, self.sprite as u8]
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TransferState {
+    dots: usize,
+    lx: u8,
+    ly: u8,
+    scx: u8,
+    fetcher: Fetcher,
+    bg: BgFifo,
+    oam: ObjFifo,
+    sprite: Option<usize>,
+}
+
+impl Debug for TransferState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("[{} - {}]({}) left {}", self.lx, self.ly, self.scx, self.dots).as_str())
     }
 }
 
@@ -181,6 +169,11 @@ impl State for TransferState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct VState {
+    dots: usize,
+}
+
 impl VState {
     const DOTS: usize = 4560;
 
@@ -226,6 +219,11 @@ impl State for VState {
     fn raw(&self) -> Vec<u8> {
         vec![self.dots as u8, (self.dots >> 8) as u8]
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct HState {
+    dots: usize,
 }
 
 impl HState {

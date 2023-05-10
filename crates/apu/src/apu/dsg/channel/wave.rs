@@ -21,6 +21,7 @@ const PATTERN_REG: [IO; 16] = [
     IO::WaveRamF
 ];
 
+#[derive(Clone)]
 pub struct Channel {
     cycle: usize,
     freq_timer: u16,

@@ -7,7 +7,7 @@ use crate::ppu::pixel::Attributes;
 
 use super::pixel::Pixel;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ObjFifo {
     inner: VecDeque<Pixel>,
     opri: bool,
@@ -39,7 +39,7 @@ impl ObjFifo {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct BgFifo {
     inner: VecDeque<Pixel>,
     enabled: bool,

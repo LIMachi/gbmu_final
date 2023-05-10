@@ -1,7 +1,9 @@
+use dyn_clone::DynClone;
 use shared::mem::Mem;
 use shared::rom::Rom;
 use crate::mbc::{Mbc, MemoryController};
 
+#[derive(Clone)]
 struct DmgBoot {
     raw: Vec<u8>
 }
@@ -22,6 +24,7 @@ impl BootSection for DmgBoot {
     fn contains(&self, addr: u16) -> bool { (0..0x100).contains(&addr) }
 }
 
+#[derive(Clone)]
 struct CgbBoot {
     raw: Vec<u8>
 }
@@ -50,7 +53,7 @@ impl Mem for CgbBoot {
     }
 }
 
-trait BootSection: Mem {
+trait BootSection: Mem + DynClone {
     fn new() -> Self where Self: Sized;
     fn contains(&self, addr: u16) -> bool;
 }
@@ -58,6 +61,15 @@ trait BootSection: Mem {
 pub(crate) struct Boot<MBC: Mbc> {
     boot: Box<dyn BootSection>,
     inner: Option<MBC>
+}
+
+impl <MBC: Mbc> Clone for Boot<MBC> {
+    fn clone(&self) -> Self {
+        Self {
+            boot: dyn_clone::clone_box(&*self.boot),
+            inner: if let Some(i) = &self.inner { Some(dyn_clone::clone(i)) } else { None }
+        }
+    }
 }
 
 impl<MBC: Mbc> Mem for Boot<MBC> {

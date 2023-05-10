@@ -1,6 +1,7 @@
 use shared::{mem::*, rom::Rom};
 use crate::mbc::Mbc;
 
+#[derive(Clone)]
 pub struct Mbc0 {
     rom: Vec<u8>,
     ram: Vec<u8>
@@ -9,7 +10,7 @@ pub struct Mbc0 {
 impl Mbc0 {
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
         let rom = raw[..=SROM_END as usize].to_vec();
-        let ram = raw[SRAM as usize..].to_vec();
+        let ram = raw[(SROM_END + 1) as usize..].to_vec();
         Box::new(Self { rom, ram })
     }
 }

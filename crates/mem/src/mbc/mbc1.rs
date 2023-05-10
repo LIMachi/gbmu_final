@@ -14,6 +14,7 @@ const RAM_BANK_END: u16 = 0x5FFF;
 const BANK_MODE: u16 = 0x6000;
 const BANK_MODE_END: u16 = 0x7FFF;
 
+#[derive(Clone)]
 pub struct Mbc1 {
     ram_banks: usize,
     rom_banks: usize,

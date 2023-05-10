@@ -10,6 +10,7 @@ const DUTY_CYCLES: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
+#[derive(Clone)]
 struct Registers {
     length: IO,
     volume: IO,
@@ -17,7 +18,7 @@ struct Registers {
     wave2: IO,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Sweep {
     shadow: u16,
     pace: u8,
@@ -93,6 +94,7 @@ impl Sweep {
     }
 }
 
+#[derive(Clone)]
 pub struct Channel {
     cycle: usize,
     freq_timer: u16,

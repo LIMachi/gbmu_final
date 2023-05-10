@@ -26,6 +26,23 @@ pub struct Apu {
     on: bool,
 }
 
+impl Clone for Apu {
+    fn clone(&self) -> Self {
+        Self {
+            fedge: self.fedge.clone(),
+            div_apu: self.div_apu,
+            sample: self.sample,
+            sample_rate: self.sample_rate,
+            speed: self.speed,
+            tick: self.tick,
+            input: Default::default(),
+            dsg: self.dsg.clone(),
+            channels: self.channels.clone(),
+            on: self.on
+        }
+    }
+}
+
 impl Default for Apu {
     fn default() -> Self {
         let sample_rate = 44100;

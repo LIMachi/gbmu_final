@@ -5,6 +5,7 @@
 
 extern crate core;
 
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use bincode::Options;
@@ -32,6 +33,15 @@ mod hdma;
 pub struct Controller {
     ppu: Ppu,
     state: ppu::PpuState,
+}
+
+impl Clone for Controller {
+    fn clone(&self) -> Self {
+        Self {
+            ppu: self.ppu.clone(),
+            state: dyn_clone::clone_box(&*self.state)
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

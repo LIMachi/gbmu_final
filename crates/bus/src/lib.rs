@@ -13,12 +13,12 @@ pub use timer::Timer;
 mod timer;
 mod devices;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Empty {}
 
 impl Mem for Empty {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Bus {
     clock: u8,
     mbc: Lock<mbc::Controller>,

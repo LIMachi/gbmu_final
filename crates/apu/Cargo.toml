@@ -14,6 +14,7 @@ rodio = "0.17.0"
 anyhow = "1.0.69"
 serde = "1.0.152"
 rtrb = "0.2.3"
+dyn-clone = "1.0.11"
 
 [dependencies.shared]
 path = "../shared"

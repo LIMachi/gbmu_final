@@ -16,6 +16,7 @@ const RAM_BANK_END: u16 = 0x5FFF;
 const LATCH: u16 = 0x6000;
 const LATCH_END: u16 = 0x7FFF;
 
+#[derive(Clone)]
 pub struct Mbc3 {
     rom: Vec<u8>,
     ram: Vec<u8>,

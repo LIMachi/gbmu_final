@@ -1,5 +1,5 @@
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Envelope {
     base: u8,
     value: u8,

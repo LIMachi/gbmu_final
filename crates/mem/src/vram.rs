@@ -5,6 +5,7 @@ use shared::mem::Mem;
 
 const BANK_SIZE: usize = 0x2000;
 
+#[derive(Clone)]
 enum Storage {
     DMG([u8; BANK_SIZE]),
     CGB([[u8; BANK_SIZE]; 2], usize),
@@ -77,7 +78,7 @@ impl Mem for Storage {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Vram {
     pub tile_cache: HashSet<usize>,
     mem: Storage,

@@ -1,12 +1,14 @@
 use std::fmt::Formatter;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use dyn_clone::DynClone;
 use serde::ser::SerializeStruct;
 use serde::{de, Deserializer, Serializer};
 use serde::de::{MapAccess, SeqAccess, Visitor};
 
 use shared::{mem::*, rom::{Mbc as Mbcs, Rom}, rom};
 use shared::serde::{Deserialize, Serialize};
+use crate::boot;
 
 use crate::boot::Boot;
 
@@ -24,7 +26,7 @@ pub trait MemoryController {
     fn ram_bank(&self) -> usize { 0 }
 }
 
-pub(crate) trait Mbc: MemoryController + Mem {
+pub(crate) trait Mbc: MemoryController + Mem + DynClone {
     fn is_boot(&self) -> bool { false }
     fn kind(&self) -> u8 { 0 }
     fn raw(&self) -> Vec<u8> { vec![] }
@@ -50,6 +52,16 @@ pub struct Controller {
     header: rom::Header,
     sav: Option<PathBuf>,
     inner: Box<dyn Mbc>,
+}
+
+impl Clone for Controller {
+    fn clone(&self) -> Self {
+        Self {
+            header: self.header.clone(),
+            sav: self.sav.clone(),
+            inner: dyn_clone::clone_box(&*self.inner)
+        }
+    }
 }
 
 impl Serialize for Controller {

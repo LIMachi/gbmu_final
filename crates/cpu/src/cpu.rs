@@ -29,6 +29,26 @@ pub struct Cpu {
     stop: usize,
 }
 
+impl Clone for Cpu {
+    fn clone(&self) -> Self {
+        Self {
+            prev: self.prev,
+            at: self.at,
+            mode: self.mode,
+            instructions: self.instructions,
+            ins: self.ins,
+            count: self.count,
+            regs: self.regs.clone(),
+            cache: self.cache.clone(),
+            prefixed: self.prefixed,
+            finished: self.finished,
+            ime: self.ime,
+            doctor: None,
+            stop: self.stop
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct InnerCpu {
     prev: Opcode,

@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.17"
+dyn-clone = "1.0.11"
 
 [dependencies.shared]
 path= "../shared"

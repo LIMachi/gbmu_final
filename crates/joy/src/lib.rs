@@ -3,7 +3,7 @@ use shared::io::{IO, IODevice, IORegs};
 use shared::mem::IOBus;
 use shared::serde::{Deserialize, Serialize};
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Joypad {
     state: u8,
 }

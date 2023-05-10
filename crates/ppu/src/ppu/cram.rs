@@ -3,7 +3,7 @@ use shared::io::{CGB_MODE, IO, IODevice, IORegs};
 use shared::mem::IOBus;
 use shared::utils::serde_arrays;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct CRAM {
     #[serde(with = "serde_arrays")]
     bgdata: [u8; 64],

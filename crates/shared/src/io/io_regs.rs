@@ -2,7 +2,7 @@ use crate::utils::palette::Palette;
 
 use super::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct IORegs {
     palette: Palette,
     cgb: IOReg,

@@ -5,7 +5,7 @@ use shared::utils::serde_arrays;
 const BANK_SIZE: usize = 0x1000;
 const WRAM_SIZE: usize = 2 * BANK_SIZE;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct CgbStorage {
     #[serde(with = "serde_arrays")]
     bank0: [u8; BANK_SIZE],
@@ -70,7 +70,7 @@ impl CgbStorage {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 enum Storage {
     #[serde(with = "serde_arrays")]
     Dmg([u8; WRAM_SIZE]),
@@ -127,7 +127,7 @@ impl Mem for Storage {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Wram {
     storage: Storage
 }

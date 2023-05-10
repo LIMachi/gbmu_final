@@ -1,10 +1,10 @@
 use std::fs;
 use std::fs::{DirEntry, File};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
-use winit::dpi::Pixel;
 use winit::event::WindowEvent;
 
 use bus::Devices;
@@ -29,7 +29,7 @@ use crate::app::RomConfig;
 use crate::render::{Event, Render};
 use crate::settings::Mode;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Console {
     speed: i32,
     rom: Option<Rom>,
@@ -40,12 +40,22 @@ pub struct Console {
 
 impl Console {
     pub fn save(&self, path: &PathBuf) {
-        let mut h= File::create(path).unwrap_or_else(|_| panic!("cannot open path {path:?}"));
-        bincode::serialize_into(h, self).unwrap_or_else(|_| panic!("cannot serialize Console"));
+        let mut h = File::create(path).unwrap_or_else(|_| panic!("cannot open path {path:?}"));
+        let i = Instant::now();
+        let v = bincode::serialize(self).unwrap_or_else(|_| panic!("cannot serialize Console"));
+        println!("took: {:?}", Instant::now() - i);
+        h.write_all(v.as_slice()).expect("cannot write save state at {path:?}");
     }
 
     pub fn load_state(path: &PathBuf) -> Option<Self> {
-        File::open(path).ok().and_then(|file| bincode::deserialize_from(file).ok())
+        File::open(path).ok().and_then(|mut file| {
+            let mut v: Vec<u8> = Vec::with_capacity(file.metadata().ok().map(|m| m.len() as usize).unwrap_or(4*1024*1024));
+            if file.read_to_end(&mut v).is_ok() {
+                bincode::deserialize(v.as_slice()).ok()
+            } else {
+                None
+            }
+        })
     }
 }
 

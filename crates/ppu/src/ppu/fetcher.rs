@@ -7,7 +7,7 @@ use crate::ppu::pixel::Attributes;
 
 use super::{fifo::*, Pixel, Ppu};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 enum State {
     Tile,
     DataLow,
@@ -23,7 +23,7 @@ pub enum Mode {
     Sprite(Sprite, u8),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Fetcher {
     clock: u8,
     x: u8,

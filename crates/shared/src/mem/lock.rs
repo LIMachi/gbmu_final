@@ -11,7 +11,7 @@ pub enum Source {
     Dma = 0x2
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Lock<M: Mem> {
     inner: M,
     lock: HashSet<Source>

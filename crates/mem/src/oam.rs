@@ -41,7 +41,7 @@ impl Mem for Sprite {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Oam {
     #[serde(with = "serde_arrays")]
     pub sprites: [Sprite; 40]

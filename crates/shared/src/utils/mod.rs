@@ -33,7 +33,7 @@ impl<T> Cell for T {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct FEdge {
     old: bool,
 }

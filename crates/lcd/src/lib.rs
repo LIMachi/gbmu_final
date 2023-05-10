@@ -13,6 +13,17 @@ pub struct Lcd {
     pub pixels: Option<Pixels>, //TODO serde: rebind using previous pixels
 }
 
+impl Clone for Lcd {
+    fn clone(&self) -> Self {
+        Self {
+            enabled: self.enabled,
+            refresh: self.refresh,
+            frame: self.frame.clone(),
+            pixels: None
+        }
+    }
+}
+
 impl Default for Lcd {
     fn default() -> Self {
         Self {

@@ -4,6 +4,7 @@ use shared::mem::IOBus;
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
 
+#[derive(Clone)]
 pub struct Channel {
     triggered: bool,
     buffer: u16,

@@ -77,6 +77,22 @@ pub struct Devices {
     pub serial: serial::Port,
 }
 
+impl Clone for Devices {
+    fn clone(&self) -> Self {
+        Self {
+            cpu: self.cpu.clone(),
+            ppu: self.ppu.clone(),
+            joy: self.joy.clone(),
+            lcd: self.lcd.clone(),
+            dma: self.dma.clone(),
+            hdma: self.hdma.clone(),
+            timer: self.timer.clone(),
+            apu: self.apu.clone(),
+            serial: Default::default()
+        }
+    }
+}
+
 impl Default for Devices {
     fn default() -> Self { Devices::builder().build() }
 }

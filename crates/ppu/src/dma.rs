@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use shared::io::{IO, IODevice};
 use shared::mem::{IOBus, OAM, Source};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Dma {
     st: u16,
     p: usize

@@ -5,6 +5,7 @@ use super::Mbc;
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE : usize = 0x0200;
 
+#[derive(Clone)]
 pub struct Mbc2 {
     rom: Vec<u8>,
     ram: Vec<u8>,

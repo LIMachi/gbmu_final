@@ -11,7 +11,7 @@ enum Panning {
     Left = 4,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct DSG {
     output: [f32; 2],
     capacitor: [f32; 2],

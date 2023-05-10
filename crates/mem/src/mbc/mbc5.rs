@@ -16,6 +16,7 @@ const ROM_BANK_H_END: u16 = 0x3FFF;
 const RAM_BANK: u16 = 0x4000;
 const RAM_BANK_END: u16 = 0x5FFF;
 
+#[derive(Clone)]
 pub struct Mbc5 {
     rom: Vec<u8>,
     ram: Vec<u8>,

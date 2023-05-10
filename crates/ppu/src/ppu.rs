@@ -16,7 +16,7 @@ pub(crate) mod states;
 
 pub(crate) type PpuState = Box<dyn State>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct REdge {
     inner: bool,
 }
@@ -33,7 +33,7 @@ impl REdge {
     }
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Copy, Clone)]
 pub(crate) struct Window {
     pub scan_enabled: bool,
     pub enabled: bool,
@@ -41,7 +41,7 @@ pub(crate) struct Window {
     pub x: u8,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, Copy, Clone)]
 pub(crate) struct Scroll {
     pub x: u8,
     pub y: u8,
@@ -60,6 +60,21 @@ pub struct Ppu {
     pub(crate) oam: Option<&'static mut Lock<Oam>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
     #[serde(default,skip)]
     pub(crate) vram: Option<&'static mut Lock<Vram>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
+}
+
+impl Clone for Ppu {
+    fn clone(&self) -> Self {
+        Self {
+            cram: self.cram.clone(),
+            sprites: self.sprites.clone(),
+            win: self.win,
+            sc: self.sc,
+            stat: self.stat.clone(),
+            lcdc: self.lcdc,
+            oam: None,
+            vram: None
+        }
+    }
 }
 
 impl Ppu {
