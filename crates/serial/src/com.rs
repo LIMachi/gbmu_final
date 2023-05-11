@@ -16,30 +16,30 @@ pub enum Msg {
     Ack,
 }
 
-impl From<&[u8; 2]> for Msg {
-    fn from(&[op, v]: &[u8; 2]) -> Self {
+impl From<&[u8; 8]> for Msg {
+    fn from(&[op, v, ..]: &[u8; 8]) -> Self {
         match op {
-            0 => Msg::Transfer(v),
-            1 => Msg::Respond(v),
-            2 => Msg::Ack,
+            104 => Msg::Transfer(v),
+            105 => Msg::Respond(v),
+            106 => Msg::Ack,
             _ => panic!("out of range")
         }
     }
 }
 
 impl Msg {
-    pub fn serialize(&self, target: &mut [u8; 2]) {
+    pub fn serialize(&self, target: &mut [u8; 8]) {
         match self {
             Msg::Transfer(v) => {
-                target[0] = 0;
+                target[0] = 104;
                 target[1] = *v;
             }
             Msg::Respond(v) => {
-                target[0] = 1;
+                target[0] = 105;
                 target[1] = *v;
             }
             Msg::Ack => {
-                target[0] = 2;
+                target[0] = 106;
             }
         }
     }
@@ -59,7 +59,7 @@ impl Client {
     pub fn run(mut self) {
         std::thread::spawn(move || {
             self.inner.set_nonblocking(false).expect("block");
-            let mut buf = [0; 2];
+            let mut buf = [0; 8];
             loop {
                 match self.inner.read_exact(&mut buf) {
                     Ok(()) => match self.data.send(Msg::from(&buf)) {
@@ -139,7 +139,7 @@ impl Server {
 
     fn send(&mut self) {
         if let (Ok(msg), Some(client)) = (self.recv.try_recv(), self.client.as_mut()) {
-            let mut buf = [0; 2];
+            let mut buf = [0; 8];
             msg.serialize(&mut buf);
             if let Err(e) = client.write_all(&buf) {
                 log::warn!("error client send: {e:?}");
