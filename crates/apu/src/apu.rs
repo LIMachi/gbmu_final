@@ -55,7 +55,12 @@ impl Default for Apu {
             tick: TICK_RATE / sample_rate as f64,
             input: Input::default(),
             dsg: dsg::DSG::new(0.),
-            channels: vec![],
+            channels: vec![
+                Channel::sweep(),
+                Channel::pulse(),
+                Channel::wave(),
+                Channel::noise(),
+            ],
             on: false,
         }
     }
