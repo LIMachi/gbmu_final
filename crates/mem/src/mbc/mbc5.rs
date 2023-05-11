@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use shared::mem::*;
 use shared::rom::Rom;
-use shared::utils::rtc::Rtc;
 
-use crate::mbc::{Mbc, MemoryController};
+use crate::mbc::{Mbc, MbcsEnum, MemoryController};
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE: usize = 0x2000;
@@ -17,7 +16,7 @@ const ROM_BANK_H_END: u16 = 0x3FFF;
 const RAM_BANK: u16 = 0x4000;
 const RAM_BANK_END: u16 = 0x5FFF;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Mbc5 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -26,12 +25,6 @@ pub struct Mbc5 {
     ram_bank: usize,
     rom_banks: usize,
     ram_banks: usize,
-}
-
-impl Mbc5 {
-    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
-        Box::new(bincode::deserialize::<Self>(raw.as_slice()).unwrap())
-    }
 }
 
 impl Mem for Mbc5 {
@@ -95,22 +88,14 @@ impl MemoryController for Mbc5 {
         }
     }
 
-    fn ram_dump(&self) -> Vec<u8> {
-        self.ram.clone()
-    }
+    fn ram_dump(&self) -> Vec<u8> { self.ram.clone() }
 
     fn rom_bank(&self) -> usize { self.rom_bank }
-    fn ram_bank(&self) -> usize {
-        self.ram_bank
-    }
+    fn ram_bank(&self) -> usize { self.ram_bank }
 }
 
-impl super::Mbc for Mbc5 {
-    fn kind(&self) -> u8 {
-        5
-    }
-
-    fn raw(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+impl Mbc for Mbc5 {
+    fn as_serde(&self) -> Option<MbcsEnum> {
+        Some(MbcsEnum::MBC5(self.clone()))
     }
 }

@@ -1,17 +1,11 @@
 use serde::{Deserialize, Serialize};
 use shared::{mem::*, rom::Rom};
-use crate::mbc::Mbc;
+use crate::mbc::{Mbc, MbcsEnum};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Mbc0 {
     rom: Vec<u8>,
     ram: Vec<u8>
-}
-
-impl Mbc0 {
-    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
-        Box::new(bincode::deserialize::<Self>(raw.as_slice()).unwrap())
-    }
 }
 
 impl Mem for Mbc0 {
@@ -48,7 +42,7 @@ impl super::MemoryController for Mbc0 {
 }
 
 impl Mbc for Mbc0 {
-    fn raw(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+    fn as_serde(&self) -> Option<MbcsEnum> {
+        Some(MbcsEnum::MBC0(self.clone()))
     }
 }

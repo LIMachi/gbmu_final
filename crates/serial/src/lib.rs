@@ -159,7 +159,7 @@ impl IODevice for Port {
             log::info!("Requested transfer ({:#02X})", bus.io(IO::SB).value());
         }
         if io == IO::SB {
-            log::info!("preparing byte for transfer {v:#02X}")
+            // log::info!("preparing byte for transfer {v:#02X}")
         }
     }
 }

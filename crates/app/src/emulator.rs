@@ -42,6 +42,7 @@ impl Console {
     pub fn save(&self, path: &PathBuf) {
         let mut h = File::create(path).unwrap_or_else(|_| panic!("cannot open path {path:?}"));
         let i = Instant::now();
+        println!("serialize");
         let v = bincode::serialize(self).unwrap_or_else(|_| panic!("cannot serialize Console"));
         println!("took: {:?}", Instant::now() - i);
         h.write_all(v.as_slice()).expect("cannot write save state at {path:?}");
@@ -51,7 +52,8 @@ impl Console {
         File::open(path).ok().and_then(|mut file| {
             let mut v: Vec<u8> = Vec::with_capacity(file.metadata().ok().map(|m| m.len() as usize).unwrap_or(4*1024*1024));
             if file.read_to_end(&mut v).is_ok() {
-                bincode::deserialize(v.as_slice()).ok()
+                println!("deserialize");
+                Some(bincode::deserialize(v.as_slice()).unwrap())
             } else {
                 None
             }
@@ -135,7 +137,7 @@ impl Emulator {
         let path = if path.is_some() { path.unwrap() } else {
             PathBuf::from("./save_states/test.save_state") //FIXME: generate path from rom name + date / change save_state folder location
         };
-        self.console.save(&path); //FIXME: use clone of console in another thread for serialization (because it takes a long time)
+        self.console.save(&path);
     }
 
     pub fn load_state(&mut self, path: Option<PathBuf>) {
@@ -143,7 +145,7 @@ impl Emulator {
             fs::read_dir("./save_states").expect("Missing local save_states directory").flatten().fold(None, |a: Option<DirEntry>, e: DirEntry| { //FIXME: change save_state folder location
                 if let Some(t) = &a {
                     let pt = t.metadata().unwrap().modified().unwrap();
-                    if e.metadata().is_ok_and(|m| m.is_file() && m.modified().is_ok_and(|l| l < pt)) {
+                    if e.metadata().is_ok_and(|m| m.is_file() && m.modified().is_ok_and(|l| l > pt)) {
                         return Some(e);
                     }
                     return a;
@@ -151,7 +153,7 @@ impl Emulator {
                 Some(e)
             }).expect("no save states to load").path()
         };
-        if let Some(mut console) = Console::load_state(&path) { //FIXME: deserialization too long + corrupted
+        if let Some(mut console) = Console::load_state(&path) {
             self.serial_claim();
             console.gb.serial = Port::new(self.link.port());
             self.audio.reload(&mut console.gb.apu);

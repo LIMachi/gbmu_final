@@ -1,9 +1,12 @@
+use dyn_clone::DynClone;
+use serde::{Deserializer, Serializer};
 use shared::mem::Mem;
 use shared::rom::Rom;
 use shared::serde::{Deserialize, Serialize};
 
-use crate::mbc::{Mbc, MemoryController, Unplugged};
+use crate::mbc::{Mbc, MbcsEnum, MemoryController, Unplugged};
 
+#[derive(Clone, Serialize, Deserialize)]
 struct DmgBoot {
     raw: Vec<u8>,
 }
@@ -24,7 +27,7 @@ impl BootSection for DmgBoot {
     fn contains(&self, addr: u16) -> bool { (0..0x100).contains(&addr) }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct CgbBoot {
     raw: Vec<u8>,
 }
@@ -48,16 +51,45 @@ impl Mem for CgbBoot {
     }
 }
 
-trait BootSection: Mem {
+trait BootSection: Mem + DynClone {
     fn new() -> Self where Self: Sized;
     fn contains(&self, addr: u16) -> bool;
 }
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct Boot {
     boot: Box<dyn BootSection>,
     inner: Box<dyn Mbc>,
 }
 
+impl Serialize for Box<dyn BootSection> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        println!("using boot serializer");
+        self.contains(0x200).serialize(serializer)
+    }
+}
+
+impl <'de> Deserialize<'de> for Box<dyn BootSection> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        println!("using boot deserializer");
+        Deserialize::deserialize(deserializer).map(|cgb: bool| {
+            if cgb {
+                Box::new(CgbBoot::new()) as Box<dyn BootSection>
+            } else {
+                Box::new(DmgBoot::new()) as Box<dyn BootSection>
+            }
+        })
+    }
+}
+
+impl Clone for Boot {
+    fn clone(&self) -> Self {
+        Self {
+            boot: dyn_clone::clone_box(&*self.boot),
+            inner: dyn_clone::clone_box(&*self.inner)
+        }
+    }
+}
 
 impl Mem for Boot {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
@@ -83,6 +115,7 @@ impl Mem for Boot {
 
 impl Mbc for Boot {
     fn is_boot(&self) -> bool { true }
+    fn as_serde(&self) -> Option<MbcsEnum> { Some(MbcsEnum::BOOT(self.clone())) }
     fn unmap(&mut self) -> Box<dyn Mbc> { std::mem::replace(&mut self.inner, Box::new(Unplugged {})) }
 }
 

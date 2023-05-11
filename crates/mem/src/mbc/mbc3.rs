@@ -3,7 +3,7 @@ use shared::mem::*;
 use shared::rom::Rom;
 use shared::utils::rtc::Rtc;
 
-use crate::mbc::{Mbc, MemoryController};
+use crate::mbc::{Mbc, MbcsEnum, MemoryController};
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE: usize = 0x2000;
@@ -17,7 +17,7 @@ const RAM_BANK_END: u16 = 0x5FFF;
 const LATCH: u16 = 0x6000;
 const LATCH_END: u16 = 0x7FFF;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Mbc3 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -27,12 +27,6 @@ pub struct Mbc3 {
     rom_banks: usize,
     rtc: Rtc,
     latch: bool,
-}
-
-impl Mbc3 {
-    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn Mbc> {
-        Box::new(bincode::deserialize::<Self>(raw.as_slice()).unwrap())
-    }
 }
 
 impl Mem for Mbc3 {
@@ -128,22 +122,14 @@ impl MemoryController for Mbc3 {
     }
 
     fn rom_bank(&self) -> usize { self.rom_bank }
-    fn ram_bank(&self) -> usize {
-        self.ram_bank
-    }
+    fn ram_bank(&self) -> usize { self.ram_bank }
 }
 
-impl super::Mbc for Mbc3 {
-    fn tick(&mut self) {
-        self.rtc.tick();
-    }
+impl Mbc for Mbc3 {
+    fn tick(&mut self) { self.rtc.tick(); }
 
-    fn kind(&self) -> u8 {
-        3
-    }
-
-    fn raw(&self) -> Vec<u8> {
-        bincode::serialize(self).unwrap()
+    fn as_serde(&self) -> Option<MbcsEnum> {
+        Some(MbcsEnum::MBC3(self.clone()))
     }
 }
 
