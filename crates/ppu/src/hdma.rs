@@ -46,7 +46,7 @@ impl Default for Hdma {
 impl Hdma {
     fn transfer(&mut self, bus: &mut dyn IOBus) -> bool {
         if self.dst == 0xA000 {
-            log::warn!("HDMA overflow");
+            log::warn!("HDMA overflow {:?}", self.mode);
             self.mode = None;
             self.state = State::Wait;
             return true;
@@ -54,6 +54,7 @@ impl Hdma {
         let v = bus.read_with(self.src, Source::Hdma);
         self.src += 1;
         bus.write_with(self.dst, v, Source::Hdma);
+        log::debug!("({:?})[{:#04X}] {:#02.2X} -> [{:#04X}]", self.mode.unwrap(), self.src - 1, v, self.dst);
         self.dst += 1;
         false
     }
@@ -61,17 +62,15 @@ impl Hdma {
     pub fn tick(&mut self, bus: &mut dyn IOBus) -> bool {
         if bus.io(IO::KEY0).value() & CGB_MODE == 0 { return false; };
         let mut tick = false;
-        let working = self.state != State::Wait;
-        self.state = match self.state {
-            s @ (State::WaitHblank | State::Active) => {
-                let stat = bus.io(IO::STAT).value();
-                let old = self.statv;
-                self.statv = stat & 0x3;
-                if old != 0 && self.statv == 0 {
-                    tick = true;
-                    State::Transfer
-                } else { s }
+        if self.state == State::WaitHblank || self.state == State::Active {
+            let stat = bus.io(IO::STAT).value();
+            let old = self.statv;
+            self.statv = stat & 0x3;
+            if old != 0 && self.statv == 0 {
+                self.state = State::Transfer;
             }
+        }
+        self.state = match self.state {
             State::Transfer if self.mode == Some(Mode::General) => {
                 tick = true;
                 if self.transfer(bus) { return false; }
@@ -95,6 +94,7 @@ impl Hdma {
                     let control = bus.io_mut(IO::HDMA5);
                     let (len, done) = (control.value() & 0x7F).overflowing_sub(1);
                     control.direct_write(len | 0x80);
+                    self.count = 0;
                     if done {
                         self.mode = None;
                         State::Wait
