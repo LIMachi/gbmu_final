@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ use crate::utils::image::RawData;
 
 mod header;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Rom {
     pub filename: String,
     pub location: PathBuf,
@@ -16,6 +17,18 @@ pub struct Rom {
     pub cover: Option<String>,
     pub raw: Option<RawData>,
     content: Vec<u8>,
+}
+
+impl PartialOrd for Rom {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.filename.partial_cmp(&other.filename)
+    }
+}
+
+impl Ord for Rom {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.filename.cmp(&other.filename)
+    }
 }
 
 impl Rom {

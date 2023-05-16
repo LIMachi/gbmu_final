@@ -1,52 +1,17 @@
-use std::collections::HashMap;
-
-use egui::Ui;
+use std::path::{Path, PathBuf};
 
 use shared::{egui, Events, Handle};
-use shared::egui::{Align, Context, Direction, Image, Layout, Margin, Rect, Response, Rounding, Sense, Separator, TextureHandle, Vec2, Widget};
-use shared::rom::Rom;
-use shared::utils::DARK_BLACK;
+use shared::egui::{Align, Context, Layout, Margin, Rounding, Separator, Widget};
 use shared::utils::image::ImageLoader;
+pub use shelves::Shelf;
 
 use crate::app::{Menu, Texture};
-use crate::app::watcher::Event;
 use crate::emulator::Emulator;
 
-const ROM_GRID: f32 = 128.;
+use super::Event;
 
-struct RomView<'a> {
-    rom: &'a Rom,
-    handle: Option<TextureHandle>,
-}
-
-impl<'a> Widget for RomView<'a> {
-    fn ui(self, ui: &mut Ui) -> Response {
-        let response = ui.allocate_response(egui::Vec2::new(ROM_GRID, ROM_GRID + 16.), Sense::click());
-        let img = Rect::from_min_size(response.rect.min, Vec2::splat(ROM_GRID));
-        let mut ui = if let Some(x) = self.handle {
-            Image::new(x.id(), (ROM_GRID, ROM_GRID)).paint_at(ui, img);
-            let mut pos = img.min;
-            pos.y += ROM_GRID;
-            ui.child_ui(Rect::from_min_size(pos, Vec2::new(ROM_GRID, 16.)), Layout::centered_and_justified(Direction::LeftToRight))
-        } else {
-            ui.child_ui(response.rect, Layout::centered_and_justified(Direction::LeftToRight))
-        };
-        egui::Frame::none()
-            .fill(DARK_BLACK)
-            .show(&mut ui, |ui| {
-                let title = &self.rom.header.title;
-                ui.label(title);
-            });
-        response
-    }
-}
-
-impl<'a> RomView<'a> {
-    fn new(rom: &'a Rom, textures: &HashMap<Texture, TextureHandle>) -> Self {
-        let handle = rom.cover.as_ref().and_then(|x| textures.get(&Texture::Cover(x.clone()))).map(|x| x.clone());
-        Self { rom, handle }
-    }
-}
+mod rom;
+mod shelves;
 
 impl shared::Ui for Menu {
     type Ext = Emulator;
@@ -59,22 +24,35 @@ impl shared::Ui for Menu {
         self.textures.insert(Texture::Save, ctx.load_svg::<40, 40>("save", "assets/icons/save.svg"));
         self.textures.insert(Texture::Nosave, ctx.load_svg::<40, 40>("nosave", "assets/icons/stop.svg"));
         for path in &emu.roms.paths {
+            self.shelves.push(Shelf::root(PathBuf::from(path)));
             self.watcher.add_path(path.clone());
             self.search(path);
         }
     }
 
     fn draw(&mut self, ctx: &mut Context, emu: &mut Emulator) {
+        let mut rem = vec![];
         for evt in self.watcher.iter() {
             match evt {
+                Event::Delete(path) => {
+                    emu.roms.paths.drain_filter(|x| Path::new(x) == &path);
+                    self.shelves.drain_filter(|x| x.has_root(&path));
+                    rem.push(path);
+                }
                 Event::Reload(path) => {
-                    self.roms.drain_filter(|x, _| x.starts_with(&path));
+                    if let Some(shelf) = self.shelves.iter_mut()
+                        .find(|x| x.has_root(&path)) {
+                        shelf.clear();
+                    }
                     self.search(&path)
                 }
             }
         }
-        while let Ok((path, mut rom)) = self.receiver.try_recv() {
-            self.add_rom(path, rom, ctx);
+        for path in rem {
+            self.watcher.remove_path(&path);
+        }
+        while let Ok((root, path, mut rom)) = self.receiver.try_recv() {
+            self.add_rom(root, path, rom, ctx);
         }
         let style = ctx.style();
         ctx.set_debug_on_hover(true);
@@ -119,20 +97,9 @@ impl shared::Ui for Menu {
                 egui::containers::ScrollArea::vertical()
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
-                        let w = ui.available_width();
-                        egui::Grid::new("roms").show(ui, |ui| {
-                            let mut n = 1;
-                            for rom in self.roms.values() {
-                                if n as f32 * (ROM_GRID + ui.spacing().item_spacing.x * 2.) + ui.spacing().scroll_bar_width + ui.spacing().scroll_bar_outer_margin > w {
-                                    ui.end_row();
-                                    n = 1;
-                                }
-                                if ui.add(RomView::new(rom, &self.textures)).clicked() {
-                                    emu.proxy.send_event(Events::Play(rom.clone())).ok();
-                                }
-                                n += 1;
-                            }
-                        });
+                        for shelf in &mut self.shelves {
+                            ui.add(shelf.view(emu, &self.textures, self.watcher.tx()));
+                        }
                     });
             });
     }

@@ -1,4 +1,5 @@
 #![feature(hash_drain_filter)]
+#![feature(drain_filter)]
 
 use std::time::Duration;
 
@@ -93,7 +94,7 @@ impl App {
                             breaks: self.emu.breakpoints.take().into_iter()
                                 .filter(|x| !x.temp())
                                 .collect(),
-                            and: self.emu.breakpoints.and()
+                            and: self.emu.breakpoints.and(),
                         },
                         emu: self.emu.settings.clone(),
                         keys: self.emu.bindings.clone(),

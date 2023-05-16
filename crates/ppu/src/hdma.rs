@@ -54,7 +54,6 @@ impl Hdma {
         let v = bus.read_with(self.src, Source::Hdma);
         self.src += 1;
         bus.write_with(self.dst, v, Source::Hdma);
-        log::debug!("({:?})[{:#04X}] {:#02.2X} -> [{:#04X}]", self.mode.unwrap(), self.src - 1, v, self.dst);
         self.dst += 1;
         false
     }

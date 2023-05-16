@@ -1,17 +1,18 @@
 use std::fmt::{Debug, Formatter};
 use std::io::Read;
 use std::path::Path;
+
 use egui::{Context, TextureHandle, TextureOptions};
 use egui_extras::image::{FitTo, load_svg_bytes_with_size};
 use winit::window::Icon;
 
 pub type Image<const W: usize, const H: usize> = [[[u32; 3]; W]; H];
 
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct RawData {
     pub w: usize,
     pub h: usize,
-    pub data: Vec<u8>
+    pub data: Vec<u8>,
 }
 
 impl Debug for RawData {
@@ -55,12 +56,16 @@ pub fn load_image_from_path(path: &Path) -> Result<(RawData, egui::ColorImage), 
     let pixels = image_buffer.as_flat_samples();
     Ok((RawData { w, h, data },
         egui::ColorImage::from_rgba_unmultiplied(
-        [w, h],
-        pixels.as_slice(),
-    )))
+            [w, h],
+            pixels.as_slice(),
+        )))
 }
 
 pub fn load_svg_from_path<const W: u32, const H: u32>(path: &Path) -> Result<egui::ColorImage, String> {
-    let buf = { let mut buf = vec![]; std::fs::File::open(path).unwrap().read_to_end(&mut buf).ok(); buf };
+    let buf = {
+        let mut buf = vec![];
+        std::fs::File::open(path).unwrap().read_to_end(&mut buf).ok();
+        buf
+    };
     load_svg_bytes_with_size(&buf, FitTo::Size(W, H))
 }
