@@ -7,7 +7,7 @@ pub use memory::Viewer;
 use shared::{egui::{self, Align, CentralPanel, Color32, FontFamily, Layout, Response, Ui, Widget}, Event, Events};
 use shared::breakpoints::Breakpoint;
 use shared::cpu::{Flags, Opcode, Reg, Value};
-use shared::egui::{Margin, ScrollArea, SidePanel, Vec2};
+use shared::egui::{ScrollArea, SidePanel, Vec2};
 use shared::emulator::Bus;
 use shared::input::{Debug, KeyCat};
 use shared::io::IO;
@@ -175,12 +175,13 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
             });
         CentralPanel::default()
             .show(ctx, |ui: &mut Ui| {
-                ui.horizontal(|ui| {
+                ui.horizontal_top(|ui| {
+                    let sp = ui.spacing().item_spacing.x;
+                    ui.spacing_mut().item_spacing.x = 3.;
                     ui.allocate_ui_with_layout(Vec2::new(500., 364.), Layout::top_down(Align::LEFT), |ui| {
                         egui::Frame::group(ui.style()).fill(DARK_BLACK)
-                            .outer_margin(Margin::symmetric(0., 2.))
-                            .show(ui, |ui: &mut Ui| {
-                                ui.columns(6, |uis: &mut [Ui]| {
+                            .show(ui, |ui| {
+                                ui.columns(6, |uis| {
                                     let flags = ext.cpu_register(Reg::F);
                                     uis[0].vertical(|ui| {
                                         ui.add(Register("A", ext.cpu_register(Reg::A)));
@@ -202,7 +203,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         ui.add(Register("SP", ext.cpu_register(Reg::SP)));
                                         ui.add(Register("PC", ext.cpu_register(Reg::PC)));
                                     });
-                                    uis[5].with_layout(Layout::top_down(Align::Center), |ui: &mut Ui| {
+                                    uis[5].with_layout(Layout::top_down(Align::Center), |ui| {
                                         //ui.label("Flags");
                                         let f = flags.u8();
                                         ui.horizontal(|ui| {
@@ -220,11 +221,12 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                 ui.push_id("disassembly", |ui| { self.disassembly.render(ext, ui); });
                             });
                     });
-                    ui.allocate_ui_with_layout(Vec2::new(340., 364.), Layout::top_down(Align::LEFT), |ui| {
+                    ui.spacing_mut().item_spacing.x = sp;
+                    ui.allocate_ui_with_layout(Vec2::new(340., 366.), Layout::top_down(Align::LEFT), |ui| {
                         egui::Frame::group(ui.style())
                             .fill(DARK_BLACK)
-                            .show(ui, |ui: &mut Ui| {
-                                ui.horizontal(|ui: &mut Ui| {
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
                                     ui.spacing_mut().item_spacing.x = 16.;
                                     let sz: Vec2 = (32., 32.).into();
                                     let pause = egui::ImageButton::new(self.tex(Texture::Pause), (40., 40.)).frame(false);
@@ -278,6 +280,8 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                 egui_extras::TableBuilder::new(ui)
                                     .columns(Column::remainder(), 3)
                                     .striped(true)
+                                    .vscroll(true)
+                                    .auto_shrink([false; 2])
                                     .cell_layout(Layout::left_to_right(Align::Center))
                                     .body(|mut body| {
                                         ext.breakpoints()
@@ -302,7 +306,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                         let boxed_bus = ext.bus();
                         let bus = boxed_bus.as_ref();
                         egui_extras::TableBuilder::new(ui)
-                            .columns(Column::exact(200.), 4)
+                            .columns(Column::exact(202.), 4)
                             .header(32., |mut header| {
                                 header.col(|ui| { ui.label("IO"); });
                                 header.col(|ui| { ui.label("Memory"); });

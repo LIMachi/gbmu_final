@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use shared::breakpoints::{Breakpoint, Breakpoints, Value};
 use shared::egui;
-use shared::egui::{Color32, Label, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
+use shared::egui::{Color32, Label, Margin, Response, ScrollArea, Sense, TextStyle, Ui, Vec2, Widget};
 use shared::egui::RichText;
 use shared::emulator::Emulator;
 use shared::mem::*;
@@ -120,6 +120,7 @@ impl Viewer {
     pub fn render(&mut self, ui: &mut egui::Ui, emu: &mut dyn Emulator) {
         egui::Frame::group(ui.style())
             .fill(DARK_BLACK)
+            .outer_margin(Margin::symmetric(0., 6.))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label("View: ");

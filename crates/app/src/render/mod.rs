@@ -58,8 +58,8 @@ impl WindowType {
                 .with_inner_size(PhysicalSize::<u32>::from((640, 576))),
             Handle::Debug => WindowBuilder::new()
                 .with_title("GBMU - debugger")
-                .with_min_inner_size(PhysicalSize::<u32>::from((1000, 750)))
-                .with_inner_size(PhysicalSize::new(1280, 720)),
+                .with_resizable(false)
+                .with_inner_size(PhysicalSize::new(1210, 672)),
             Handle::Settings => WindowBuilder::new()
                 .with_title("GBMU - settings")
                 .with_inner_size(PhysicalSize::<u32>::from((270, 550)))
