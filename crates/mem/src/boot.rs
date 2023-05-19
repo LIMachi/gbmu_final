@@ -58,7 +58,6 @@ pub(crate) struct Boot {
     inner: Box<dyn Mbc>,
 }
 
-
 impl Mem for Boot {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         if self.boot.contains(absolute) {

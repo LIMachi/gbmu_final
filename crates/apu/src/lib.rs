@@ -54,7 +54,7 @@ impl Controller {
         Self { driver: audio }
     }
 
-    pub fn apu(&mut self) -> Apu {
-        Apu::new(self.driver.sample_rate(), self.driver.bind())
+    pub fn apu(&self, cgb: bool) -> Apu {
+        Apu::new(self.driver.sample_rate(), self.driver.bind(), cgb)
     }
 }

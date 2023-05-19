@@ -4,9 +4,8 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub use config::{AppConfig, DbgConfig, RomConfig};
 use render::Shelf;
-use shared::egui::{Context, TextureHandle, TextureId, Widget};
+use shared::egui::{Context, TextureHandle, TextureId};
 use shared::rom::Rom;
-use shared::serde::{Deserialize, Serialize};
 use shared::utils::image::{ImageLoader, RawData};
 use watcher::FileWatcher;
 

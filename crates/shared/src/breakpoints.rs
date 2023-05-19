@@ -127,7 +127,6 @@ impl Access {
     }
 }
 
-//TODO add Read(u16) / Write(u16)
 #[derive(Serialize, Deserialize, Copy, Clone, PartialEq, Debug)]
 pub enum Break {
     Access(Access),

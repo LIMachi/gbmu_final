@@ -5,7 +5,6 @@ use shared::winit as winit;
 
 pub struct Lcd {
     enabled: bool,
-    refresh: bool,
     frame: Vec<u8>,
     pixels: Option<Pixels>,
 }
@@ -14,7 +13,6 @@ impl Default for Lcd {
     fn default() -> Self {
         Self {
             enabled: false,
-            refresh: false,
             frame: vec![0; (4 * Lcd::WIDTH * Lcd::HEIGHT) as usize],
             pixels: None,
         }

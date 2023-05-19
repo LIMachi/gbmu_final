@@ -24,7 +24,7 @@ impl FileWatcher {
         let mut w = notify::recommended_watcher(move |event| {
             match event {
                 Ok(e @ notify::Event {
-                    kind: EventKind::Create(_) | EventKind::Remove(_),
+                    kind: EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_),
                     ..
                 }) => {
                     log::info!("{e:?}");

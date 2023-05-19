@@ -7,7 +7,7 @@ pub struct CRAM {
     dmgbgpal: [[u8; 3]; 4],
     dmgobj0pal: [[u8; 3]; 4],
     dmgobj1pal: [[u8; 3]; 4],
-    posted_in_cgb: bool
+    posted_in_cgb: bool,
 }
 
 impl Default for CRAM {
@@ -18,7 +18,7 @@ impl Default for CRAM {
             dmgbgpal: [[0xFF; 3]; 4],
             dmgobj0pal: [[0xFF; 3]; 4],
             dmgobj1pal: [[0xFF; 3]; 4],
-            posted_in_cgb: false
+            posted_in_cgb: false,
         }
     }
 }
@@ -68,29 +68,6 @@ impl CRAM {
                 let palette = a.palette();
                 let rgb555 = self.bgdata[palette * 8 + c as usize * 2] as u16 | (self.bgdata[palette * 8 + c as usize * 2 + 1] as u16) << 8;
                 rgb555.to_bytes()
-            }
-        }
-    }
-
-    pub fn dump(&self) {
-        for pal in 0..8 {
-            for c in 0..4usize {
-                let rgb555 = self.bgdata[pal * 8 + c * 2] as u16 | (self.bgdata[pal * 8 + c * 2 + 1] as u16) << 8;
-                if rgb555 & 0x8000 != 0 {
-                    if c != 0 { panic!("well here goes theory"); }
-                    break;
-                }
-                log::debug!("[BGP|PAL-{pal}] {rgb555:#08X} {:#02X?}", rgb555.to_bytes());
-            }
-        }
-        for pal in 0..8 {
-            for c in 0..4usize {
-                let rgb555 = self.objdata[pal * 8 + c * 2] as u16 | (self.objdata[pal * 8 + c * 2 + 1] as u16) << 8;
-                if rgb555 & 0x8000 != 0 {
-                    if c != 0 { panic!("well here goes theory"); }
-                    break;
-                }
-                log::debug!("[OBJ|PAL-{pal}] {rgb555:#08X} {:#02X?}", rgb555.to_bytes());
             }
         }
     }

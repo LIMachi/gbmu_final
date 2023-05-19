@@ -1,4 +1,4 @@
-use apu::Apu;
+use apu::{Apu, Controller};
 use joy::Joypad;
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
@@ -8,20 +8,20 @@ use shared::mem::IOBus;
 use crate::Timer;
 
 #[derive(Default)]
-pub struct ConsoleBuilder {
-    apu: Option<Apu>,
+pub struct ConsoleBuilder<'a> {
+    apu: Option<&'a Controller>,
     serial: Option<serial::Port>,
     skip: bool,
     cgb: bool,
 }
 
-impl ConsoleBuilder {
+impl<'a> ConsoleBuilder<'a> {
     pub fn with_link(mut self, cable: serial::com::Serial) -> Self {
         self.serial = Some(serial::Port::new(cable));
         self
     }
 
-    pub fn with_apu(mut self, apu: Apu) -> Self {
+    pub fn with_sound_driver(mut self, apu: &'a Controller) -> Self {
         self.apu = Some(apu);
         self
     }
@@ -52,7 +52,7 @@ impl ConsoleBuilder {
             cpu,
             ppu,
             lcd,
-            apu: self.apu.unwrap_or_default(),
+            apu: self.apu.map(|x| x.apu(self.cgb)).unwrap_or_default(),
             dma: ppu::Dma::default(),
             hdma: ppu::Hdma::default(),
             serial: self.serial.unwrap_or_default(),
@@ -79,7 +79,7 @@ impl Default for Devices {
 }
 
 impl Devices {
-    pub fn builder() -> ConsoleBuilder {
+    pub fn builder() -> ConsoleBuilder<'static> {
         ConsoleBuilder::default()
     }
 

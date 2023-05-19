@@ -165,7 +165,6 @@ impl Fetcher {
             }
         }
         State::Tile
-        // TODO use obj palette if mode == sprite
     }
 
     fn sleep(&mut self, _: &Ppu) -> State {

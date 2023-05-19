@@ -127,7 +127,6 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
     fn init(&mut self, ctx: &mut Context, emu: &mut E) {
         let base = ColorImage::new([64, 64], Color32::from_black_alpha(50));
         let count = if emu.bus().is_cgb() { 768 } else { 384 };
-        println!("{:?}", emu.bus().is_cgb());
         for n in 0..count {
             let s = Textures::Tile(n);
             self.insert(s, ctx.load_texture(format!("{:?}", s), base.clone(), TextureOptions::NEAREST));
@@ -159,7 +158,7 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
         match event {
             shared::winit::event::Event::UserEvent(Events::Reload) => {
                 self.init(ctx, ext);
-            },
+            }
             _ => {}
         }
     }

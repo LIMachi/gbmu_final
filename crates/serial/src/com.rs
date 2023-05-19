@@ -108,7 +108,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn connect(&mut self, mut stream: TcpStream, addr: SocketAddr) {
+    pub fn connect(&mut self, stream: TcpStream, addr: SocketAddr) {
         let (tx, rec_x) = channel();
         let (td, rec_d) = channel();
         self.data = Some(rec_x);

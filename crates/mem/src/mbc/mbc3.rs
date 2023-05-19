@@ -35,7 +35,7 @@ impl Mem for Mbc3 {
                 let bank = self.rom_bank % self.rom_banks;
                 let addr = addr as usize + bank * BANK_SIZE;
                 if addr >= self.rom.len() {
-                    eprintln!("out of bounds cartridge rom read at {absolute}");
+                    log::error!("out of bounds cartridge rom read at {absolute}");
                     0xFF
                 } else { self.rom[addr] }
             }
@@ -45,7 +45,7 @@ impl Mem for Mbc3 {
                     n => {
                         let addr = addr as usize + n * RAM_SIZE;
                         if addr >= self.ram.len() {
-                            eprintln!("out of bounds cartridge ram read at {absolute}");
+                            log::error!("out of bounds cartridge ram read at {absolute}");
                             0xFF
                         } else { self.ram[addr] }
                     }
@@ -127,7 +127,7 @@ impl MemoryController for Mbc3 {
 
 impl super::Mbc for Mbc3 {
     fn tick(&mut self) {
-        self.rtc.tick();
+        self.rtc.tick(false);
     }
 }
 

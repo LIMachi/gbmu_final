@@ -73,8 +73,7 @@ impl shared::Ui for Settings {
     fn init(&mut self, _ctx: &mut Context, ext: &mut Emulator) {
         self.autosave = (ext.settings.timer / 60).to_string();
     }
-
-    //TODO bouger les keybinds
+    
     fn draw(&mut self, ctx: &mut Context, emu: &mut Emulator) {
         CentralPanel::default()
             .show(ctx, |ui: &mut Ui| {

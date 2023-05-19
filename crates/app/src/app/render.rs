@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use shared::{egui, Events, Handle};
-use shared::egui::{Align, Context, Layout, Margin, Rounding, Separator, Widget};
+use shared::egui::{Align, Context, Layout, Margin, Rounding, Separator};
 use shared::utils::image::ImageLoader;
 pub use shelves::Shelf;
 
@@ -51,11 +51,10 @@ impl shared::Ui for Menu {
         for path in rem {
             self.watcher.remove_path(&path);
         }
-        while let Ok((root, path, mut rom)) = self.receiver.try_recv() {
+        while let Ok((root, path, rom)) = self.receiver.try_recv() {
             self.add_rom(root, path, rom, ctx);
         }
         let style = ctx.style();
-        ctx.set_debug_on_hover(true);
         let frame = egui::Frame::side_top_panel(&style)
             .inner_margin(Margin::symmetric(8., 8.))
             .rounding(Rounding::none());

@@ -31,7 +31,6 @@ impl IORegs {
 
     pub fn compat_mode(&mut self) {
         if self.io(IO::KEY0).value() == DMG_MODE {
-            log::info!("DMG compatibility mode: enabled");
             self.io_mut(IO::HDMA5).direct_write(0).set_access(IORegs::DISABLED);
             self.io_mut(IO::KEY1).direct_write(0).set_access(IORegs::DISABLED);
             self.io_mut(IO::OCPD).direct_write(0).set_access(IORegs::DISABLED);
@@ -48,7 +47,6 @@ impl IORegs {
     }
 
     pub fn skip_boot(&mut self, console: u8) {
-        log::info!("DMG compat mode: {:#02X}", console);
         if console & 0x80 == 0 {
             self.set(IO::KEY0, DMG_MODE);
             self.set(IO::OPRI, 0x1);

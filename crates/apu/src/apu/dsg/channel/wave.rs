@@ -1,6 +1,7 @@
 use shared::io::{AccessMode, IO, IODevice, IORegs};
 use shared::mem::IOBus;
-use super::{SoundChannel, Channels};
+
+use super::{Channels, SoundChannel};
 
 const PATTERN_REG: [IO; 16] = [
     IO::WaveRam0,
@@ -34,7 +35,7 @@ impl Channel {
             cycle: 0,
             freq_timer: 0,
             dac: false,
-            freq: 0
+            freq: 0,
         }
     }
 
@@ -46,7 +47,7 @@ impl Channel {
 impl SoundChannel for Channel {
     fn output(&self, io: &mut IORegs) -> u8 {
         let v = (io.io(IO::NR32).value() >> 5) & 0x3;
-        if v == 0 { return 0 }
+        if v == 0 { return 0; }
         ((io.io(PATTERN_REG[self.cycle / 2]).value() >> ((self.cycle & 1) * 4)) & 0xF) >> (v - 1)
     }
 
@@ -68,7 +69,7 @@ impl SoundChannel for Channel {
     fn trigger(&mut self, _io: &mut IORegs) -> bool {
         self.cycle = 1;
         self.freq_timer = 2 * (0x7FF - self.freq) | (self.freq_timer & 0x3);
-        false //FIXME: handle special cases/obscure behaviors
+        false
     }
 
     fn length(&self) -> u8 { 0xFF }

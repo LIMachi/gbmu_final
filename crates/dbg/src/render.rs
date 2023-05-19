@@ -63,7 +63,6 @@ impl Data {
         let opcode = u16::convert(&self.raw_op);
         let prefix = opcode & 0xFF00 == 0xCB00;
         if let Ok(opcode) = Opcode::try_from((opcode as u8, prefix)) {
-            println!("{} {:?}", self.raw_op, opcode);
             self.ins = opcode;
             self.op = shared::cpu::dbg::dbg_opcodes(opcode).1;
         }
@@ -143,7 +142,6 @@ impl<E: Emulator> Default for Ninja<E> {
             disassembly: Disassembly::new(),
             viewer: Viewer::default(),
             textures: Default::default(),
-            keys: Default::default(),
         }
     }
 }
@@ -246,10 +244,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         if ui.add(egui::Button::new("-")).clicked() { ext.speeddown(); }
                                     });
                                     if ui.add(into).clicked() { ext.step_into(&mut self.disassembly); };
-                                    if ui.add(pause).clicked() {
-                                        ext.pause();
-                                        log::info!("pause");
-                                    };
+                                    if ui.add(pause).clicked() { ext.pause(); };
                                     if ui.add(play).clicked() { Debugger::<E>::play(ext, &mut self.disassembly); };
                                     if ui.add(step).clicked() { ext.step(&mut self.disassembly) };
                                     if ui.add(reset).clicked() { ext.reset(); };

@@ -55,7 +55,6 @@ enum State {
 
 pub struct Port {
     cable: Serial,
-    ready: bool,
     bits: u8,
     cycles: usize,
     data: Option<u8>,
@@ -68,7 +67,7 @@ impl Default for Port {
 
 impl Port {
     pub fn new(cable: Serial) -> Self {
-        Self { data: None, cable, bits: 0, cycles: 0, ready: false, state: State::Idle }
+        Self { data: None, cable, bits: 0, cycles: 0, state: State::Idle }
     }
 
     pub fn link(&mut self) -> &mut Serial { &mut self.cable }
@@ -104,7 +103,7 @@ impl Port {
                         self.state = State::Idle;
                         self.data = Some(io.io(IO::SB).value());
                         self.interrupt(io);
-                    } else if let (State::Transfer, Some(o)) = (self.state, self.data) {
+                    } else if let (State::Transfer, Some(_)) = (self.state, self.data) {
                         self.state = State::Ack;
                         self.cable.send(Msg::Ack);
                     } else {
@@ -150,14 +149,10 @@ impl Port {
 }
 
 impl IODevice for Port {
-    fn write(&mut self, io: IO, v: u8, bus: &mut dyn IOBus) {
+    fn write(&mut self, io: IO, v: u8, _bus: &mut dyn IOBus) {
         if io == IO::SC && v & 0x81 == 0x81 {
             self.cycles = 0;
             self.bits = 0;
-            log::info!("Requested transfer ({:#02X})", bus.io(IO::SB).value());
-        }
-        if io == IO::SB {
-            log::info!("preparing byte for transfer {v:#02X}")
         }
     }
 }

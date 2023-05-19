@@ -56,7 +56,7 @@ impl From<u8> for Gameboy {
 }
 
 mod capability {
-    pub const NONE: u8 = 0b00000;
+    pub const ROM: u8 = 0b00000;
     // always
     pub const RAM: u8 = 0b00001;
     pub const SRAM: u8 = 0b00011;
@@ -70,17 +70,17 @@ mod capability {
 pub struct Capabilities(u8);
 
 impl Default for Capabilities {
-    fn default() -> Self { Self(capability::NONE) }
+    fn default() -> Self { Self(capability::ROM) }
 }
 
 impl Capabilities {
+    const SAVE: u8 = capability::RAM | capability::BATT;
+
     pub fn ram(&self) -> bool {
         (self.0 & capability::RAM) != 0
     }
 
-    pub fn save(&self) -> bool {
-        (self.0 & capability::BATT) != 0 //TODO gros cat pas sur ....
-    }
+    pub fn save(&self) -> bool { (self.0 & Capabilities::SAVE) == Capabilities::SAVE }
 
     pub fn switch(&self) -> bool {
         (self.0 & capability::SRAM.bitxor(capability::RAM)) != 0
@@ -127,7 +127,6 @@ impl Default for Cartridge {
     fn default() -> Self { Cartridge::Rom }
 }
 
-
 pub enum Mbc {
     MBC0,
     MBC1,
@@ -145,29 +144,29 @@ impl Cartridge {
     pub fn capabilities(&self) -> Capabilities {
         use capability::*;
         match self {
-            Cartridge::Rom => Capabilities(NONE),
-            Cartridge::RomMbc1 => Capabilities(NONE),
+            Cartridge::Rom => Capabilities(ROM),
+            Cartridge::RomMbc1 => Capabilities(ROM),
             Cartridge::RomRamMbc1 => Capabilities(RAM),
             Cartridge::RomRamMbc1Batt => Capabilities(RAM | BATT),
-            Cartridge::RomMbc2 => Capabilities(NONE),
+            Cartridge::RomMbc2 => Capabilities(ROM),
             Cartridge::RomMbc2Batt => Capabilities(RAM | BATT),
             Cartridge::RomRam => Capabilities(RAM),
             Cartridge::RomRamBatt => Capabilities(RAM | BATT),
-            Cartridge::RomMmm01 => Capabilities(NONE),
+            Cartridge::RomMmm01 => Capabilities(ROM),
             Cartridge::RomMmm01Sram => Capabilities(SRAM),
             Cartridge::RomMmm01SramBatt => Capabilities(SRAM | BATT),
             Cartridge::RomMbc3TmrBatt => Capabilities(TMR | BATT),
             Cartridge::RomRamMbc3TmrBatt => Capabilities(RAM | TMR | BATT),
-            Cartridge::RomMbc3 => Capabilities(NONE),
+            Cartridge::RomMbc3 => Capabilities(ROM),
             Cartridge::RomRamMbc3 => Capabilities(RAM),
             Cartridge::RomRamMbc3Batt => Capabilities(RAM | BATT),
-            Cartridge::RomMbc5 => Capabilities(NONE),
+            Cartridge::RomMbc5 => Capabilities(ROM),
             Cartridge::RomRamMbc5 => Capabilities(RAM),
             Cartridge::RomRamMbc5Batt => Capabilities(RAM | BATT),
             Cartridge::RomMbc5Mr => Capabilities(MR),
             Cartridge::RomMbc5MrSram => Capabilities(MR | SRAM),
             Cartridge::RomMbc5MrSramBatt => Capabilities(MR | SRAM | BATT),
-            Cartridge::UNSUPPORTED => Capabilities(NONE)
+            Cartridge::UNSUPPORTED => Capabilities(ROM)
         }
     }
 

@@ -1,9 +1,7 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-use shared::{mem::*, rom::{Mbc as Mbcs, Rom}, rom};
-use shared::serde::{Deserialize, Serialize};
-use shared::serde::de::DeserializeOwned;
+use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
 
 use crate::boot::Boot;
 
@@ -41,7 +39,6 @@ impl MemoryController for Unplugged {
 }
 
 pub struct Controller {
-    header: shared::rom::Header,
     sav: Option<PathBuf>,
     inner: Box<dyn Mbc>,
 }
@@ -54,15 +51,11 @@ impl Controller {
     pub fn new(rom: &Rom, cgb: bool) -> Self {
         let (sav, ram) = if rom.header.cartridge.capabilities().save() {
             let sav = rom.location.clone().join(&rom.filename);
-            log::info!("Trying to load save data...");
             let ram = if let Some(mut f) = std::fs::File::open(&sav.with_extension("sav")).ok() {
                 let mut v = Vec::with_capacity(rom.header.ram_size.size());
                 f.read_to_end(&mut v).expect("failed to read save");
                 v
-            } else {
-                log::info!("No save detected, fresh file");
-                vec![0xAF; rom.header.ram_size.size()]
-            };
+            } else { vec![0xAF; rom.header.ram_size.size()] };
             (Some(sav), ram)
         } else {
             (None, vec![0xAF; rom.header.ram_size.size()])
@@ -79,7 +72,6 @@ impl Controller {
         Self {
             sav,
             inner,
-            header: rom.header.clone(),
         }
     }
 
@@ -107,7 +99,7 @@ impl Controller {
     }
 
     pub fn unplugged() -> Self {
-        Self { sav: None, header: rom::Header::default(), inner: Box::new(Unplugged {}) }
+        Self { sav: None, inner: Box::new(Unplugged {}) }
     }
 }
 
@@ -117,10 +109,7 @@ impl MBCController for Controller {
     fn tick(&mut self) { self.inner.tick(); }
 
     fn post(&mut self) {
-        if self.inner.is_boot() {
-            log::info!("---- POST ----");
-            self.inner = self.inner.unmap();
-        }
+        if self.inner.is_boot() { self.inner = self.inner.unmap(); }
     }
 }
 

@@ -180,7 +180,6 @@ pub struct Screen {
 
 impl Render for Screen {
     fn init(&mut self, window: &Window, emu: &mut Emulator) {
-        log::info!("init LCD");
         emu.console.gb.lcd.init(window);
         window.focus_window();
         self.focus = true;
@@ -283,8 +282,8 @@ impl Console {
         let gb = Devices::builder()
             .skip_boot(skip)
             .set_cgb(cgb)
-            .with_apu(controller.audio.apu())
             .with_link(controller.serial_port())
+            .with_sound_driver(&controller.audio)
             .build();
         let bus = bus::Bus::init(&rom)
             .cgb(cgb)

@@ -1,14 +1,13 @@
 #![feature(drain_filter)]
 #![feature(if_let_guard)]
 
-use std::collections::{HashMap, HashSet};
-use shared::{egui::Context, cpu::{Reg, Value}, emulator::Emulator, breakpoints::Breakpoint};
-
-mod render;
+use std::collections::HashMap;
 
 use render::{Disassembly, Viewer};
+use shared::{breakpoints::Breakpoint, cpu::{Reg, Value}, egui::Context, emulator::Emulator};
 use shared::egui::{TextureHandle, TextureId};
-use shared::winit::event::VirtualKeyCode;
+
+mod render;
 
 #[derive(Copy, Clone, Hash, PartialOrd, PartialEq, Eq)]
 enum Texture {
@@ -16,7 +15,7 @@ enum Texture {
     Pause,
     Step,
     Reset,
-    Into
+    Into,
 }
 
 trait Debugger<E: Emulator> {
@@ -41,8 +40,7 @@ impl<E: Emulator> Debugger<E> for E {
 
     fn step(&mut self, dice: &mut Disassembly<E>) {
         if let Some((pc, op)) = dice.next(self) {
-            if op.is_jmp() { self.breakpoints().step() }
-            else { self.breakpoints().schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()) }
+            if op.is_jmp() { self.breakpoints().step() } else { self.breakpoints().schedule(Breakpoint::register(Reg::PC, Value::U16(pc + op.size as u16)).once()) }
         } else { self.breakpoints().step(); }
         Debugger::<E>::play(self, dice);
     }
@@ -73,5 +71,4 @@ pub struct Ninja<E: Emulator> {
     disassembly: Disassembly<E>,
     viewer: Viewer,
     textures: HashMap<Texture, TextureHandle>,
-    keys: HashSet<VirtualKeyCode>,
 }

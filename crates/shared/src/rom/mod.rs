@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::{Read, Result};
+use std::io::{ErrorKind, Read, Result};
 use std::path::{Path, PathBuf};
 
 pub use header::{Capabilities, Header, Mbc};
@@ -39,12 +39,13 @@ impl Rom {
         let mut v = Vec::new();
         let mut file = File::open(path)?;
         file.read_to_end(&mut v)?;
-        let h = header::Header::new(&v[0..=0x14F]);
-        println!("{:?}", h);
+        if v.len() < 0x150 {
+            return Err(std::io::Error::new(ErrorKind::InvalidData, "Invalid rom"));
+        }
         Ok(Self {
             filename: f,
             location,
-            header: h,
+            header: Header::new(&v[0..=0x14F]),
             content: v,
             cover: None,
             raw: None,

@@ -69,7 +69,7 @@ impl Mem for Mbc1 {
         }
     }
 
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
+    fn get_range(&self, st: u16, _len: u16) -> Vec<u8> {
         use mem::*;
         match st {
             ROM => self.rom[0..0x4000].to_vec(),
@@ -78,7 +78,7 @@ impl Mem for Mbc1 {
                 if self.rom_reg_1 == 0 { bank = 1; }
                 bank |= (self.rom_reg_2 as usize) << 5;
                 bank &= self.rom_banks;
-                let mut st = bank << 14;
+                let st = bank << 14;
                 let end = st + 0x4000;
                 if end > self.rom.len() {
                     vec![0; 0x4000]

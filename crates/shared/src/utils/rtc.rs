@@ -12,14 +12,23 @@ pub struct Rtc {
     lm: u8,
     lh: u8,
     ldl: u8,
-    ldh: u8
+    ldh: u8,
 }
 
 impl Default for Rtc {
     fn default() -> Self {
         Self {
-            quartz: 0, s: 0, m: 0, h: 0, dl: 0, dh: 0,
-            ls: 0, lm: 0, lh: 0, ldl: 0, ldh: 0
+            quartz: 0,
+            s: 0,
+            m: 0,
+            h: 0,
+            dl: 0,
+            dh: 0,
+            ls: 0,
+            lm: 0,
+            lh: 0,
+            ldl: 0,
+            ldh: 0,
         }
     }
 }
@@ -43,14 +52,14 @@ impl Rtc {
             0x8 => {
                 self.s = value & 0x3F;
                 self.quartz = 0;
-            },
+            }
             0x9 => self.m = value & 0x3F,
             0xA => self.h = value & 0x1F,
             0xB => self.dl = value,
             0xC => {
                 log::info!("wrote ctrl {value:#04X}");
                 self.dh = value & 0xC1
-            },
+            }
             _ => unreachable!()
         }
         self.latch();
@@ -64,16 +73,26 @@ impl Rtc {
         self.ldh = self.dh & 0xC1;
     }
 
-    pub fn tick(&mut self) {
-        if self.dh & 0x40 != 0 { return };
-        if self.quartz == 32767 { self.quartz = 0; }
-        else { self.quartz += 1; return ; }
-        if self.s == 59 { self.s = 0; }
-        else { self.s = (self.s + 1) & 0x3F; return ; }
-        if self.m == 59 { self.m = 0; }
-        else  { self.m = (self.m + 1) & 0x3F; return }
-        if self.h == 23 { self.h = 0; }
-        else  { self.h = (self.h + 1) & 0x1F; return }
+    pub fn tick(&mut self, seconds: bool) {
+        if self.dh & 0x40 != 0 { return; };
+        if !seconds {
+            if self.quartz == 32767 { self.quartz = 0; } else {
+                self.quartz += 1;
+                return;
+            }
+        }
+        if self.s == 59 { self.s = 0; } else {
+            self.s = (self.s + 1) & 0x3F;
+            return;
+        }
+        if self.m == 59 { self.m = 0; } else {
+            self.m = (self.m + 1) & 0x3F;
+            return;
+        }
+        if self.h == 23 { self.h = 0; } else {
+            self.h = (self.h + 1) & 0x1F;
+            return;
+        }
         let (dl, c) = self.dl.overflowing_add(1);
         if c {
             if self.dh & 1 != 0 { self.dh |= 0x80; }
@@ -94,8 +113,8 @@ impl Rtc {
 
     pub fn deserialize(raw: Vec<u8>) -> Option<Self> {
         if raw.len() != 18 { return None; }
-        let [s, m, h, dl, dh] = raw[0..5] else { unreachable!()  };
-        let [ls, lm, lh, ldl, ldh] = raw[5..10] else { unreachable!()  };
+        let [s, m, h, dl, dh] = raw[0..5] else { unreachable!() };
+        let [ls, lm, lh, ldl, ldh] = raw[5..10] else { unreachable!() };
         let [e0, e1, e2, e3, e4, e5, e6, e7] = raw[10..18] else { unreachable!() };
         let epoch = u64::from_le_bytes([e0, e1, e2, e3, e4, e5, e6, e7]);
         let mut elapsed = SystemTime::now().duration_since(std::time::UNIX_EPOCH)
@@ -105,7 +124,7 @@ impl Rtc {
         if elapsed / Rtc::MAX_SECONDS > 0 { rtc.dh |= 0x80; }
         elapsed %= Rtc::MAX_SECONDS;
         if dh & 0x40 == 0 {
-            for _ in 0..elapsed { rtc.tick(); }
+            for _ in 0..elapsed { rtc.tick(true); }
             log::info!("had {elapsed} seconds to catch up ! {rtc:#02X?}");
         }
         Some(rtc)

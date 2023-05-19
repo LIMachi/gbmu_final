@@ -1,14 +1,13 @@
+pub use noise::Channel as NoiseChannel;
+pub use pulse::Channel as PulseChannel;
 use shared::io::{AccessMode, IO, IODevice, IORegs};
+use shared::mem::IOBus;
+pub use wave::Channel as WaveChannel;
 
 mod wave;
 mod pulse;
 mod noise;
 mod envelope;
-
-pub use pulse::Channel as PulseChannel;
-pub use wave::Channel as WaveChannel;
-pub use noise::Channel as NoiseChannel;
-use shared::mem::IOBus;
 
 pub enum Event {
     Envelope,
@@ -29,28 +28,28 @@ pub(crate) trait SoundChannel: IODevice {
     fn output(&self, io: &mut IORegs) -> u8;
 
     fn channel(&self) -> Channels;
-    fn enable(&mut self) { }
-    fn disable(&mut self) { }
+    fn enable(&mut self) {}
+    fn disable(&mut self) {}
     fn dac_enabled(&self) -> bool { false }
 
     fn clock(&mut self, io: &mut IORegs);
     fn trigger(&mut self, io: &mut IORegs) -> bool;
     fn sweep(&mut self, _io: &mut IORegs) -> bool { false }
-    fn envelope(&mut self) { }
+    fn envelope(&mut self) {}
 
     fn length(&self) -> u8;
 
-    fn on_enable(&mut self, _io: &mut IORegs) {  }
-    fn on_disable(&mut self, _io: &mut IORegs) {  }
+    fn on_enable(&mut self, _io: &mut IORegs) {}
+    fn on_disable(&mut self, _io: &mut IORegs) {}
 
-    fn power_on(&mut self, _io: &mut IORegs) { }
-    fn power_off(&mut self, _io: &mut IORegs) { }
+    fn power_on(&mut self, _io: &mut IORegs) {}
+    fn power_off(&mut self, _io: &mut IORegs) {}
 }
 
 impl SoundChannel for () {
     fn output(&self, _io: &mut IORegs) -> u8 { 0 }
     fn channel(&self) -> Channels { Channels::Noise }
-    fn clock(&mut self, _io: &mut IORegs) { }
+    fn clock(&mut self, _io: &mut IORegs) {}
     fn trigger(&mut self, _io: &mut IORegs) -> bool { false }
     fn length(&self) -> u8 { 0 }
 }
@@ -134,10 +133,12 @@ impl Channel {
     }
 
     pub fn power_off(&mut self, io: &mut IORegs) {
-       io.io_mut(self.nr1).direct_write(0).set_access(AccessMode::rdonly()); //FIXME: DMG allow length modification!
-       io.io_mut(self.nr2).direct_write(0).set_access(AccessMode::rdonly());
-       io.io_mut(self.nr3).direct_write(0).set_access(AccessMode::rdonly());
-       io.io_mut(self.nr4).direct_write(0).set_access(AccessMode::rdonly());
+        if io.io(IO::CGB).value() != 0 {
+            io.io_mut(self.nr1).direct_write(0).set_access(AccessMode::rdonly());
+        }
+        io.io_mut(self.nr2).direct_write(0).set_access(AccessMode::rdonly());
+        io.io_mut(self.nr3).direct_write(0).set_access(AccessMode::rdonly());
+        io.io_mut(self.nr4).direct_write(0).set_access(AccessMode::rdonly());
         self.inner.power_off(io);
     }
 
@@ -160,7 +161,7 @@ impl Channel {
             Event::Length if io.io(self.nr4).bit(6) != 0 && self.length_timer != 0 => {
                 self.length_timer -= 1;
                 if self.length_timer == 0 { self.enabled = false; }
-            },
+            }
             Event::Sweep => if self.inner.sweep(io) { self.disable(io); },
             Event::Envelope => self.inner.envelope(),
             _ => {}

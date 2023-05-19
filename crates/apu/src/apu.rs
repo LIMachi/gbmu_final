@@ -21,6 +21,7 @@ pub struct Apu {
     dsg: dsg::DSG,
     channels: Vec<Channel>,
     on: bool,
+    cgb: bool,
 }
 
 impl Default for Apu {
@@ -28,6 +29,7 @@ impl Default for Apu {
         let sample_rate = 44100;
         Self {
             fedge: Default::default(),
+            cgb: false,
             div_apu: 0,
             sample: 0.,
             sample_rate,
@@ -48,8 +50,8 @@ impl Default for Apu {
 
 impl Apu {
     fn charge_factor(&self) -> f32 {
-        // TODO match on hypothetical cgb bus (0.998943 for cgb)
-        0.999958f32.powf(TICK_RATE as f32 / self.sample_rate as f32)
+        if self.cgb { 0.998943 } else { 0.999958f32 }
+            .powf(TICK_RATE as f32 / self.sample_rate as f32)
     }
 
     pub fn set_speed(&mut self, speed: f64) {
@@ -58,7 +60,7 @@ impl Apu {
         self.sample = 0.;
     }
 
-    pub(crate) fn new(sample_rate: u32, input: Input) -> Self {
+    pub(crate) fn new(sample_rate: u32, input: Input, cgb: bool) -> Self {
         let channels = vec![
             Channel::sweep(),
             Channel::pulse(),
@@ -67,6 +69,7 @@ impl Apu {
         ];
         let mut apu = Self {
             fedge: FEdge::default(),
+            cgb,
             div_apu: 0,
             sample: 0.,
             sample_rate,
@@ -92,13 +95,11 @@ impl Apu {
     fn power(&mut self, io: &mut IORegs, on: bool) {
         if on != self.on {
             if on {
-                log::info!("APU on");
                 for channel in self.channels.iter_mut() {
                     channel.power_on(io);
                 }
                 self.dsg.power_on(io);
             } else {
-                log::info!("APU off");
                 for channel in self.channels.iter_mut() {
                     channel.power_off(io);
                 }

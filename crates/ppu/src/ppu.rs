@@ -3,7 +3,6 @@ use mem::{oam::{Oam, Sprite}, Vram};
 use pixel::Pixel;
 use shared::io::{IO, IODevice, IORegs, LCDC};
 use shared::mem::*;
-use shared::utils::ToBox;
 use states::*;
 
 use crate::ppu::states::Mode::VBlank;
