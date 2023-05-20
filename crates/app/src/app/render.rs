@@ -17,12 +17,12 @@ impl shared::Ui for Menu {
     type Ext = Emulator;
 
     fn init(&mut self, ctx: &mut Context, emu: &mut Emulator) {
-        self.textures.insert(Texture::Add, ctx.load_svg::<40, 40>("add", "assets/icons/add.svg"));
-        self.textures.insert(Texture::Debug, ctx.load_svg::<40, 40>("debug", "assets/icons/debug.svg"));
-        self.textures.insert(Texture::Settings, ctx.load_svg::<40, 40>("settings", "assets/icons/settings.svg"));
-        self.textures.insert(Texture::Spritesheet, ctx.load_svg::<40, 40>("spritesheet", "assets/icons/palette.svg"));
-        self.textures.insert(Texture::Save, ctx.load_svg::<40, 40>("save", "assets/icons/save.svg"));
-        self.textures.insert(Texture::Nosave, ctx.load_svg::<40, 40>("nosave", "assets/icons/stop.svg"));
+        self.textures.insert(Texture::Add, ctx.load_svg_bytes::<40, 40>("add", include_bytes!("../../../../assets/icons/add.svg")));
+        self.textures.insert(Texture::Debug, ctx.load_svg_bytes::<40, 40>("debug", include_bytes!("../../../../assets/icons/debug.svg")));
+        self.textures.insert(Texture::Settings, ctx.load_svg_bytes::<40, 40>("settings", include_bytes!("../../../../assets/icons/settings.svg")));
+        self.textures.insert(Texture::Spritesheet, ctx.load_svg_bytes::<40, 40>("spritesheet", include_bytes!("../../../../assets/icons/palette.svg")));
+        self.textures.insert(Texture::Save, ctx.load_svg_bytes::<40, 40>("save", include_bytes!("../../../../assets/icons/save.svg")));
+        self.textures.insert(Texture::Nosave, ctx.load_svg_bytes::<40, 40>("nosave", include_bytes!("../../../../assets/icons/stop.svg")));
         for path in &emu.roms.paths {
             self.shelves.push(Shelf::root(PathBuf::from(path)));
             self.watcher.add_path(path.clone());

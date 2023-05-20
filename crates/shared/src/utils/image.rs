@@ -34,6 +34,7 @@ impl RawData {
 pub trait ImageLoader {
     fn load_image<S: Into<String>, P: AsRef<std::path::Path>>(&self, name: S, path: P) -> Option<(TextureHandle, RawData)>;
     fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle;
+    fn load_svg_bytes<const W: u32, const H: u32>(&mut self, name: impl Into<String>, bytes: &[u8]) -> TextureHandle;
 }
 
 impl ImageLoader for Context {
@@ -45,6 +46,12 @@ impl ImageLoader for Context {
     fn load_svg<const W: u32, const H: u32>(&mut self, name: impl Into<String>, path: impl AsRef<Path>) -> TextureHandle {
         let img = load_svg_from_path::<W, H>(path.as_ref()).unwrap();
         self.load_texture(name, img, TextureOptions::LINEAR)
+    }
+
+    fn load_svg_bytes<const W: u32, const H: u32>(&mut self, name: impl Into<String>, bytes: &[u8]) -> TextureHandle {
+        let name = name.into();
+        let tex = load_svg_bytes_with_size(bytes, FitTo::Size(W, H)).expect(format!("could not load {}", name).as_str());
+        self.load_texture(name, tex, TextureOptions::LINEAR)
     }
 }
 
