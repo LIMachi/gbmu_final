@@ -35,15 +35,6 @@ pub struct Controller {
     state: ppu::PpuState,
 }
 
-impl Clone for Controller {
-    fn clone(&self) -> Self {
-        Self {
-            ppu: self.ppu.clone(),
-            state: dyn_clone::clone_box(&*self.state),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 struct InnerPpuState {
     mode: Mode,

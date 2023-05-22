@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
+
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use pixel::Pixel;
 use shared::io::{IO, IODevice, IORegs, LCDC};
 use shared::mem::*;
 use states::*;
-
-use crate::ppu::states::Mode::VBlank;
 
 mod fetcher;
 mod cram;
@@ -49,16 +48,16 @@ pub(crate) struct Scroll {
 
 #[derive(Serialize, Deserialize)]
 pub struct Ppu {
-    // pub(crate) dots: usize,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
     pub(crate) win: Window,
     pub(crate) sc: Scroll,
     pub(crate) stat: REdge,
     pub(crate) lcdc: u8,
-    #[serde(default,skip)]
-    pub(crate) oam: Option<&'static mut Lock<Oam>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
-    #[serde(default,skip)]
+    #[serde(default, skip)]
+    pub(crate) oam: Option<&'static mut Lock<Oam>>,
+    //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
+    #[serde(default, skip)]
     pub(crate) vram: Option<&'static mut Lock<Vram>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
 }
 
@@ -72,7 +71,7 @@ impl Clone for Ppu {
             stat: self.stat.clone(),
             lcdc: self.lcdc,
             oam: None,
-            vram: None
+            vram: None,
         }
     }
 }
@@ -82,7 +81,6 @@ impl Ppu {
         let sprites = Vec::with_capacity(10);
         Self {
             sc: Scroll::default(),
-            // dots: 0,
             cram: cram::CRAM::default(),
             sprites,
             lcdc: 0,
@@ -134,22 +132,17 @@ impl Ppu {
     pub(crate) fn tick(&mut self, state: &mut Box<dyn State>, io: &mut IORegs, lcd: &mut Lcd) {
         let lcdc = io.io(IO::LCDC).value();
         if self.lcdc.enabled() && !lcdc.enabled() {
-            // self.dots = 0;
             io.io_mut(IO::LY).direct_write(0);
             self.set_state(io, state, VState::immediate().boxed());
             lcd.disable(io);
         }
         self.lcdc = lcdc;
         if self.lcdc.enabled() {
-            // self.dots += 1;
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
                     lcd.vblank();
                     lcd.enable();
-                } else if state.mode() == VBlank {
-                    // log::debug!("ppu frame time: {} dots", self.dots);
-                    // self.dots = 0;
                 }
                 self.set_state(io, state, next);
             }

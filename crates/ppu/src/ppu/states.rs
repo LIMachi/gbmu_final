@@ -1,5 +1,5 @@
 use std::fmt::{Debug, Formatter};
-use dyn_clone::DynClone;
+
 use serde::{Deserialize, Serialize};
 
 use lcd::Lcd;
@@ -20,16 +20,16 @@ pub enum Mode {
     VBlank = 1,
 }
 
-pub(crate) trait State: Debug + DynClone {
+pub(crate) trait State: Debug {
     fn mode(&self) -> Mode;
     fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, lcd: &mut Lcd) -> Option<Box<dyn State>>;
-    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized + Clone { Box::new(self) }
+    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized { Box::new(self) }
     fn name(&self) -> String { format!("{:?}", self.mode()) }
     fn first_tick(&self) -> bool { false }
     fn raw(&self) -> Vec<u8> { vec![] }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct OamState {
     clock: u8,
     sprite: usize,
@@ -39,7 +39,7 @@ impl OamState {
     pub fn new() -> Self { Self { sprite: 0, clock: 0 } }
 
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
-        Box::new(Self { clock: raw[0], sprite: raw[1] as usize})
+        Box::new(Self { clock: raw[0], sprite: raw[1] as usize })
     }
 }
 
@@ -169,7 +169,7 @@ impl State for TransferState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VState {
     dots: usize,
 }
@@ -184,7 +184,7 @@ impl VState {
     }
 
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
-        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8)})
+        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8) })
     }
 }
 
@@ -221,7 +221,7 @@ impl State for VState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HState {
     dots: usize,
 }
@@ -232,7 +232,7 @@ impl HState {
     }
 
     pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
-        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8)})
+        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8) })
     }
 }
 
