@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use mem::oam::Sprite;
 use shared::io::{CGB_MODE, IO, IORegs, LCDC};
 use shared::mem::Source;
@@ -6,7 +7,7 @@ use crate::ppu::pixel::Attributes;
 
 use super::{fifo::*, Pixel, Ppu};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 enum State {
     Tile,
     DataLow,
@@ -15,13 +16,14 @@ enum State {
     Push,
 }
 
-#[derive(Eq, PartialEq, Debug, Copy, Clone)]
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum Mode {
     Bg,
     Window,
     Sprite(Sprite, u8),
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Fetcher {
     clock: u8,
     x: u8,

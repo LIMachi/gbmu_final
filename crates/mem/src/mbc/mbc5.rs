@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use shared::mem::*;
 use shared::rom::Rom;
 
-use crate::mbc::MemoryController;
+use crate::mbc::{Mbc, MbcKind, MemoryController};
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE: usize = 0x2000;
@@ -15,6 +17,7 @@ const ROM_BANK_H_END: u16 = 0x3FFF;
 const RAM_BANK: u16 = 0x4000;
 const RAM_BANK_END: u16 = 0x5FFF;
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Mbc5 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -86,14 +89,18 @@ impl MemoryController for Mbc5 {
         }
     }
 
-    fn ram_dump(&self) -> Vec<u8> {
-        self.ram.clone()
-    }
+    fn ram_dump(&self) -> Vec<u8> { self.ram.clone() }
 
     fn rom_bank(&self) -> usize { self.rom_bank }
-    fn ram_bank(&self) -> usize {
-        self.ram_bank
-    }
+    fn ram_bank(&self) -> usize { self.ram_bank }
 }
 
-impl super::Mbc for Mbc5 {}
+impl Mbc for Mbc5 {
+    fn serialize(&self) -> Option<MbcKind> {
+        Some(MbcKind::MBC5(bincode::serialize(self).expect("failed to serialize")))
+    }
+
+    fn deserialize(raw: &[u8]) -> Box<dyn Mbc> {
+        Box::new(bincode::deserialize::<Self>(raw).expect("deserialization failed"))
+    }
+}

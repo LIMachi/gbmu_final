@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
 use shared::mem::Mem;
 
 const STACK_SIZE: usize = 0x7F;
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Hram {
     mem: Vec<u8>,
 }

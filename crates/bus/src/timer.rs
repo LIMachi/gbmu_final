@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use shared::io::{IO, IORegs};
 use shared::utils::FEdge;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct Timer {
     timer: u8,
     tima_inner: u8,

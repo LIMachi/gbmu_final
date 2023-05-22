@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Result};
 use std::path::{Path, PathBuf};
+use serde::{Deserialize, Serialize};
 
 pub use header::{Capabilities, Header, Mbc};
 
@@ -9,7 +10,7 @@ use crate::utils::image::RawData;
 
 mod header;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Rom {
     pub filename: String,
     pub location: PathBuf,

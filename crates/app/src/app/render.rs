@@ -23,6 +23,7 @@ impl shared::Ui for Menu {
         self.textures.insert(Texture::Spritesheet, ctx.load_svg_bytes::<40, 40>("spritesheet", include_bytes!("../../../../assets/icons/palette.svg")));
         self.textures.insert(Texture::Save, ctx.load_svg_bytes::<40, 40>("save", include_bytes!("../../../../assets/icons/save.svg")));
         self.textures.insert(Texture::Nosave, ctx.load_svg_bytes::<40, 40>("nosave", include_bytes!("../../../../assets/icons/stop.svg")));
+        self.textures.insert(Texture::SaveState, ctx.load_svg_bytes::<40, 40>("save_state", include_bytes!("../../../../assets/icons/s.svg")));
         for path in &emu.roms.paths {
             self.shelves.push(Shelf::root(PathBuf::from(path)));
             self.watcher.add_path(path.clone());
@@ -72,6 +73,7 @@ impl shared::Ui for Menu {
                     let add = egui::ImageButton::new(self.tex(Texture::Add), (32., 32.)).frame(false);
                     let save = egui::ImageButton::new(self.tex(Texture::Save), (32., 32.)).frame(false);
                     let nosave = egui::ImageButton::new(self.tex(Texture::Nosave), (32., 32.)).frame(false);
+                    let save_state = egui::ImageButton::new(self.tex(Texture::SaveState), (32., 32.)).frame(false);
                     l.with_layout(Layout::default(), |ui| {
                         if ui.add(add).clicked() {
                             if let Some(file) = rfd::FileDialog::new().set_directory("/").pick_folder() {
@@ -85,6 +87,8 @@ impl shared::Ui for Menu {
                         if ui.add(setting).clicked() { emu.proxy.send_event(Events::Open(Handle::Settings)).ok(); };
                         ui.add(Separator::default().vertical().spacing(4.));
                         if emu.is_running() {
+                            if ui.add(save_state).clicked() { emu.console.save_state(); }
+                            ui.add(Separator::default().vertical().spacing(4.));
                             if ui.add(save).clicked() { emu.console.bus.save(false); }
                             if ui.add(nosave).clicked() { emu.stop(false); }
                         }

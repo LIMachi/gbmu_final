@@ -1,5 +1,8 @@
 #![feature(hash_drain_filter)]
+#![feature(is_some_and)]
 #![feature(drain_filter)]
+
+extern crate core;
 
 use std::time::Duration;
 

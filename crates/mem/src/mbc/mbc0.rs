@@ -1,9 +1,13 @@
-use shared::{mem::*, rom::Rom};
-use crate::mbc::Mbc;
+use serde::{Deserialize, Serialize};
 
+use shared::{mem::*, rom::Rom};
+
+use crate::mbc::{Mbc, MbcKind};
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Mbc0 {
     rom: Vec<u8>,
-    ram: Vec<u8>
+    ram: Vec<u8>,
 }
 
 impl Mem for Mbc0 {
@@ -30,7 +34,7 @@ impl super::MemoryController for Mbc0 {
     fn new(rom: &Rom, ram: Vec<u8>) -> Self {
         Self {
             rom: rom.raw().clone(),
-            ram
+            ram,
         }
     }
 
@@ -39,4 +43,12 @@ impl super::MemoryController for Mbc0 {
     }
 }
 
-impl Mbc for Mbc0 { }
+impl Mbc for Mbc0 {
+    fn serialize(&self) -> Option<MbcKind> {
+        Some(MbcKind::MBC0(bincode::serialize(self).expect("failed to serialize")))
+    }
+
+    fn deserialize(raw: &[u8]) -> Box<dyn Mbc> {
+        Box::new(bincode::deserialize::<Self>(raw).expect("deserialization failed"))
+    }
+}

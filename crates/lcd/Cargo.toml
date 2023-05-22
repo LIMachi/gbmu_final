@@ -10,3 +10,7 @@ pixels = "0.11.0"
 
 [dependencies.shared]
 path = "../shared"
+
+[dependencies.serde]
+version = "1.0.152"
+features = ["derive"]

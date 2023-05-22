@@ -4,11 +4,12 @@ use std::path::Path;
 
 use egui::{Context, TextureHandle, TextureOptions};
 use egui_extras::image::{FitTo, load_svg_bytes_with_size};
+use serde::{Deserialize, Serialize};
 use winit::window::Icon;
 
 pub type Image<const W: usize, const H: usize> = [[[u32; 3]; W]; H];
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RawData {
     pub w: usize,
     pub h: usize,

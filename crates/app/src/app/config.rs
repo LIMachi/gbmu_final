@@ -47,7 +47,7 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    pub fn config_dir() -> PathBuf {
+    fn config_dir() -> PathBuf {
         let cfg = directories::ProjectDirs::from("org", "ft", "GBMU")
             .expect("unsupported platform")
             .config_dir()
@@ -60,7 +60,7 @@ impl AppConfig {
         cfg
     }
 
-    pub fn data_dir() -> PathBuf {
+    fn data_dir() -> PathBuf {
         let data = directories::ProjectDirs::from("org", "ft", "GBMU")
             .expect("unsupported platform")
             .data_dir()
@@ -73,8 +73,12 @@ impl AppConfig {
         data
     }
 
+    pub fn save_path<S: AsRef<str>>(rom: S) -> PathBuf {
+        Self::data_dir().join(format!("{}_{}.state", rom.as_ref(), chrono::Local::now().format("%Y-%m-%d_%H-%M-%S-%3f")))
+    }
+
     pub fn load() -> Self {
-        serde_any::from_file(AppConfig::config_dir()).unwrap_or_else(|_| Default::default())
+        serde_any::from_file(AppConfig::config_dir().join("gbmu.ron")).unwrap_or_else(|_| Default::default())
     }
 
     pub fn store(self) {

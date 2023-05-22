@@ -94,6 +94,12 @@ pub struct Serial {
     pub(crate) port: u16,
 }
 
+impl Default for Serial {
+    fn default() -> Self {
+        Serial::phantom()
+    }
+}
+
 pub struct Server {
     socket: TcpListener,
     connected: Arc<AtomicBool>,

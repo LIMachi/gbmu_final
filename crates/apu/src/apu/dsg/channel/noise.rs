@@ -4,6 +4,7 @@ use shared::mem::IOBus;
 use crate::apu::dsg::channel::envelope::Envelope;
 use super::{SoundChannel, Channels};
 
+#[derive(Clone)]
 pub struct Channel {
     triggered: bool,
     buffer: u16,
@@ -32,6 +33,19 @@ impl Channel {
             (0, s) => 16 << (s - 1),
             (r, s) => 16 * (r << s)
         }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn SoundChannel + 'static> {
+        let envelope = Envelope::from_raw(&raw[..5]);
+        let buffer = u16::from_le_bytes(raw[7..9].try_into().unwrap());
+        let freq_timer = u16::from_le_bytes(raw[9..].try_into().unwrap());
+        Box::new(Self {
+            triggered: raw[5] == 1,
+            buffer,
+            freq_timer,
+            envelope,
+            dac: raw[6] == 1
+        })
     }
 }
 
@@ -77,6 +91,15 @@ impl SoundChannel for Channel {
     fn envelope(&mut self) { self.envelope.clock(); }
 
     fn length(&self) -> u8 { 0x3F }
+
+    fn raw(&self) -> Vec<u8> {
+        let mut out = self.envelope.raw();
+        out.push(if self.triggered { 1 } else { 0 });
+        out.push(if self.dac { 1 } else { 0 });
+        out.extend(self.buffer.to_le_bytes());
+        out.extend(self.freq_timer.to_le_bytes());
+        out
+    }
 }
 
 impl IODevice for Channel {

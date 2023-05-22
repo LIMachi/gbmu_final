@@ -1,9 +1,12 @@
+use serde::{Deserializer, Serializer};
+
 use shared::mem::Mem;
 use shared::rom::Rom;
 use shared::serde::{Deserialize, Serialize};
 
-use crate::mbc::{Mbc, MemoryController, Unplugged};
+use crate::mbc::{Mbc, MbcKind, MemoryController, Unplugged};
 
+#[derive(Serialize, Deserialize)]
 struct DmgBoot {
     raw: Vec<u8>,
 }
@@ -53,9 +56,28 @@ trait BootSection: Mem {
     fn contains(&self, addr: u16) -> bool;
 }
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct Boot {
     boot: Box<dyn BootSection>,
     inner: Box<dyn Mbc>,
+}
+
+impl Serialize for Box<dyn BootSection> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        self.contains(0x200).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Box<dyn BootSection> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Deserialize::deserialize(deserializer).map(|cgb: bool| {
+            if cgb {
+                Box::new(CgbBoot::new()) as Box<dyn BootSection>
+            } else {
+                Box::new(DmgBoot::new()) as Box<dyn BootSection>
+            }
+        })
+    }
 }
 
 impl Mem for Boot {
@@ -82,6 +104,14 @@ impl Mem for Boot {
 
 impl Mbc for Boot {
     fn is_boot(&self) -> bool { true }
+    fn serialize(&self) -> Option<MbcKind> {
+        Some(MbcKind::BOOT(bincode::serialize(self).expect("failed to serialize")))
+    }
+
+    fn deserialize(raw: &[u8]) -> Box<dyn Mbc> {
+        Box::new(bincode::deserialize::<Self>(raw).expect("deserialization failed"))
+    }
+
     fn unmap(&mut self) -> Box<dyn Mbc> { std::mem::replace(&mut self.inner, Box::new(Unplugged {})) }
 }
 

@@ -1,12 +1,45 @@
 use std::collections::HashSet;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use shared::mem::Mem;
 
 const BANK_SIZE: usize = 0x2000;
 
+#[derive(Clone)]
 enum Storage {
     DMG([u8; BANK_SIZE]),
     CGB([[u8; BANK_SIZE]; 2], usize),
+}
+
+impl Serialize for Storage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        match self {
+            Storage::DMG(bank) => {
+                let mut v = bank.to_vec();
+                v.insert(0, 0);
+                v
+            },
+            Storage::CGB(banks, selected) => {
+                let mut v = banks[0].to_vec();
+                v.insert(0, 1);
+                v.insert(1, *selected as u8);
+                v.extend(banks[1]);
+                v
+            }
+        }.serialize(serializer)
+    }
+}
+
+impl <'de> Deserialize<'de> for Storage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Deserialize::deserialize(deserializer).map(|v: Vec<u8>| {
+            if v[0] == 1 {
+                Storage::CGB([v[2..2 + BANK_SIZE].try_into().unwrap(), v[2 + BANK_SIZE..].try_into().unwrap()], v[1] as usize)
+            } else {
+                Storage::DMG(v[1..].try_into().unwrap())
+            }
+        })
+    }
 }
 
 impl Storage {
@@ -45,6 +78,7 @@ impl Mem for Storage {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Vram {
     pub tile_cache: HashSet<usize>,
     mem: Storage,

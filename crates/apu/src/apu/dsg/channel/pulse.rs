@@ -10,6 +10,7 @@ const DUTY_CYCLES: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
+#[derive(Clone)]
 struct Registers {
     length: IO,
     volume: IO,
@@ -17,7 +18,7 @@ struct Registers {
     wave2: IO,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Sweep {
     shadow: u16,
     pace: u8,
@@ -29,6 +30,23 @@ struct Sweep {
 }
 
 impl Sweep {
+    pub fn raw(&self) -> Vec<u8> {
+        vec![(self.shadow & 0xFF) as u8, ((self.shadow >> 8) & 0xFF) as u8, self.pace, self.timer, if self.negate { 1 } else { 0 }, self.shift, if self.ran { 1 } else { 0 }, if self.enabled { 1 } else { 0 }]
+    }
+
+    pub fn from_raw(raw: &[u8]) -> Self {
+        let shadow: u16 = raw[0] as u16 | ((raw[1] as u16) << 8);
+        Self {
+            shadow,
+            pace: raw[2],
+            timer: raw[3],
+            negate: raw[4] == 1,
+            shift: raw[5],
+            ran: raw[6] == 1,
+            enabled: raw[7] == 1
+        }
+    }
+
     pub fn update(&mut self, data: u8) {
         let neg = self.negate;
 
@@ -76,6 +94,7 @@ impl Sweep {
     }
 }
 
+#[derive(Clone)]
 pub struct Channel {
     cycle: usize,
     freq_timer: u16,
@@ -117,12 +136,41 @@ impl Channel {
         }
     }
 
+    pub(crate) fn from_raw(sweep: bool, raw: Vec<u8>) -> Box<dyn SoundChannel + 'static> {
+        let mut out = Self::new(sweep);
+        out.envelope = Envelope::from_raw(&raw[..5]);
+        out.triggered = raw[5] == 1;
+        out.dac = raw[6] == 1;
+        out.freq = raw[7] as u16 | ((raw[8] as u16) << 8);
+        out.freq_timer = raw[9] as u16 | ((raw[10] as u16) << 8);
+        out.cycle = raw[11] as usize;
+        if sweep {
+            out.sweep = Sweep::from_raw(&raw[12..]);
+        }
+        Box::new(out)
+    }
+
     fn frequency(&self, io: &mut IORegs) -> u16 {
         io.io(self.registers.wave1).value() as u16 | ((io.io(self.registers.wave2).value() as u16 & 0x7) << 8)
     }
 }
 
 impl SoundChannel for Channel {
+    fn raw(&self) -> Vec<u8> {
+        let mut out = self.envelope.raw();
+        out.push(if self.triggered { 1 } else { 0 });
+        out.push(if self.dac { 1 } else { 0 });
+        out.push((self.freq & 0xFF) as u8);
+        out.push(((self.freq >> 8) & 0xFF) as u8);
+        out.push((self.freq_timer & 0xFF) as u8);
+        out.push(((self.freq_timer >> 8) & 0xFF) as u8);
+        out.extend(self.cycle.to_le_bytes());
+        if self.has_sweep {
+            out.extend(self.sweep.raw())
+        }
+        out
+    }
+
     fn output(&self, io: &mut IORegs) -> u8 {
         let waveform = io.io(self.registers.length).value() >> 6;
         DUTY_CYCLES[waveform as usize][self.cycle] * self.envelope.volume()

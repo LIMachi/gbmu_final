@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use apu::{Apu, Controller};
 use joy::Joypad;
 use shared::audio_settings::AudioSettings;
@@ -62,15 +63,17 @@ impl<'a> ConsoleBuilder<'a> {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Devices {
     pub cpu: cpu::Cpu,
     pub ppu: ppu::Controller,
-    pub joy: joy::Joypad,
+    pub joy: Joypad,
     pub lcd: lcd::Lcd,
     pub dma: ppu::Dma,
     pub hdma: ppu::Hdma,
     pub timer: Timer,
     pub apu: Apu,
+    #[serde(default, skip)]
     pub serial: serial::Port,
 }
 

@@ -2,12 +2,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use egui::Color32;
+use serde::{Deserialize, Serialize};
 
 pub mod image;
 pub mod clock;
 pub mod rtc;
 pub mod convert;
 pub mod palette;
+pub mod serde_arrays;
 
 pub const DARK_BLACK: Color32 = Color32::from_rgb(0x23, 0x27, 0x2A);
 
@@ -31,7 +33,7 @@ impl<T> Cell for T {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize, Clone)]
 pub struct FEdge {
     old: bool,
 }

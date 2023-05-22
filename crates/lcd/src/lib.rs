@@ -1,12 +1,15 @@
 use pixels::{Pixels, PixelsBuilder, SurfaceTexture};
 
 use shared::io::{IO, IORegs};
+use shared::serde::{Deserialize, Serialize};
 use shared::winit as winit;
 
+#[derive(Serialize, Deserialize)]
 pub struct Lcd {
     enabled: bool,
     frame: Vec<u8>,
-    pixels: Option<Pixels>,
+    #[serde(default, skip)]
+    pub pixels: Option<Pixels>, //TODO serde: rebind using previous pixels
 }
 
 impl Default for Lcd {
@@ -59,6 +62,12 @@ impl LCD for Lcd {
 impl Lcd {
     pub const WIDTH: u32 = 160;
     pub const HEIGHT: u32 = 144;
+
+    pub fn reload(self, load: Self) -> Self {
+        let mut t = load;
+        t.pixels = self.pixels;
+        t
+    }
 
     pub fn init(&mut self, window: &winit::window::Window) {
         let sz = window.inner_size();

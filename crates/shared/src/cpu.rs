@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 pub use super::opcodes::*;
 pub use super::registers::{Flags, Reg, regs};
 pub use super::value::Value;
@@ -25,7 +26,7 @@ pub trait Bus {
     fn toggle_ds(&mut self);
 }
 
-#[derive(Copy, Debug, Clone, Eq, PartialEq)]
+#[derive(Copy, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MemStatus {
     Read(u8),
     Write(u16),
@@ -35,7 +36,7 @@ pub enum MemStatus {
     Idle
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Op {
     Read(u16, u8),
     Write(u16, u8)

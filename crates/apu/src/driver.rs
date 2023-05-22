@@ -9,7 +9,7 @@ use cpal::{
 use rodio::{cpal, Device, OutputStream, OutputStreamHandle, Sink, Source, SupportedStreamConfig};
 use rtrb::{Consumer, Producer, RingBuffer};
 
-pub(crate) struct Input(pub(crate) Producer<f32>);
+pub struct Input(pub(crate) Producer<f32>);
 
 impl Default for Input {
     fn default() -> Self {

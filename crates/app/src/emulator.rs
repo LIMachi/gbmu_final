@@ -1,3 +1,7 @@
+use std::fs;
+use std::fs::{DirEntry, File};
+use std::io::{ErrorKind, Write};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -5,8 +9,8 @@ use winit::event::WindowEvent;
 
 use bus::Devices;
 use mem::{Oam, Vram};
+use serial::{Link, Port};
 use serial::com::Serial;
-use serial::Link;
 use shared::{Events, Handle};
 use shared::audio_settings::AudioSettings;
 use shared::breakpoints::Breakpoints;
@@ -25,13 +29,29 @@ use crate::app::RomConfig;
 use crate::render::{Event, Render};
 use crate::settings::Mode;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub struct Console {
     speed: i32,
     rom: Option<Rom>,
     pub bus: bus::Bus,
     pub gb: Devices,
     running: bool,
+}
+
+impl Console {
+    pub fn save_state(&self) {
+        let rom = self.rom.as_ref().unwrap();
+        let path = AppConfig::save_path(&rom.header.title);
+        let mut h = File::create(&path).expect(format!("cannot open path {path:?}").as_str());
+        let v = bincode::serialize(self).expect("cannot serialize Console");
+        h.write_all(v.as_slice()).expect(format!("cannot write save state at {path:?}").as_str());
+    }
+
+    pub fn load_state<P: AsRef<Path>>(path: P) -> Option<Self> {
+        File::open(path).and_then(|file| {
+            bincode::deserialize_from(file).map_err(|e| std::io::Error::new(ErrorKind::InvalidData, format!("{e:?}")))
+        }).map_err(|x| log::warn!("error loading state: {x:?}")).ok()
+    }
 }
 
 fn autosave_default() -> u64 { 900 }
@@ -106,6 +126,28 @@ impl Emulator {
         emu
     }
 
+    pub fn load_state(&mut self, path: Option<PathBuf>) {
+        let path = if path.is_some() { path.unwrap() } else {
+            fs::read_dir("./save_states").expect("Missing local save_states directory").flatten().fold(None, |a: Option<DirEntry>, e: DirEntry| { //FIXME: change save_state folder location
+                if let Some(t) = &a {
+                    let pt = t.metadata().unwrap().modified().unwrap();
+                    if e.metadata().is_ok_and(|m| m.is_file() && m.modified().is_ok_and(|l| l > pt)) {
+                        return Some(e);
+                    }
+                    return a;
+                }
+                Some(e)
+            }).expect("no save states to load").path()
+        };
+        if let Some(mut console) = Console::load_state(&path) {
+            self.serial_claim();
+            console.gb.serial = Port::new(self.link.port());
+            self.audio.reload(&mut console.gb.apu);
+            self.console = console;
+            self.proxy.send_event(Events::Reload).ok();
+        }
+    }
+
     pub fn mode(&self) -> Mode { self.cgb }
 
     pub fn link_do<R, F: Fn(&mut Serial) -> R>(&mut self, f: F) -> R {
@@ -149,7 +191,7 @@ impl Emulator {
         }
     }
 
-    pub fn is_running(&self) -> bool { self.console.running }
+    pub fn is_running(&self) -> bool { self.console.running && self.console.rom.is_some() }
 
     pub fn stop(&mut self, save: bool) {
         self.serial_claim();

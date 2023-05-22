@@ -26,6 +26,7 @@ pub(crate) enum Texture {
     Add,
     Save,
     Nosave,
+    SaveState,
     Cover(String),
 }
 

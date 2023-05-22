@@ -15,3 +15,7 @@ path = "../shared"
 [features]
 log_opcode = []
 doctor = []
+
+[dependencies.serde]
+version = "1.0.152"
+features = ["derive"]

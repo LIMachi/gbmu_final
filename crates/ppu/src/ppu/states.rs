@@ -1,4 +1,6 @@
 use std::fmt::{Debug, Formatter};
+use dyn_clone::DynClone;
+use serde::{Deserialize, Serialize};
 
 use lcd::Lcd;
 use mem::oam::Sprite;
@@ -9,7 +11,7 @@ use super::{
     fetcher::{self, Fetcher}, fifo::{BgFifo, ObjFifo}, Ppu, Scroll,
 };
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Mode {
     Search = 2,
@@ -18,16 +20,16 @@ pub enum Mode {
     VBlank = 1,
 }
 
-pub(crate) trait State: Debug {
+pub(crate) trait State: Debug + DynClone {
     fn mode(&self) -> Mode;
     fn tick(&mut self, ppu: &mut Ppu, io: &mut IORegs, lcd: &mut Lcd) -> Option<Box<dyn State>>;
-    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized { Box::new(self) }
-    fn name(&self) -> String {
-        format!("{:?}", self.mode())
-    }
+    fn boxed(self) -> Box<dyn State> where Self: 'static + Sized + Clone { Box::new(self) }
+    fn name(&self) -> String { format!("{:?}", self.mode()) }
+    fn first_tick(&self) -> bool { false }
+    fn raw(&self) -> Vec<u8> { vec![] }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OamState {
     clock: u8,
     sprite: usize,
@@ -35,33 +37,10 @@ pub struct OamState {
 
 impl OamState {
     pub fn new() -> Self { Self { sprite: 0, clock: 0 } }
-}
 
-pub struct TransferState {
-    dots: usize,
-    lx: u8,
-    ly: u8,
-    scx: u8,
-    fetcher: Fetcher,
-    bg: BgFifo,
-    oam: ObjFifo,
-    sprite: Option<usize>,
-}
-
-impl Debug for TransferState {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("[{} - {}]({}) left {}", self.lx, self.ly, self.scx, self.dots).as_str())
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        Box::new(Self { clock: raw[0], sprite: raw[1] as usize})
     }
-}
-
-#[derive(Debug)]
-pub struct HState {
-    dots: usize,
-}
-
-#[derive(Debug)]
-pub struct VState {
-    dots: usize,
 }
 
 impl State for OamState {
@@ -89,6 +68,28 @@ impl State for OamState {
             Some(TransferState::new(ppu, io).boxed())
         } else { None }
     }
+
+    fn raw(&self) -> Vec<u8> {
+        vec![self.clock, self.sprite as u8]
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TransferState {
+    dots: usize,
+    lx: u8,
+    ly: u8,
+    scx: u8,
+    fetcher: Fetcher,
+    bg: BgFifo,
+    oam: ObjFifo,
+    sprite: Option<usize>,
+}
+
+impl Debug for TransferState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("[{} - {}]({}) left {}", self.lx, self.ly, self.scx, self.dots).as_str())
+    }
 }
 
 impl TransferState {
@@ -105,6 +106,11 @@ impl TransferState {
             bg: BgFifo::new(),
             oam: ObjFifo::new(io.io(IO::OPRI).bit(0) != 0),
         }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        let t: Self = bincode::deserialize(&*raw).unwrap();
+        Box::new(t)
     }
 }
 
@@ -157,6 +163,15 @@ impl State for TransferState {
         }
         None
     }
+
+    fn raw(&self) -> Vec<u8> {
+        bincode::serialize(self).unwrap()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VState {
+    dots: usize,
 }
 
 impl VState {
@@ -166,6 +181,10 @@ impl VState {
 
     pub fn immediate() -> Self {
         Self { dots: 0 }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8)})
     }
 }
 
@@ -192,11 +211,28 @@ impl State for VState {
             None
         }
     }
+
+    fn first_tick(&self) -> bool {
+        self.dots >= Self::DOTS
+    }
+
+    fn raw(&self) -> Vec<u8> {
+        vec![self.dots as u8, (self.dots >> 8) as u8]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HState {
+    dots: usize,
 }
 
 impl HState {
     pub fn new(dots: usize) -> Self {
         Self { dots }
+    }
+
+    pub(crate) fn from_raw(raw: Vec<u8>) -> Box<dyn State> {
+        Box::new(Self { dots: raw[0] as usize | ((raw[1] as usize) << 8)})
     }
 }
 
@@ -217,5 +253,9 @@ impl State for HState {
         } else {
             None
         }
+    }
+
+    fn raw(&self) -> Vec<u8> {
+        vec![self.dots as u8, (self.dots >> 8) as u8]
     }
 }

@@ -1,6 +1,13 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use mbc0::Mbc0;
+use mbc1::Mbc1;
+use mbc2::Mbc2;
+use mbc3::Mbc3;
+use mbc5::Mbc5;
 use shared::{mem::*, rom::{Mbc as Mbcs, Rom}};
 
 use crate::boot::Boot;
@@ -21,15 +28,21 @@ pub trait MemoryController {
 
 pub(crate) trait Mbc: MemoryController + Mem {
     fn is_boot(&self) -> bool { false }
+    fn serialize(&self) -> Option<MbcKind>;
+    fn deserialize(raw: &[u8]) -> Box<dyn Mbc> where Self: Sized;
     fn unmap(&mut self) -> Box<dyn Mbc> { unreachable!() }
     fn tick(&mut self) {}
 }
 
+#[derive(Default, Serialize, Deserialize)]
 pub struct Unplugged {}
 
 impl Mem for Unplugged {}
 
-impl Mbc for Unplugged {}
+impl Mbc for Unplugged {
+    fn serialize(&self) -> Option<MbcKind> { None }
+    fn deserialize(_: &[u8]) -> Box<dyn Mbc> { panic!("Not supposed to serialize unplugged Console !") }
+}
 
 impl MemoryController for Unplugged {
     fn new(_rom: &Rom, _ram: Vec<u8>) -> Self where Self: Sized {
@@ -38,9 +51,42 @@ impl MemoryController for Unplugged {
     fn ram_dump(&self) -> Vec<u8> { vec![] }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Controller {
     sav: Option<PathBuf>,
     inner: Box<dyn Mbc>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) enum MbcKind {
+    BOOT(Vec<u8>),
+    MBC0(Vec<u8>),
+    MBC1(Vec<u8>),
+    MBC2(Vec<u8>),
+    MBC3(Vec<u8>),
+    MBC5(Vec<u8>),
+}
+
+impl Serialize for Box<dyn Mbc> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        Mbc::serialize(self.as_ref()).serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Box<dyn Mbc> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Deserialize::deserialize(deserializer).map(|e: Option<MbcKind>| {
+            match e {
+                None => Box::new(Unplugged {}) as Box<dyn Mbc>,
+                Some(MbcKind::BOOT(m)) => <Boot as Mbc>::deserialize(&m),
+                Some(MbcKind::MBC0(m)) => <Mbc0 as Mbc>::deserialize(&m),
+                Some(MbcKind::MBC1(m)) => <Mbc1 as Mbc>::deserialize(&m),
+                Some(MbcKind::MBC2(m)) => <Mbc2 as Mbc>::deserialize(&m),
+                Some(MbcKind::MBC3(m)) => <Mbc3 as Mbc>::deserialize(&m),
+                Some(MbcKind::MBC5(m)) => <Mbc5 as Mbc>::deserialize(&m),
+            }
+        })
+    }
 }
 
 impl Default for Controller {
@@ -61,11 +107,11 @@ impl Controller {
             (None, vec![0xAF; rom.header.ram_size.size()])
         };
         let inner: Box<dyn Mbc> = match rom.header.cartridge.mbc() {
-            Mbcs::MBC0 => Box::new(Boot::new(cgb, mbc0::Mbc0::new(rom, ram))),
-            Mbcs::MBC1 => Box::new(Boot::new(cgb, mbc1::Mbc1::new(rom, ram))),
-            Mbcs::MBC2 => Box::new(Boot::new(cgb, mbc2::Mbc2::new(rom, ram))),
-            Mbcs::MBC3 => Box::new(Boot::new(cgb, mbc3::Mbc3::new(rom, ram))),
-            Mbcs::MBC5 => Box::new(Boot::new(cgb, mbc5::Mbc5::new(rom, ram))),
+            Mbcs::MBC0 => Box::new(Boot::new(cgb, Mbc0::new(rom, ram))),
+            Mbcs::MBC1 => Box::new(Boot::new(cgb, Mbc1::new(rom, ram))),
+            Mbcs::MBC2 => Box::new(Boot::new(cgb, Mbc2::new(rom, ram))),
+            Mbcs::MBC3 => Box::new(Boot::new(cgb, Mbc3::new(rom, ram))),
+            Mbcs::MBC5 => Box::new(Boot::new(cgb, Mbc5::new(rom, ram))),
             Mbcs::Unknown => unimplemented!()
         };
 

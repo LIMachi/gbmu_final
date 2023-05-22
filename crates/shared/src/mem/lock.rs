@@ -1,15 +1,17 @@
 use std::collections::HashSet;
 use std::hash::Hash;
+use serde::{Deserialize, Serialize};
 use crate::io::{IO, IODevice};
 use super::{Mem, IOBus};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Source {
     Hdma = 0x0,
     Ppu = 0x1,
     Dma = 0x2
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Lock<M: Mem> {
     inner: M,
     lock: HashSet<Source>

@@ -57,4 +57,8 @@ impl Controller {
     pub fn apu(&self, cgb: bool) -> Apu {
         Apu::new(self.driver.sample_rate(), self.driver.bind(), cgb)
     }
+
+    pub fn reload(&mut self, apu: &mut Apu) {
+        apu.input = self.driver.bind();
+    }
 }

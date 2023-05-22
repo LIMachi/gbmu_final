@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
 use shared::mem::Mem;
+use shared::utils::serde_arrays;
 
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Sprite {
     pub y: u8,
     pub x: u8,
@@ -39,7 +41,9 @@ impl Mem for Sprite {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Oam {
+    #[serde(with = "serde_arrays")]
     pub sprites: [Sprite; 40]
 }
 

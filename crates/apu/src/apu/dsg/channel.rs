@@ -1,3 +1,5 @@
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 pub use noise::Channel as NoiseChannel;
 pub use pulse::Channel as PulseChannel;
 use shared::io::{AccessMode, IO, IODevice, IORegs};
@@ -12,15 +14,16 @@ mod envelope;
 pub enum Event {
     Envelope,
     Sweep,
-    Length
+    Length,
 }
 
+#[derive(Serialize, Deserialize)]
 #[repr(u8)]
 pub(crate) enum Channels {
     Sweep = 0,
     Pulse = 1,
     Wave = 2,
-    Noise = 3
+    Noise = 3,
 }
 
 // inner waveform generator
@@ -44,6 +47,8 @@ pub(crate) trait SoundChannel: IODevice {
 
     fn power_on(&mut self, _io: &mut IORegs) {}
     fn power_off(&mut self, _io: &mut IORegs) {}
+
+    fn raw(&self) -> Vec<u8> { vec![] }
 }
 
 impl SoundChannel for () {
@@ -54,9 +59,10 @@ impl SoundChannel for () {
     fn length(&self) -> u8 { 0 }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Capacitor {
     factor: f32,
-    value: f32
+    value: f32,
 }
 
 impl Capacitor {
@@ -77,6 +83,7 @@ impl Capacitor {
 }
 
 // handles DAC output/switches/volume/length
+#[derive(Serialize, Deserialize)]
 pub(crate) struct Channel {
     pub enabled: bool,
     length_timer: u8,
@@ -86,7 +93,34 @@ pub(crate) struct Channel {
     nr4: IO,
     dac: Capacitor,
     inner: Box<dyn SoundChannel + 'static>,
-    pcm: IO
+    pcm: IO,
+}
+
+#[derive(Serialize, Deserialize)]
+struct InnerSoundChannel {
+    kind: Channels,
+    raw: Vec<u8>,
+}
+
+impl Serialize for Box<dyn SoundChannel + 'static> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        let kind = self.channel();
+        let raw = self.raw();
+        InnerSoundChannel { kind, raw }.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Box<dyn SoundChannel + 'static> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        Deserialize::deserialize(deserializer).map(|InnerSoundChannel { kind, raw }| {
+            match kind {
+                Channels::Sweep => PulseChannel::from_raw(true, raw),
+                Channels::Pulse => PulseChannel::from_raw(false, raw),
+                Channels::Wave => WaveChannel::from_raw(raw),
+                Channels::Noise => NoiseChannel::from_raw(raw)
+            }
+        })
+    }
 }
 
 impl Channel {
@@ -109,7 +143,7 @@ impl Channel {
             pcm: match c {
                 0 | 1 => IO::PCM12,
                 _ => IO::PCM34,
-            }
+            },
         }
     }
 

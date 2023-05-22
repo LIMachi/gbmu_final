@@ -1,11 +1,16 @@
+use serde::{Deserialize, Serialize};
+
 use shared::mem::*;
 use shared::rom::Rom;
+
+use crate::mbc::MbcKind;
 
 use super::Mbc;
 
 const BANK_SIZE: usize = 0x4000;
 const RAM_SIZE: usize = 0x0200;
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Mbc2 {
     rom: Vec<u8>,
     ram: Vec<u8>,
@@ -14,7 +19,7 @@ pub struct Mbc2 {
     ram_enabled: bool,
 }
 
-impl super::Mem for Mbc2 {
+impl Mem for Mbc2 {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         match absolute {
             ROM..=ROM_END => self.rom[addr as usize],
@@ -95,4 +100,12 @@ impl super::MemoryController for Mbc2 {
     fn rom_bank(&self) -> usize { self.rom_bank }
 }
 
-impl Mbc for Mbc2 {}
+impl Mbc for Mbc2 {
+    fn serialize(&self) -> Option<MbcKind> {
+        Some(MbcKind::MBC2(bincode::serialize(self).expect("failed to serialize")))
+    }
+
+    fn deserialize(raw: &[u8]) -> Box<dyn Mbc> {
+        Box::new(bincode::deserialize::<Self>(raw).expect("deserialization failed"))
+    }
+}

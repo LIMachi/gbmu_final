@@ -69,7 +69,7 @@ impl LCDC for u8 {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u16)]
 pub enum IO {
     ///0x140
@@ -611,7 +611,7 @@ impl Access {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct IOReg {
     pub(crate) v: u8,
     dirty: bool,

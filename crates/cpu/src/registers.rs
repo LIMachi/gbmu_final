@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use shared::cpu::{Reg, Value};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Registers {
     a: u8,
     f: u8,

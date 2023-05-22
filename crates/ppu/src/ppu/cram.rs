@@ -1,8 +1,13 @@
+use serde::{Deserialize, Serialize};
 use shared::io::{CGB_MODE, IO, IODevice, IORegs};
 use shared::mem::IOBus;
+use shared::utils::serde_arrays;
 
+#[derive(Serialize, Deserialize, Copy, Clone)]
 pub struct CRAM {
+    #[serde(with = "serde_arrays")]
     bgdata: [u8; 64],
+    #[serde(with = "serde_arrays")]
     objdata: [u8; 64],
     dmgbgpal: [[u8; 3]; 4],
     dmgobj0pal: [[u8; 3]; 4],
