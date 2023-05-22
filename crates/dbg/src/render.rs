@@ -150,11 +150,11 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
     type Ext = E;
 
     fn init(&mut self, ctx: &mut Context, _ext: &mut E) {
-        self.textures.insert(Texture::Play, ctx.load_svg::<40, 40>("play", "assets/icons/play.svg"));
-        self.textures.insert(Texture::Pause, ctx.load_svg::<40, 40>("pause", "assets/icons/pause.svg"));
-        self.textures.insert(Texture::Step, ctx.load_svg::<32, 32>("step", "assets/icons/step.svg"));
-        self.textures.insert(Texture::Reset, ctx.load_svg::<40, 40>("reset", "assets/icons/reset.svg"));
-        self.textures.insert(Texture::Into, ctx.load_svg::<40, 40>("into", "assets/icons/into.svg"));
+        self.textures.insert(Texture::Play, ctx.load_svg_bytes::<40, 40>("play", include_bytes!("../../../assets/icons/play.svg")));
+        self.textures.insert(Texture::Pause, ctx.load_svg_bytes::<40, 40>("pause", include_bytes!("../../../assets/icons/pause.svg")));
+        self.textures.insert(Texture::Step, ctx.load_svg_bytes::<32, 32>("step", include_bytes!("../../../assets/icons/step.svg")));
+        self.textures.insert(Texture::Reset, ctx.load_svg_bytes::<40, 40>("reset", include_bytes!("../../../assets/icons/reset.svg")));
+        self.textures.insert(Texture::Into, ctx.load_svg_bytes::<40, 40>("into", include_bytes!("../../../assets/icons/into.svg")));
     }
 
     fn draw(&mut self, ctx: &mut Context, ext: &mut E) {

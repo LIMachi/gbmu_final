@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
 use shared::audio_settings::AudioSettings;
@@ -45,7 +47,39 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
+    pub fn config_dir() -> PathBuf {
+        let cfg = directories::ProjectDirs::from("org", "ft", "GBMU")
+            .expect("unsupported platform")
+            .config_dir()
+            .to_path_buf();
+        if !cfg.exists() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .create(&cfg).expect("Can't create path to config");
+        }
+        cfg
+    }
+
+    pub fn data_dir() -> PathBuf {
+        let data = directories::ProjectDirs::from("org", "ft", "GBMU")
+            .expect("unsupported platform")
+            .data_dir()
+            .to_path_buf();
+        if !data.exists() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .create(&data).expect("Can't create path to config");
+        }
+        data
+    }
+
     pub fn load() -> Self {
-        serde_any::from_file("gbmu.ron").unwrap_or_else(|_| Default::default())
+        serde_any::from_file(AppConfig::config_dir()).unwrap_or_else(|_| Default::default())
+    }
+
+    pub fn store(self) {
+        if let Err(e) = serde_any::ser::to_file_pretty(Self::config_dir().join("gbmu.ron"), &self) {
+            log::error!("error while saving config {e:?}");
+        }
     }
 }

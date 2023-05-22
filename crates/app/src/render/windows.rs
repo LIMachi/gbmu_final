@@ -39,6 +39,10 @@ impl Windows {
             .map(|x| x.data())
     }
 
+    fn handle(&self, win: &WindowId) -> Option<Handle> {
+        self.handles.iter().find(|(_, id)| id == &win).map(|x| *x.0)
+    }
+
     pub fn is_open(&self, handle: Handle) -> bool {
         self.handles.contains_key(&handle)
     }
@@ -50,13 +54,12 @@ impl Windows {
         }
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, window_id } => {
-                if let Some((&h, &_id)) = self.handles.iter().find(|(_, v)| v == &window_id) {
-                    if self.windows.contains_key(window_id) && self.windows.len() == 1 || h == Handle::Main {
+                if let Some(h) = self.handle(window_id) {
+                    if h == Handle::Main {
                         self.proxy.send_event(Events::Quit).ok();
                         flow.set_exit();
                     } else {
-                        self.handles.remove(&h);
-                        self.windows.remove(window_id);
+                        self.close(h);
                     }
                 }
             }

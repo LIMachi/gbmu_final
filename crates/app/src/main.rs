@@ -86,7 +86,7 @@ impl App {
                 }
                 Event::UserEvent(Events::Quit) => {
                     self.emu.stop(true);
-                    let conf = AppConfig {
+                    AppConfig {
                         sound_device: self.emu.audio.config(),
                         audio_settings: self.emu.audio_settings.clone(),
                         roms: self.emu.roms.clone(),
@@ -100,10 +100,7 @@ impl App {
                         keys: self.emu.bindings.clone(),
                         mode: self.emu.mode(),
                         bios: self.emu.enabled_boot(),
-                    };
-                    if let Err(e) = serde_any::ser::to_file_pretty("gbmu.ron", &conf) {
-                        log::warn!("error while saving config {e:?}");
-                    }
+                    }.store();
                     flow.set_exit();
                 }
                 _ => {}
