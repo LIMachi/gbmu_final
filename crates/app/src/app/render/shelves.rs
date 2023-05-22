@@ -15,37 +15,53 @@ use crate::emulator::Emulator;
 
 use super::rom::ROM_GRID;
 
-#[derive(Eq)]
-pub struct Shelf {
+pub(crate) trait ShelfItem {
+    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui) -> Response;
+    fn clicked(&self, shelf: &ShelfView<Self>) where Self: Sized;
+}
+
+impl ShelfItem for Rom {
+    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui) -> Response {
+        ui.add(RomView::new(self, textures))
+    }
+
+    fn clicked(&self, shelf: &ShelfView<Self>) {
+        shelf.emu.proxy.send_event(Events::Play(self.clone())).ok();
+    }
+}
+
+pub(crate) struct Shelf<I: ShelfItem> {
     root: bool,
     path: PathBuf,
     cache: HashSet<PathBuf>,
-    roms: Vec<Rom>,
-    subs: Vec<Shelf>,
+    roms: Vec<I>,
+    subs: Vec<Shelf<I>>,
 }
 
-impl PartialEq for Shelf {
+impl<Item: ShelfItem> Eq for Shelf<Item> {}
+
+impl<Item: ShelfItem> PartialEq for Shelf<Item> {
     fn eq(&self, other: &Self) -> bool {
         self.path.eq(&other.path)
     }
 }
 
-impl PartialOrd for Shelf {
+impl<Item: ShelfItem> PartialOrd for Shelf<Item> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.path.partial_cmp(&other.path)
     }
 }
 
-impl Ord for Shelf {
+impl<Item: ShelfItem> Ord for Shelf<Item> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.path.cmp(&other.path)
     }
 }
 
-impl Shelf {
-    pub(crate) fn view<'a>(&'a mut self, emu: &'a mut Emulator,
+impl<Item: ShelfItem + Ord> Shelf<Item> {
+    pub(crate) fn view<'a>(&'a self, emu: &'a mut Emulator,
                            covers: &'a HashMap<Texture, TextureHandle>,
-                           tx: Sender<Event>) -> ShelfView {
+                           tx: Sender<Event>) -> ShelfView<Item> {
         ShelfView { shelf: self, covers, emu, tx }
     }
 
@@ -59,7 +75,7 @@ impl Shelf {
         self.subs.clear();
     }
 
-    pub fn add(&mut self, path: PathBuf, rom: Rom) {
+    pub fn add(&mut self, path: PathBuf, rom: Item) {
         let paths: Vec<PathBuf> = path.ancestors()
             .map(|x| x.to_path_buf())
             .collect();
@@ -67,7 +83,7 @@ impl Shelf {
         self.add_rec(&mut paths.iter().rev().skip_while(|x| x != &&root).skip(1).peekable(), rom);
     }
 
-    fn add_rec<'a, I: Iterator<Item=&'a PathBuf>>(&mut self, paths: &mut Peekable<I>, rom: Rom) {
+    fn add_rec<'a, I: Iterator<Item=&'a PathBuf>>(&mut self, paths: &mut Peekable<I>, rom: Item) {
         let path = paths.next().expect("should at least be a file");
         if paths.peek().is_none() {
             if !self.cache.contains(path) {
@@ -106,14 +122,14 @@ impl Shelf {
     }
 }
 
-pub struct ShelfView<'a> {
+pub(crate) struct ShelfView<'a, Item: ShelfItem> {
     covers: &'a HashMap<Texture, TextureHandle>,
-    shelf: &'a mut Shelf,
+    shelf: &'a Shelf<Item>,
     emu: &'a mut Emulator,
     tx: Sender<Event>,
 }
 
-impl<'a> Widget for ShelfView<'a> {
+impl<'a, Item: ShelfItem + Ord> Widget for ShelfView<'a, Item> {
     fn ui(self, ui: &mut Ui) -> Response {
         let path = self.shelf.path.to_str().expect("path to string");
         let id = ui.make_persistent_id("shelf_header_".to_owned() + path);
@@ -134,13 +150,11 @@ impl<'a> Widget for ShelfView<'a> {
                                 ui.end_row();
                                 n = 1;
                             }
-                            if ui.add(RomView::new(rom, &self.covers)).clicked() {
-                                self.emu.proxy.send_event(Events::Play(rom.clone())).ok();
-                            }
+                            if rom.render(&self.covers, ui).clicked() { rom.clicked(&self); }
                             n += 1;
                         }
                     });
-                for shelf in &mut self.shelf.subs {
+                for shelf in &self.shelf.subs {
                     ui.add(shelf.view(self.emu, self.covers, self.tx.clone()));
                 }
             }).0

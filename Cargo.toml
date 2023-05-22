@@ -6,8 +6,16 @@ edition = "2021"
 [profile.release]
 debug = true
 
+[profile.release-thin]
+inherits = "release"
+opt-level = "z"
+debug = false
+lto = true
+codegen-units = 1
+strip = true
+
 [workspace]
-resolver="2"
+resolver = "2"
 members = [
     "crates/cpu",
     "crates/lcd",
@@ -23,4 +31,4 @@ members = [
 
 [patch.crates-io]
 egui_wgpu_backend = { path = "patches/egui_wgpu_backend" }
-egui_winit_platform = { path = "patches/egui_winit_platform"}
+egui_winit_platform = { path = "patches/egui_winit_platform" }

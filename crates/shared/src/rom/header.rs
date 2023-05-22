@@ -277,6 +277,7 @@ impl RamSize {
 
     pub fn banks(&self) -> usize {
         match self.0 {
+            0 => 0,
             2 => 1,
             3 => 4,
             4 => 16,
@@ -290,6 +291,7 @@ impl RamSize {
 
     pub fn mask(&self) -> usize {
         match self.0 {
+            0 => 0x0,
             2 => 0x0,
             3 => 0x3,
             4 => 0xF,

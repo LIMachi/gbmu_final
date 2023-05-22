@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 #![feature(hash_drain_filter)]
 #![feature(is_some_and)]
 #![feature(drain_filter)]
@@ -145,7 +147,7 @@ fn main() {
                     st.restart();
                     let p = (t / 4194304.) * 100.;
                     let n = dt.as_secs_f64() * 100.;
-                    log::debug!("cycles: {:.0} ({:0.2} %) | took {dt:?} ({n:0.2}% capacity)", t, p);
+                    log::info!("cycles: {:.0} ({:0.2} %) | took {dt:?} ({n:0.2}% capacity)", t, p);
                     dt = Duration::from_secs(0);
                     cycles = 0;
                 }

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use shared::{egui, Events, Handle};
 use shared::egui::{Align, Context, Layout, Margin, Rounding, Separator};
 use shared::utils::image::ImageLoader;
-pub use shelves::Shelf;
+pub(crate) use shelves::Shelf;
 
 use crate::app::{Menu, Texture};
 use crate::emulator::Emulator;

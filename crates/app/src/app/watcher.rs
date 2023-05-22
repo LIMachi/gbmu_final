@@ -27,7 +27,7 @@ impl FileWatcher {
                     kind: EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_),
                     ..
                 }) => {
-                    log::info!("{e:?}");
+                    log::debug!("{e:?}");
                     tx.send(Event::Reload(x.clone())).ok();
                 }
                 _ => {}

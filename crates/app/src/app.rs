@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, Sender};
 
 pub use config::{AppConfig, DbgConfig, RomConfig};
-use render::Shelf;
+pub(crate) use render::Shelf;
 use shared::egui::{Context, TextureHandle, TextureId};
 use shared::rom::Rom;
 use shared::utils::image::{ImageLoader, RawData};
@@ -37,7 +37,7 @@ pub struct Menu {
     sender: Sender<(PathBuf, String, Rom)>,
     receiver: Receiver<(PathBuf, String, Rom)>,
     watcher: FileWatcher,
-    shelves: Vec<Shelf>,
+    shelves: Vec<Shelf<Rom>>,
 }
 
 impl Default for Menu {

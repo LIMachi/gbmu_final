@@ -38,6 +38,12 @@ pub struct Console {
     running: bool,
 }
 
+#[derive(Serialize, Deserialize)]
+struct State {
+    console: Vec<u8>,
+    preview: Vec<u8>,
+}
+
 impl Console {
     pub fn save_state(&self) {
         let rom = self.rom.as_ref().unwrap();
@@ -138,13 +144,14 @@ impl Emulator {
                 }
                 Some(e)
             }).expect("no save states to load").path()
-        };
+        }; // TODO delete this
         if let Some(mut console) = Console::load_state(&path) {
             self.serial_claim();
             console.gb.serial = Port::new(self.link.port());
             self.audio.reload(&mut console.gb.apu);
             self.console = console;
             self.proxy.send_event(Events::Reload).ok();
+            self.proxy.send_event(Events::Open(Handle::Game)).ok();
         }
     }
 
