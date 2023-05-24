@@ -6,19 +6,19 @@ use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 use super::Event;
 
-pub struct FileWatcher {
+pub struct FileWatcher<Item> {
     watchers: HashMap<PathBuf, RecommendedWatcher>,
-    tx: Sender<Event>,
-    events: Receiver<Event>,
+    tx: Sender<Event<Item>>,
+    events: Receiver<Event<Item>>,
 }
 
-impl FileWatcher {
+impl<Item: Send + 'static> FileWatcher<Item> {
     pub fn new() -> Self {
         let (tx, events) = channel();
         Self { watchers: Default::default(), tx, events }
     }
 
-    pub fn add_path(&mut self, path: String) {
+    pub fn add_path(&mut self, path: PathBuf) {
         let x = path.clone();
         let tx = self.tx.clone();
         let mut w = notify::recommended_watcher(move |event| {
@@ -34,7 +34,7 @@ impl FileWatcher {
             };
         }).expect("failed to build watcher");
         if w.watch(Path::new(&path), RecursiveMode::Recursive)
-            .map_err(|e| log::warn!("failed to start watcher for path {path}, reason: {e:?}"))
+            .map_err(|e| log::warn!("failed to start watcher for path {path:?}, reason: {e:?}"))
             .is_ok()
         {
             self.watchers.insert(PathBuf::from(path), w);
@@ -45,9 +45,9 @@ impl FileWatcher {
         self.watchers.remove(buf);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=Event> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item=Event<Item>> + '_ {
         self.events.try_iter()
     }
 
-    pub fn tx(&self) -> Sender<Event> { self.tx.clone() }
+    pub fn tx(&self) -> Sender<Event<Item>> { self.tx.clone() }
 }

@@ -4,20 +4,28 @@ use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 
-use shared::egui::{Grid, Response, TextureHandle, Ui, Widget};
+use shared::egui::{Context, Grid, Response, TextureHandle, Ui, Widget};
 use shared::egui::collapsing_header::CollapsingState;
 use shared::Events;
 use shared::rom::Rom;
+use shared::utils::image::ImageLoader;
 
 use crate::app::{Event, Texture};
-use crate::app::render::rom::RomView;
 use crate::emulator::Emulator;
 
 use super::rom::ROM_GRID;
+use super::rom::RomView;
 
-pub(crate) trait ShelfItem {
+pub(crate) trait ShelfItem: Ord + Send {
     fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui) -> Response;
-    fn clicked(&self, shelf: &ShelfView<Self>) where Self: Sized;
+    fn clicked(&self, shelf: &mut ShelfView<Self>) where Self: Sized;
+
+    fn extensions() -> &'static [&'static str];
+
+    fn load_from_path(path: &Path) -> std::io::Result<Self> where Self: Sized;
+
+    fn set_cover(&mut self, cover: String);
+    fn load_cover(&self, ctx: &Context) -> Option<TextureHandle>;
 }
 
 impl ShelfItem for Rom {
@@ -25,13 +33,50 @@ impl ShelfItem for Rom {
         ui.add(RomView::new(self, textures))
     }
 
-    fn clicked(&self, shelf: &ShelfView<Self>) {
+    fn clicked(&self, shelf: &mut ShelfView<Self>) {
         shelf.emu.proxy.send_event(Events::Play(self.clone())).ok();
+    }
+
+    fn extensions() -> &'static [&'static str] { &["gb", "gbc"] }
+
+    fn load_from_path(path: &Path) -> std::io::Result<Self> where Self: Sized { Rom::load(path) }
+
+    fn set_cover(&mut self, cover: String) {
+        self.cover = Some(cover);
+    }
+
+    fn load_cover(&self, ctx: &Context) -> Option<TextureHandle> {
+        let dir = &self.location;
+        let path = dir.join(&self.filename);
+        let stem = PathBuf::from(&self.filename).file_stem().unwrap().to_string_lossy().to_string();
+        let mut default = None;
+        dir.read_dir()
+            .map_err(|e| log::warn!("could not read item directory {e:?}"))
+            .ok()
+            .and_then(|x|
+                x.filter_map(|x| x.ok().filter(|e| e.file_type().map(|ty| ty.is_file()).unwrap_or(false)))
+                    .filter(|e| e.path() != path)
+                    .filter_map(|x| try {
+                        (
+                            x.path(),
+                            x.path().extension().and_then(|ext| ext.to_str()).map(|s| s.to_string())?,
+                            x.path().file_stem().and_then(|x| x.to_str()).map(|s| s.to_string())?)
+                    })
+                    .filter(|(_, ext, _)| ["jpeg", "jpg", "png"].contains(&ext.as_str()))
+                    .filter_map(|(path, _, file)| if file == "cover" || file == "default" {
+                        default = Some(path);
+                        None
+                    } else { Some((path, file)) })
+                    .find(|(_, x)| x.as_str() == stem)
+                    .map(|(path, _)| path).or(default))
+            .and_then(|x| ctx.load_image(&self.header.title, x))
+            .map(|x| x.0)
     }
 }
 
 pub(crate) struct Shelf<I: ShelfItem> {
     root: bool,
+    name: Option<String>,
     path: PathBuf,
     cache: HashSet<PathBuf>,
     roms: Vec<I>,
@@ -58,11 +103,11 @@ impl<Item: ShelfItem> Ord for Shelf<Item> {
     }
 }
 
-impl<Item: ShelfItem + Ord> Shelf<Item> {
+impl<Item: ShelfItem> Shelf<Item> {
     pub(crate) fn view<'a>(&'a self, emu: &'a mut Emulator,
                            covers: &'a HashMap<Texture, TextureHandle>,
-                           tx: Sender<Event>) -> ShelfView<Item> {
-        ShelfView { shelf: self, covers, emu, tx }
+                           tx: Sender<Event<Item>>) -> ShelfView<Item> {
+        ShelfView { shelf: self, covers, emu, tx, remove: true }
     }
 
     pub fn has_root<P: AsRef<Path>>(&self, path: P) -> bool {
@@ -75,12 +120,12 @@ impl<Item: ShelfItem + Ord> Shelf<Item> {
         self.subs.clear();
     }
 
-    pub fn add(&mut self, path: PathBuf, rom: Item) {
+    pub fn add(&mut self, path: PathBuf, item: Item) {
         let paths: Vec<PathBuf> = path.ancestors()
             .map(|x| x.to_path_buf())
             .collect();
         let root = self.path.clone();
-        self.add_rec(&mut paths.iter().rev().skip_while(|x| x != &&root).skip(1).peekable(), rom);
+        self.add_rec(&mut paths.iter().rev().skip_while(|x| x != &&root).skip(1).peekable(), item);
     }
 
     fn add_rec<'a, I: Iterator<Item=&'a PathBuf>>(&mut self, paths: &mut Peekable<I>, rom: Item) {
@@ -108,6 +153,7 @@ impl<Item: ShelfItem + Ord> Shelf<Item> {
             roms: vec![],
             subs: vec![],
             cache: Default::default(),
+            name: None,
         }
     }
 
@@ -115,34 +161,53 @@ impl<Item: ShelfItem + Ord> Shelf<Item> {
         Self {
             root: true,
             path,
+            name: None,
             roms: vec![],
             subs: vec![],
             cache: Default::default(),
         }
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
     }
 }
 
 pub(crate) struct ShelfView<'a, Item: ShelfItem> {
     covers: &'a HashMap<Texture, TextureHandle>,
     shelf: &'a Shelf<Item>,
-    emu: &'a mut Emulator,
-    tx: Sender<Event>,
+    pub(crate) emu: &'a mut Emulator,
+    tx: Sender<Event<Item>>,
+    remove: bool,
 }
 
-impl<'a, Item: ShelfItem + Ord> Widget for ShelfView<'a, Item> {
-    fn ui(self, ui: &mut Ui) -> Response {
-        let path = self.shelf.path.to_str().expect("path to string");
+impl<'a, Item: ShelfItem> ShelfView<'a, Item> {
+    pub fn can_remove_root(mut self, remove: bool) -> Self {
+        self.remove = remove;
+        self
+    }
+}
+
+impl<'a, Item: ShelfItem> Widget for ShelfView<'a, Item> {
+    fn ui(mut self, ui: &mut Ui) -> Response {
+        let path = if self.shelf.root {
+            self.shelf.path.to_str().expect("path to string")
+        } else {
+            self.shelf.path.file_stem().and_then(|stem| stem.to_str()).expect("dir")
+        };
         let id = ui.make_persistent_id("shelf_header_".to_owned() + path);
+
         CollapsingState::load_with_default_open(ui.ctx(), id, true)
             .show_header(ui, |ui| {
-                ui.label(path);
-                if self.shelf.root && ui.button("-").clicked() {
+                ui.label(self.shelf.name.as_ref().map(|e| e.as_str()).unwrap_or(path));
+                if self.shelf.root && self.remove && ui.button("-").clicked() {
                     self.tx.send(Event::Delete(self.shelf.path.clone())).ok();
                 };
             })
-            .body_unindented(|ui| {
+            .body(|ui| {
                 let w = ui.available_width();
-                Grid::new("shelf_grid_".to_owned() + path)
+                let mut res = Grid::new("shelf_grid_".to_owned() + path)
                     .show(ui, |ui| {
                         let mut n = 1;
                         for rom in &self.shelf.roms {
@@ -150,13 +215,14 @@ impl<'a, Item: ShelfItem + Ord> Widget for ShelfView<'a, Item> {
                                 ui.end_row();
                                 n = 1;
                             }
-                            if rom.render(&self.covers, ui).clicked() { rom.clicked(&self); }
+                            if rom.render(&self.covers, ui).clicked() { rom.clicked(&mut self); }
                             n += 1;
                         }
-                    });
+                    }).response;
                 for shelf in &self.shelf.subs {
-                    ui.add(shelf.view(self.emu, self.covers, self.tx.clone()));
+                    res |= ui.add(shelf.view(self.emu, self.covers, self.tx.clone()));
                 }
+                res
             }).0
     }
 }

@@ -1,7 +1,7 @@
-use std::fs;
-use std::fs::{DirEntry, File};
+use std::cmp::Ordering;
+use std::fs::File;
 use std::io::{ErrorKind, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,7 @@ use shared::input::{Keybindings, KeyCat, Shortcut};
 use shared::mem::{IOBus, MBCController};
 use shared::rom::Rom;
 use shared::utils::clock::Clock;
+use shared::utils::image::RawData;
 use shared::utils::palette::Palette;
 use shared::winit::window::Window;
 
@@ -39,25 +40,48 @@ pub struct Console {
 }
 
 #[derive(Serialize, Deserialize)]
-struct State {
-    console: Vec<u8>,
-    preview: Vec<u8>,
+pub struct State {
+    pub console: Vec<u8>,
+    pub preview: RawData,
+    #[serde(skip)]
+    pub cover: Option<String>,
+    pub path: String,
+}
+
+impl State {
+    pub fn load(&self) -> Option<Console> {
+        bincode::deserialize(&self.console).ok()
+    }
+}
+
+impl PartialEq for State {
+    fn eq(&self, other: &Self) -> bool {
+        self.path.eq(&other.path)
+    }
+}
+
+impl Eq for State {}
+
+impl PartialOrd for State {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        other.path.partial_cmp(&self.path)
+    }
+}
+
+impl Ord for State {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.path.cmp(&self.path)
+    }
 }
 
 impl Console {
-    pub fn save_state(&self) {
-        let rom = self.rom.as_ref().unwrap();
-        let path = AppConfig::save_path(&rom.header.title);
-        let mut h = File::create(&path).expect(format!("cannot open path {path:?}").as_str());
-        let v = bincode::serialize(self).expect("cannot serialize Console");
-        h.write_all(v.as_slice()).expect(format!("cannot write save state at {path:?}").as_str());
-    }
-
     pub fn load_state<P: AsRef<Path>>(path: P) -> Option<Self> {
         File::open(path).and_then(|file| {
             bincode::deserialize_from(file).map_err(|e| std::io::Error::new(ErrorKind::InvalidData, format!("{e:?}")))
         }).map_err(|x| log::warn!("error loading state: {x:?}")).ok()
     }
+
+    pub fn active(&self) -> bool { self.rom.is_some() }
 }
 
 fn autosave_default() -> u64 { 900 }
@@ -104,6 +128,7 @@ pub struct Emulator {
     pub link_port: u16,
     pub timer: Instant,
     clock: Clock,
+    pub last: Option<State>,
 }
 
 impl Emulator {
@@ -127,25 +152,36 @@ impl Emulator {
             bios: conf.bios,
             timer: Instant::now(),
             clock: Clock::new(4),
+            last: None,
         };
         emu.bindings.init();
         emu
     }
 
-    pub fn load_state(&mut self, path: Option<PathBuf>) {
-        let path = if path.is_some() { path.unwrap() } else {
-            fs::read_dir("./save_states").expect("Missing local save_states directory").flatten().fold(None, |a: Option<DirEntry>, e: DirEntry| { //FIXME: change save_state folder location
-                if let Some(t) = &a {
-                    let pt = t.metadata().unwrap().modified().unwrap();
-                    if e.metadata().is_ok_and(|m| m.is_file() && m.modified().is_ok_and(|l| l > pt)) {
-                        return Some(e);
-                    }
-                    return a;
-                }
-                Some(e)
-            }).expect("no save states to load").path()
-        }; // TODO delete this
-        if let Some(mut console) = Console::load_state(&path) {
+    pub fn save_state(&mut self) {
+        let rom = self.console.rom.as_ref().unwrap();
+        let (time, path) = AppConfig::save_path(&rom.header.title);
+        let v = bincode::serialize(&self.console).expect("cannot serialize Console");
+        let buf = self.console.gb.lcd.pixels.as_ref().unwrap().get_frame().to_owned();
+        let preview = RawData { w: 160, h: 144, data: buf }.downsize([8, 0], [152, 144]);
+        let mut h = File::create(&path).expect(format!("cannot open path {path:?}").as_str());
+        let state = State {
+            console: v,
+            preview,
+            cover: None,
+            path: time,
+        };
+        let v = bincode::serialize(&state).expect("failed to save state");
+        h.write_all(&v).expect("failed to save state");
+        self.last = Some(state);
+    }
+
+    pub fn load_state(&mut self, state: Option<&State>) {
+        if let Some(mut console) = state
+            .or(self.last.as_ref())
+            .and_then(|x| x.load()) {
+            log::info!("loaded state, will save to : {:?}", console.bus.mbc().save_path());
+            self.console.bus.save(false);
             self.serial_claim();
             console.gb.serial = Port::new(self.link.port());
             self.audio.reload(&mut console.gb.apu);
@@ -202,9 +238,7 @@ impl Emulator {
 
     pub fn stop(&mut self, save: bool) {
         self.serial_claim();
-        self.link_do(|x| {
-            x.disconnect();
-        });
+        self.link_do(|x| { x.disconnect(); });
         if save { self.console.bus.save(false); }
         self.console = Console::default();
     }
@@ -246,9 +280,6 @@ impl Render for Screen {
         match event {
             Event::UserEvent(Events::Play(rom)) => {
                 emu.insert(rom.clone(), true);
-                if let Some(raw) = &rom.raw {
-                    window.set_window_icon(raw.icon());
-                }
                 window.set_title(&rom.header.title);
             }
             Event::UserEvent(Events::Reload) => { Render::init(self, window, emu); }
@@ -268,6 +299,8 @@ impl Render for Screen {
                     Shortcut::Save => emu.console.bus.save(false),
                     Shortcut::SpeedUp => emu.speedup(),
                     Shortcut::SpeedDown => emu.speeddown(),
+                    Shortcut::SaveState => if emu.console.active() { emu.save_state() },
+                    Shortcut::LoadState => emu.load_state(None)
                 }
             }
             e => emu.bindings.update(&mut emu.console.gb.joy, e, emu.console.bus.io_regs()),

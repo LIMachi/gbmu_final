@@ -3,15 +3,14 @@ use std::path::{Path, PathBuf};
 use shared::{egui, Events, Handle};
 use shared::egui::{Align, Context, Layout, Margin, Rounding, Separator};
 use shared::utils::image::ImageLoader;
-pub(crate) use shelves::Shelf;
+pub(crate) use shelves::{Shelf, ShelfItem};
 
-use crate::app::{Menu, Texture};
+use crate::app::{AppConfig, Event, Menu, Texture};
 use crate::emulator::Emulator;
-
-use super::Event;
 
 mod rom;
 mod shelves;
+pub mod state;
 
 impl shared::Ui for Menu {
     type Ext = Emulator;
@@ -25,35 +24,29 @@ impl shared::Ui for Menu {
         self.textures.insert(Texture::Nosave, ctx.load_svg_bytes::<40, 40>("nosave", include_bytes!("../../../../assets/icons/stop.svg")));
         self.textures.insert(Texture::SaveState, ctx.load_svg_bytes::<40, 40>("save_state", include_bytes!("../../../../assets/icons/s.svg")));
         for path in &emu.roms.paths {
-            self.shelves.push(Shelf::root(PathBuf::from(path)));
-            self.watcher.add_path(path.clone());
-            self.search(path);
+            self.roms.new_root(PathBuf::from(path), None);
         }
+        self.states.new_root(AppConfig::state_path(), Some(String::from("Save States")));
     }
 
     fn draw(&mut self, ctx: &mut Context, emu: &mut Emulator) {
-        let mut rem = vec![];
-        for evt in self.watcher.iter() {
+        for evt in self.roms.update() {
             match evt {
                 Event::Delete(path) => {
                     emu.roms.paths.drain_filter(|x| Path::new(x) == &path);
-                    self.shelves.drain_filter(|x| x.has_root(&path));
-                    rem.push(path);
                 }
-                Event::Reload(path) => {
-                    if let Some(shelf) = self.shelves.iter_mut()
-                        .find(|x| x.has_root(&path)) {
-                        shelf.clear();
-                    }
-                    self.search(&path)
+                Event::Added(root, path, mut rom) => {
+                    self.add_cover(&path, &mut rom, ctx);
+                    self.roms.add_item(root, path, rom);
                 }
+                _ => {}
             }
         }
-        for path in rem {
-            self.watcher.remove_path(&path);
-        }
-        while let Ok((root, path, rom)) = self.receiver.try_recv() {
-            self.add_rom(root, path, rom, ctx);
+        for evt in self.states.update() {
+            if let Event::Added(root, path, mut state) = evt {
+                self.add_cover(&path, &mut state, ctx);
+                self.states.add_item(root, path, state);
+            }
         }
         let style = ctx.style();
         let frame = egui::Frame::side_top_panel(&style)
@@ -86,8 +79,10 @@ impl shared::Ui for Menu {
                         if ui.add(spritesheet).clicked() { emu.proxy.send_event(Events::Open(Handle::Sprites)).ok(); };
                         if ui.add(setting).clicked() { emu.proxy.send_event(Events::Open(Handle::Settings)).ok(); };
                         ui.add(Separator::default().vertical().spacing(4.));
+                        if emu.console.active() {
+                            if ui.add(save_state).clicked() { emu.save_state(); }
+                        }
                         if emu.is_running() {
-                            if ui.add(save_state).clicked() { emu.console.save_state(); }
                             ui.add(Separator::default().vertical().spacing(4.));
                             if ui.add(save).clicked() { emu.console.bus.save(false); }
                             if ui.add(nosave).clicked() { emu.stop(false); }
@@ -100,8 +95,13 @@ impl shared::Ui for Menu {
                 egui::containers::ScrollArea::vertical()
                     .auto_shrink([false, true])
                     .show(ui, |ui| {
-                        for shelf in &mut self.shelves {
-                            ui.add(shelf.view(emu, &self.textures, self.watcher.tx()));
+                        for shelf in &mut self.states.shelves {
+                            ui.add(shelf.view(emu, &self.textures, self.states.watcher.tx())
+                                .can_remove_root(false));
+                        }
+                        ui.separator();
+                        for shelf in &mut self.roms.shelves {
+                            ui.add(shelf.view(emu, &self.textures, self.roms.watcher.tx()));
                         }
                     });
             });

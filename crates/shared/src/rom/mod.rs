@@ -2,11 +2,10 @@ use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{ErrorKind, Read, Result};
 use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
 
 pub use header::{Capabilities, Header, Mbc};
-
-use crate::utils::image::RawData;
 
 mod header;
 
@@ -16,7 +15,6 @@ pub struct Rom {
     pub location: PathBuf,
     pub header: header::Header,
     pub cover: Option<String>,
-    pub raw: Option<RawData>,
     content: Vec<u8>,
 }
 
@@ -49,7 +47,6 @@ impl Rom {
             header: Header::new(&v[0..=0x14F]),
             content: v,
             cover: None,
-            raw: None,
         })
     }
 

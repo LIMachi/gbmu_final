@@ -73,8 +73,25 @@ impl AppConfig {
         data
     }
 
-    pub fn save_path<S: AsRef<str>>(rom: S) -> PathBuf {
-        Self::data_dir().join(format!("{}_{}.state", rom.as_ref(), chrono::Local::now().format("%Y-%m-%d_%H-%M-%S-%3f")))
+    pub fn state_path() -> PathBuf {
+        let path = Self::data_dir().join("states");
+        if !path.exists() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .create(&path).expect("Access denied");
+        }
+        path
+    }
+
+    pub fn save_path<S: AsRef<str>>(rom: S) -> (String, PathBuf) {
+        let path = Self::state_path().join(rom.as_ref());
+        if !path.exists() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .create(&path).expect("Access denied");
+        }
+        let time = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S-%3f");
+        (time.to_string(), path.join(format!("{}.state", time)))
     }
 
     pub fn load() -> Self {

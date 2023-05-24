@@ -2,7 +2,7 @@ use std::fmt::{Debug, Formatter};
 use std::io::Read;
 use std::path::Path;
 
-use egui::{Context, TextureHandle, TextureOptions};
+use egui::{ColorImage, Context, TextureHandle, TextureOptions};
 use egui_extras::image::{FitTo, load_svg_bytes_with_size};
 use serde::{Deserialize, Serialize};
 use winit::window::Icon;
@@ -14,6 +14,22 @@ pub struct RawData {
     pub w: usize,
     pub h: usize,
     pub data: Vec<u8>,
+}
+
+impl RawData {
+    pub fn downsize(mut self, min: [usize; 2], max: [usize; 2]) -> Self {
+        let [mx, my] = min;
+        let [hx, hy] = max;
+        let mut data = Vec::with_capacity((hy - my) * (hx - mx) * 4);
+        let ll = self.w * 4;
+        for y in my..hy {
+            data.extend_from_slice(&self.data[y * ll + 4 * mx..y * ll + 4 * hx]);
+        }
+        self.w = hx - mx;
+        self.h = hy - my;
+        self.data = data;
+        self
+    }
 }
 
 impl Debug for RawData {
@@ -29,6 +45,10 @@ impl Debug for RawData {
 impl RawData {
     pub fn icon(&self) -> Option<Icon> {
         Icon::from_rgba(self.data.clone(), self.w as u32, self.h as u32).ok()
+    }
+
+    pub fn image(&self) -> ColorImage {
+        ColorImage::from_rgba_unmultiplied([self.w, self.h], &self.data)
     }
 }
 

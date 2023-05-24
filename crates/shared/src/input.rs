@@ -35,6 +35,8 @@ pub enum Shortcut {
     SpeedDown,
     Save,
     Quit,
+    SaveState,
+    LoadState,
 }
 
 #[derive(Serialize, Deserialize, Hash, Copy, Clone, Eq, PartialEq, Debug)]
@@ -120,7 +122,9 @@ impl KeyCat {
         [KeyCat::Game(Shortcut::SpeedDown),
             KeyCat::Game(Shortcut::SpeedUp),
             KeyCat::Game(Shortcut::Save),
-            KeyCat::Game(Shortcut::Quit)
+            KeyCat::Game(Shortcut::Quit),
+            KeyCat::Game(Shortcut::SaveState),
+            KeyCat::Game(Shortcut::LoadState),
         ]
     }
 }
@@ -151,6 +155,9 @@ impl Default for Keybindings {
         bindings.insert(Input::key(VirtualKeyCode::F9), KeyCat::Dbg(Debug::Run));
         bindings.insert(Input::key(VirtualKeyCode::F3), KeyCat::Dbg(Debug::Step));
         bindings.insert(Input::key(VirtualKeyCode::F4), KeyCat::Dbg(Debug::Reset));
+
+        bindings.insert(Input::key(VirtualKeyCode::F5), KeyCat::Game(Shortcut::SaveState));
+        bindings.insert(Input::key(VirtualKeyCode::F6), KeyCat::Game(Shortcut::LoadState));
         Self { bindings, inputs: Default::default(), modifiers: Default::default() }
     }
 }

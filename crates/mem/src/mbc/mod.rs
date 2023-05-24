@@ -53,7 +53,7 @@ impl MemoryController for Unplugged {
 
 #[derive(Serialize, Deserialize)]
 pub struct Controller {
-    sav: Option<PathBuf>,
+    pub sav: Option<PathBuf>,
     inner: Box<dyn Mbc>,
 }
 
@@ -157,6 +157,8 @@ impl MBCController for Controller {
     fn post(&mut self) {
         if self.inner.is_boot() { self.inner = self.inner.unmap(); }
     }
+
+    fn save_path(&self) -> Option<PathBuf> { self.sav.clone() }
 }
 
 impl Mem for Controller {

@@ -1,9 +1,12 @@
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::rc::Rc;
+
+pub use lock::*;
+
 use crate::io::{IO, IOReg, IORegs};
 
 pub mod lock;
-pub use lock::*;
 
 pub trait Mem {
     fn read(&self, _addr: u16, _absolute: u16) -> u8 {
@@ -14,7 +17,7 @@ pub trait Mem {
         self.read(addr, absolute)
     }
 
-    fn write(&mut self, _addr: u16, _value: u8, _absolute: u16) { }
+    fn write(&mut self, _addr: u16, _value: u8, _absolute: u16) {}
 
     fn get_range(&self, _st: u16, _len: u16) -> Vec<u8> { vec![] }
 
@@ -26,8 +29,8 @@ pub trait Mem {
         self.write(addr, value, absolute)
     }
 
-    fn lock(&mut self, _access: Source) { }
-    fn unlock(&mut self, _access: Source) { }
+    fn lock(&mut self, _access: Source) {}
+    fn unlock(&mut self, _access: Source) {}
 }
 
 impl Mem for Rc<RefCell<dyn Mem>> {
@@ -87,7 +90,7 @@ impl<T: Mem> Mem for Rc<RefCell<T>> {
     fn unlock(&mut self, access: Source) { self.as_ref().borrow_mut().unlock(access); }
 }
 
-impl Mem for () { }
+impl Mem for () {}
 
 pub trait IOBus {
     fn io_mut(&mut self, io: IO) -> &mut IOReg;
@@ -114,6 +117,8 @@ pub trait MBCController: Mem {
     fn tick(&mut self);
 
     fn post(&mut self);
+
+    fn save_path(&self) -> Option<PathBuf>;
 }
 
 pub const ROM: u16 = 0x0;
