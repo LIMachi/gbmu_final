@@ -130,6 +130,7 @@ pub struct Emulator {
     pub timer: Instant,
     clock: Clock,
     pub last: Option<State>,
+    time_restriction: Instant,
 }
 
 impl Emulator {
@@ -154,12 +155,14 @@ impl Emulator {
             timer: Instant::now(),
             clock: Clock::new(4),
             last: None,
+            time_restriction: Instant::now()
         };
         emu.bindings.init();
         emu
     }
 
     pub fn save_state(&mut self) {
+        if self.time_restriction.elapsed().as_secs_f32() < 0.5 { return; }
         let rom = self.console.rom.as_ref().unwrap();
         let (time, path) = AppConfig::save_path(&rom.header.title);
         let v = bincode::serialize(&self.console).expect("cannot serialize Console");
@@ -176,9 +179,11 @@ impl Emulator {
         let v = bincode::serialize(&state).expect("failed to save state");
         h.write_all(&v).expect("failed to save state");
         self.last = Some(state);
+        self.time_restriction = Instant::now();
     }
 
     pub fn load_state(&mut self, state: Option<&State>) {
+        if self.time_restriction.elapsed().as_secs_f32() < 0.5 { return; }
         if let Some(mut console) = state
             .or(self.last.as_ref())
             .and_then(|x| x.load()) {
@@ -190,6 +195,7 @@ impl Emulator {
             self.console = console;
             self.proxy.send_event(Events::Reload).ok();
             self.proxy.send_event(Events::Open(Handle::Game)).ok();
+            self.time_restriction = Instant::now();
         }
     }
 
