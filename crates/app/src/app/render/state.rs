@@ -1,19 +1,21 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::Sender;
 
 use shared::egui;
-use shared::egui::{Context, Direction, Image, Layout, Rect, Response, Sense, TextureHandle, TextureOptions, Ui, Vec2, Widget};
+use shared::egui::{Button, Context, Direction, Image, Layout, Rect, Response, Sense, TextureHandle, TextureOptions, Ui, Vec2, Widget};
 use shared::utils::DARK_BLACK;
 
 use crate::app::render::rom::ROM_GRID;
 use crate::app::render::shelves::ShelfView;
-use crate::app::Texture;
+use crate::app::{Event, Shelf, Storage, Texture};
 pub use crate::emulator::State;
 
 pub struct StateView<'a> {
     state: &'a State,
     handle: TextureHandle,
+    events: &'a Sender<Event<State>>
 }
 
 impl<'a> Widget for StateView<'a> {
@@ -27,8 +29,9 @@ impl<'a> Widget for StateView<'a> {
         egui::Frame::none()
             .fill(DARK_BLACK)
             .show(&mut ui, |ui| {
-                // let title = &self.rom.header.title;
-                // ui.label(title);
+                if ui.button("x").clicked() {
+                    self.events.send(Event::Delete(PathBuf::from(&self.state.path)));
+                };
             });
         response
     }
@@ -36,10 +39,11 @@ impl<'a> Widget for StateView<'a> {
 
 
 impl super::ShelfItem for State {
-    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui) -> Response {
+    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui, events: &Sender<Event<State>>) -> Response {
         ui.add(StateView {
             state: self,
             handle: textures.get(&Texture::Cover(self.cover.clone().unwrap())).cloned().unwrap(),
+            events
         })
     }
 
@@ -66,6 +70,12 @@ impl super::ShelfItem for State {
     }
 
     fn load_cover(&self, ctx: &Context) -> Option<TextureHandle> {
-        Some(ctx.load_texture(&self.path, self.preview.image(), TextureOptions::LINEAR))
+        Some(ctx.load_texture(&self.ts, self.preview.image(), TextureOptions::LINEAR))
+    }
+
+    fn remove(storage: &mut Storage<State>, path: &PathBuf) where Self: Sized {
+        std::fs::remove_file(path).ok();
+        storage.shelves[0].clear();
+        storage.search(storage.shelves[0].path.clone());
     }
 }

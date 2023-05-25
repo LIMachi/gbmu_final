@@ -4,20 +4,20 @@ use std::iter::Peekable;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 
-use shared::egui::{Context, Grid, Response, TextureHandle, Ui, Widget};
+use shared::egui::{Context, Grid, Response, RichText, TextureHandle, Ui, Widget};
 use shared::egui::collapsing_header::CollapsingState;
 use shared::Events;
 use shared::rom::Rom;
 use shared::utils::image::ImageLoader;
 
-use crate::app::{Event, Texture};
+use crate::app::{Event, Storage, Texture};
 use crate::emulator::Emulator;
 
 use super::rom::ROM_GRID;
 use super::rom::RomView;
 
 pub(crate) trait ShelfItem: Ord + Send {
-    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui) -> Response;
+    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui, events: &Sender<Event<Self>>) -> Response where Self: Sized;
     fn clicked(&self, shelf: &mut ShelfView<Self>) where Self: Sized;
 
     fn extensions() -> &'static [&'static str];
@@ -26,10 +26,11 @@ pub(crate) trait ShelfItem: Ord + Send {
 
     fn set_cover(&mut self, cover: String);
     fn load_cover(&self, ctx: &Context) -> Option<TextureHandle>;
+    fn remove(shelf: &mut Storage<Self>, path: &PathBuf) where Self: Sized;
 }
 
 impl ShelfItem for Rom {
-    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui) -> Response {
+    fn render(&self, textures: &HashMap<Texture, TextureHandle>, ui: &mut Ui, _: &Sender<Event<Self>>) -> Response {
         ui.add(RomView::new(self, textures))
     }
 
@@ -72,14 +73,19 @@ impl ShelfItem for Rom {
             .and_then(|x| ctx.load_image(&self.header.title, x))
             .map(|x| x.0)
     }
+
+    fn remove(storage: &mut Storage<Rom>, path: &PathBuf) {
+        storage.shelves.drain_filter(|x| x.has_root(path));
+        storage.watcher.remove_path(path);
+    }
 }
 
 pub(crate) struct Shelf<I: ShelfItem> {
     root: bool,
     name: Option<String>,
-    path: PathBuf,
+    pub(crate) path: PathBuf,
     cache: HashSet<PathBuf>,
-    roms: Vec<I>,
+    items: Vec<I>,
     subs: Vec<Shelf<I>>,
 }
 
@@ -116,7 +122,7 @@ impl<Item: ShelfItem> Shelf<Item> {
 
     pub fn clear(&mut self) {
         self.cache.clear();
-        self.roms.clear();
+        self.items.clear();
         self.subs.clear();
     }
 
@@ -133,8 +139,8 @@ impl<Item: ShelfItem> Shelf<Item> {
         if paths.peek().is_none() {
             if !self.cache.contains(path) {
                 self.cache.insert(path.clone());
-                self.roms.push(rom);
-                self.roms.sort();
+                self.items.push(rom);
+                self.items.sort();
             }
         } else if let Some(sub) = self.subs.iter_mut().find(|x| x.has_root(path)) {
             sub.add_rec(paths, rom);
@@ -150,7 +156,7 @@ impl<Item: ShelfItem> Shelf<Item> {
         Self {
             root: false,
             path,
-            roms: vec![],
+            items: vec![],
             subs: vec![],
             cache: Default::default(),
             name: None,
@@ -162,7 +168,7 @@ impl<Item: ShelfItem> Shelf<Item> {
             root: true,
             path,
             name: None,
-            roms: vec![],
+            items: vec![],
             subs: vec![],
             cache: Default::default(),
         }
@@ -200,7 +206,9 @@ impl<'a, Item: ShelfItem> Widget for ShelfView<'a, Item> {
 
         CollapsingState::load_with_default_open(ui.ctx(), id, true)
             .show_header(ui, |ui| {
-                ui.label(self.shelf.name.as_ref().map(|e| e.as_str()).unwrap_or(path));
+                ui.label(RichText::new(self.shelf.name.as_ref().map(|e| e.as_str()).unwrap_or(path)).size(
+                    if self.shelf.root { 24. } else { 16. }
+                ));
                 if self.shelf.root && self.remove && ui.button("-").clicked() {
                     self.tx.send(Event::Delete(self.shelf.path.clone())).ok();
                 };
@@ -210,12 +218,12 @@ impl<'a, Item: ShelfItem> Widget for ShelfView<'a, Item> {
                 let mut res = Grid::new("shelf_grid_".to_owned() + path)
                     .show(ui, |ui| {
                         let mut n = 1;
-                        for rom in &self.shelf.roms {
+                        for rom in &self.shelf.items {
                             if n as f32 * (ROM_GRID + ui.spacing().item_spacing.x * 1.) + ui.spacing().scroll_bar_width + ui.spacing().scroll_bar_outer_margin > w {
                                 ui.end_row();
                                 n = 1;
                             }
-                            if rom.render(&self.covers, ui).clicked() { rom.clicked(&mut self); }
+                            if rom.render(&self.covers, ui, &self.tx).clicked() { rom.clicked(&mut self); }
                             n += 1;
                         }
                     }).response;

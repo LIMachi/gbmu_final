@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{ErrorKind, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,8 @@ pub struct State {
     pub preview: RawData,
     #[serde(skip)]
     pub cover: Option<String>,
-    pub path: String,
+    pub path: PathBuf,
+    pub ts: String,
 }
 
 impl State {
@@ -56,7 +57,7 @@ impl State {
 
 impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
-        self.path.eq(&other.path)
+        self.ts.eq(&other.ts)
     }
 }
 
@@ -64,13 +65,13 @@ impl Eq for State {}
 
 impl PartialOrd for State {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.path.partial_cmp(&self.path)
+        other.ts.partial_cmp(&self.ts)
     }
 }
 
 impl Ord for State {
     fn cmp(&self, other: &Self) -> Ordering {
-        other.path.cmp(&self.path)
+        other.ts.cmp(&self.ts)
     }
 }
 
@@ -169,7 +170,8 @@ impl Emulator {
             console: v,
             preview,
             cover: None,
-            path: time,
+            path,
+            ts: time
         };
         let v = bincode::serialize(&state).expect("failed to save state");
         h.write_all(&v).expect("failed to save state");

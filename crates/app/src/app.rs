@@ -33,7 +33,7 @@ pub(crate) enum Texture {
     Cover(String),
 }
 
-struct Storage<Item: ShelfItem + 'static> {
+pub(crate) struct Storage<Item: ShelfItem + 'static> {
     watcher: FileWatcher<Item>,
     sender: Sender<(PathBuf, String, Item)>,
     receiver: Receiver<(PathBuf, String, Item)>,
@@ -87,15 +87,10 @@ impl<I: ShelfItem + 'static> Storage<I> {
     }
 
     fn update(&mut self) -> Vec<Event<I>> {
-        let mut rem = vec![];
-        let mut events = vec![];
-
-        for evt in self.watcher.iter() {
+        let mut events = self.watcher.iter().collect::<Vec<Event<I>>>();
+        for evt in &events {
             match &evt {
-                Event::Delete(path) => {
-                    self.shelves.drain_filter(|x| x.has_root(path));
-                    rem.push(path.clone());
-                }
+                Event::Delete(path) => I::remove(self, path),
                 Event::Reload(path) => {
                     if let Some(shelf) = self.shelves.iter_mut()
                         .find(|x| x.has_root(&path)) {
@@ -105,10 +100,6 @@ impl<I: ShelfItem + 'static> Storage<I> {
                 }
                 _ => unreachable!()
             }
-            events.push(evt);
-        }
-        for path in rem {
-            self.watcher.remove_path(&path);
         }
         while let Ok((root, path, item)) = self.receiver.try_recv() {
             events.push(Event::Added(root, path, item));
