@@ -3,18 +3,20 @@
 Création d’un émulateur de GameBoy Gris et de GameBoy Color.
 
 ## 🚀 Projet
-### Run
-> Rust
+### Compile
+> rust nightly >= 1.72
+
+> cargo build --release
 
 => Dependencies graphics: Winit / egui / egui-winit / pixels
 
 ### Feature
 - [x] Débogueur
 - [x] Backup
-- [ ] Save State
-- [x] Serial Port
-- [ ] Special palettes / default palettes
-- [ ] Joypad support
+- [x] Save State
+- [x] (partially) Serial Port
+- [x] Special palettes / default palettes
+- [x] Joypad support
 
 ## ✍️ Autor
 
