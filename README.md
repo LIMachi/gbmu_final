@@ -5,6 +5,7 @@ Création d’un émulateur de GameBoy Gris et de GameBoy Color.
 ## 🚀 Projet
 ### Compile
 > rust nightly >= 1.72
+
 > cargo build --release
 
 => Dependencies graphics: Winit / egui / egui-winit / pixels
