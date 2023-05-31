@@ -1,6 +1,5 @@
 #![windows_subsystem = "windows"]
 #![feature(hash_drain_filter)]
-#![feature(is_some_and)]
 #![feature(drain_filter)]
 #![feature(try_blocks)]
 
@@ -48,7 +47,7 @@ impl App {
 
     pub fn proxy(&self) -> Proxy { self.event_loop.as_ref().unwrap().create_proxy() }
 
-    pub fn open<'a>(&mut self, handle: Handle, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
+    pub fn open(&mut self, handle: Handle, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
         self.windows.create(handle, &mut self.emu, event_loop);
         self
     }
