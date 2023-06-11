@@ -1,7 +1,4 @@
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
-
 pub use lock::*;
 
 use crate::io::{IO, IOReg, IORegs};
@@ -31,63 +28,6 @@ pub trait Mem {
 
     fn lock(&mut self, _access: Source) {}
     fn unlock(&mut self, _access: Source) {}
-}
-
-impl Mem for Rc<RefCell<dyn Mem>> {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
-        self.as_ref().borrow().read(addr, absolute)
-    }
-
-    fn value(&self, addr: u16, absolute: u16) -> u8 {
-        self.as_ref().borrow().value(addr, absolute)
-    }
-
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        self.as_ref().borrow_mut().write(addr, value, absolute)
-    }
-
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        self.as_ref().borrow().get_range(st, len)
-    }
-
-    fn read_with(&self, addr: u16, absolute: u16, access: Source) -> u8 {
-        self.as_ref().borrow().read_with(addr, absolute, access)
-    }
-
-    fn write_with(&mut self, addr: u16, value: u8, absolute: u16, access: Source) {
-        self.as_ref().borrow_mut().write_with(addr, value, absolute, access)
-    }
-
-    fn lock(&mut self, access: Source) { self.as_ref().borrow_mut().lock(access); }
-    fn unlock(&mut self, access: Source) { self.as_ref().borrow_mut().unlock(access); }
-}
-
-impl<T: Mem> Mem for Rc<RefCell<T>> {
-    fn read(&self, addr: u16, absolute: u16) -> u8 {
-        self.as_ref().borrow().read(addr, absolute)
-    }
-
-    fn value(&self, addr: u16, absolute: u16) -> u8 {
-        self.as_ref().borrow().value(addr, absolute)
-    }
-
-    fn write(&mut self, addr: u16, value: u8, absolute: u16) {
-        self.as_ref().borrow_mut().write(addr, value, absolute)
-    }
-
-    fn get_range(&self, st: u16, len: u16) -> Vec<u8> {
-        self.as_ref().borrow().get_range(st, len)
-    }
-
-    fn read_with(&self, addr: u16, absolute: u16, access: Source) -> u8 {
-        self.as_ref().borrow().read_with(addr, absolute, access)
-    }
-
-    fn write_with(&mut self, addr: u16, value: u8, absolute: u16, access: Source) {
-        self.as_ref().borrow_mut().write_with(addr, value, absolute, access)
-    }
-    fn lock(&mut self, access: Source) { self.as_ref().borrow_mut().lock(access); }
-    fn unlock(&mut self, access: Source) { self.as_ref().borrow_mut().unlock(access); }
 }
 
 impl Mem for () {}

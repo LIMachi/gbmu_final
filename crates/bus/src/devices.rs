@@ -82,7 +82,7 @@ impl Default for Devices {
 }
 
 impl Devices {
-    pub fn builder() -> ConsoleBuilder<'static> {
+    pub fn builder<'a>() -> ConsoleBuilder<'a> {
         ConsoleBuilder::default()
     }
 
