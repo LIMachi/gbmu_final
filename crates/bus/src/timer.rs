@@ -15,7 +15,6 @@ impl Timer {
     //     self.div.direct_write(0xAC);
     // }
 
-    // TODO doesnt tick during cpu stop mode
     pub fn tick(&mut self, io: &mut IORegs) {
         let div = io.io_mut(IO::DIV);
         let (v, c) = if div.dirty() {
