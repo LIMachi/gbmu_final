@@ -56,9 +56,8 @@ pub struct Ppu {
     pub(crate) lcdc: u8,
     #[serde(default, skip)]
     pub(crate) oam: Option<&'static mut Lock<Oam>>,
-    //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
     #[serde(default, skip)]
-    pub(crate) vram: Option<&'static mut Lock<Vram>>, //TODO serde: serialization/deserialization should only happen while the cpu is checking that the operations are empty (and so the locks should not be active, thanks mono threading)
+    pub(crate) vram: Option<&'static mut Lock<Vram>>,
 }
 
 impl Clone for Ppu {

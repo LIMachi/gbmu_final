@@ -22,7 +22,6 @@ pub struct Apu {
     tick: f64,
     #[serde(default, skip)]
     pub input: Input,
-    //TODO serde: rebind input on deserialize
     dsg: dsg::DSG,
     channels: Vec<Channel>,
     on: bool,

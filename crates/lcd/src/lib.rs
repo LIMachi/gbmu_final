@@ -9,7 +9,7 @@ pub struct Lcd {
     enabled: bool,
     frame: Vec<u8>,
     #[serde(default, skip)]
-    pub pixels: Option<Pixels>, //TODO serde: rebind using previous pixels
+    pub pixels: Option<Pixels>,
 }
 
 impl Default for Lcd {
