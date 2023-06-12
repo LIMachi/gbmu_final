@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use shared::mem::Mem;
+use shared::{mem::Mem, egui::ColorImage};
 
 const BANK_SIZE: usize = 0x2000;
 
@@ -85,6 +85,7 @@ pub struct Vram {
 }
 
 impl Vram {
+
     pub fn tile_data(&self, tile: usize, bank: usize) -> [u8; 64] {
         let mut out = [0; 64];
         for y in 0..8 {
@@ -121,6 +122,7 @@ impl Mem for Vram {
 impl Vram {
     pub fn new(cgb: bool) -> Self {
         Self {
+            draw_cache: HashMap::with_capacity(768),
             tile_cache: HashSet::with_capacity(768),
             mem: if cgb {
                 Storage::CGB([[0; BANK_SIZE]; 2], 0)

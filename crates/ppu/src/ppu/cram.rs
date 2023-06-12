@@ -42,10 +42,10 @@ impl Rgb555 for u16 {
 }
 
 impl CRAM {
-    pub fn color(&self, pixel: super::Pixel, io: &mut IORegs) -> [u8; 3] {
+    pub fn color(&self, pixel: super::Pixel, io: &IORegs) -> [u8; 3] {
         match (pixel.color, pixel.attrs, pixel.sprite, io.io(IO::KEY0).value() & CGB_MODE != 0) {
             (c, a, true, false) => {
-                let palette = if a.obp1() { io.io(IO::OBP1) } else { io.io_mut(IO::OBP0) }.read() >> (2 * c);
+                let palette = if a.obp1() { io.io(IO::OBP1) } else { io.io(IO::OBP0) }.read() >> (2 * c);
                 if self.posted_in_cgb {
                     if a.obp1() {
                         self.dmgobj1pal[(palette & 3) as usize]

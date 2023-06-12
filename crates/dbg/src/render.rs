@@ -239,7 +239,7 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                         if ui.add(egui::Button::new("+")).clicked() { ext.speedup(); }
                                         let text = match sp {
                                             0 => egui::Label::new("Normal"),
-                                            n @ 1..=5 => egui::Label::new(format!("{}x", 1. + n as f32 / 5.)),
+                                            n @ 1.. => egui::Label::new(format!("{}x", 1. + n as f32 / 5.)),
                                             n => egui::Label::new(format!("1/{}", (1 << -n)))
                                         };
                                         ui.add(text);

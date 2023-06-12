@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use pixel::Pixel;
-use shared::io::{IO, IODevice, IORegs, LCDC};
+use shared::{io::{IO, IODevice, IORegs, LCDC}, egui::{epaint::ahash::{HashMap, HashMapExt}}};
 use shared::mem::*;
 use states::*;
+use super::render::ColorBuffer;
 
 mod fetcher;
 mod cram;
@@ -58,21 +59,7 @@ pub struct Ppu {
     pub(crate) oam: Option<&'static mut Lock<Oam>>,
     #[serde(default, skip)]
     pub(crate) vram: Option<&'static mut Lock<Vram>>,
-}
-
-impl Clone for Ppu {
-    fn clone(&self) -> Self {
-        Self {
-            cram: self.cram.clone(),
-            sprites: self.sprites.clone(),
-            win: self.win,
-            sc: self.sc,
-            stat: self.stat.clone(),
-            lcdc: self.lcdc,
-            oam: None,
-            vram: None,
-        }
-    }
+    pub(crate) tile_cache: HashMap<usize, ColorBuffer<8, 8>>
 }
 
 impl Ppu {
@@ -87,7 +74,19 @@ impl Ppu {
             stat: REdge::new(),
             oam: None,
             vram: None,
+            tile_cache: HashMap::with_capacity(768)
         }
+    }
+
+    pub(crate) fn mark(&mut self, tile: usize) {
+        self.tile_cache.entry(tile).or_insert_with(ColorBuffer::<8, 8>::new);
+    }
+
+    pub(crate) fn store_tile(&mut self, io: &IORegs, tile: usize, y: u8, pixels: impl Iterator<Item=Pixel>) {
+        self.tile_cache.entry(tile)
+        .and_modify(|tile| {
+            tile.set_line(y as usize, pixels);
+        });
     }
 
     pub(crate) fn oam(&self) -> &Lock<Oam> { self.oam.as_ref().unwrap() }

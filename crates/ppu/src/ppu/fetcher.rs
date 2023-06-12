@@ -27,6 +27,7 @@ pub enum Mode {
 pub struct Fetcher {
     clock: u8,
     x: u8,
+    y: u8,
     ly: u8,
     attrs: Attributes,
     tile: u16,
@@ -43,6 +44,7 @@ impl Fetcher {
             clock: 0,
             state: State::Tile,
             x: 0,
+            y: 0,
             ly,
             attrs: Attributes::default(),
             tile: 0,
@@ -106,11 +108,11 @@ impl Fetcher {
             Mode::Window => ppu.win.y,
             Mode::Sprite(s, ..) => self.ly.wrapping_sub(s.y),
         } & wrap) as u16;
-        let y = if self.attrs.flip_y() { wrap as u16 - y } else { y };
+        self.y = if self.attrs.flip_y() { wrap as u16 - y } else { y } as u8;
         let addr = (match self.mode {
             Mode::Bg | Mode::Window => !(!ppu.lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
             Mode::Sprite(..) => 0
-        } << 12) | (tile << 4) | (y << 1) | (high as u16);
+        } << 12) | (tile << 4) | ((self.y as u16) << 1) | (high as u16);
         ppu.vram().get(Source::Ppu, |v| v.read_bank(addr, self.attrs.bank()))
     }
 
@@ -146,11 +148,16 @@ impl Fetcher {
                 *c = ((low >> x) & 0x1) | (((high >> x) & 0x1) << 1);
             });
             if self.attrs.flip_x() { colors.reverse(); }
+            ppu.store_tile(io, self.tile, self.y & 8, colors.iter().map(|x| if let Mode::Sprite(..) = self.mode {
+                Pixel::sprite(*x, 0, self.attrs)
+            } else {
+                Pixel::bg(if io.io(IO::KEY0).value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { *x }, self.attrs)
+            }));
             if let Mode::Sprite(sp, n) = self.mode {
                 let s = 8u8.saturating_sub(sp.x) as usize;
                 colors.rotate_left(s);
                 colors[8 - s..].iter_mut().for_each(|x| *x = 0);
-                oam.merge(colors.iter().map(|x| Pixel::sprite(*x, n, self.attrs)));
+                oam.merge(colors.iter().map(|x: &u8| Pixel::sprite(*x, n, self.attrs)));
                 self.set_mode(self.prev);
                 bg.enable();
             } else if bg.push(colors.iter().map(|x|

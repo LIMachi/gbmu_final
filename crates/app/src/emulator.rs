@@ -349,7 +349,7 @@ impl Schedule for Emulator {
     fn speed(&self) -> i32 { self.console.speed }
     fn speedup(&mut self) {
         let speed = self.console.speed + 1;
-        if speed <= 10 { self.console.set_speed(speed); }
+        if speed <= 15 { self.console.set_speed(speed); }
     }
 
     fn speeddown(&mut self) {
@@ -393,9 +393,8 @@ impl Console {
     fn speed_mult(&self) -> f64 {
         match self.speed {
             0 => 1.,
-            n @ 1..=10 => 1. / (1. + 0.2 * n as f64),
-            n if n < 0 => (1 << -n) as f64,
-            _ => unimplemented!()
+            n @ 1.. => 1. / (1. + 0.2 * n as f64),
+            n => (1 << -n) as f64,
         }
     }
 

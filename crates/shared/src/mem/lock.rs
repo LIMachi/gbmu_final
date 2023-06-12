@@ -51,6 +51,12 @@ impl<M: Mem> Lock<M> {
         }
     }
 
+    pub fn do_mut<F: Fn(&mut M)>(&self, source: Source, f: F) {
+        if self.lock.iter().find(|x| x > &&v).is_none() {
+            f(&mut self.inner);
+        }
+    }
+
     pub fn inner(&self) -> &M { &self.inner }
     pub fn inner_mut(&mut self) -> &mut M { &mut self.inner }
 }
