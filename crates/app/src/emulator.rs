@@ -155,7 +155,7 @@ impl Emulator {
             timer: Instant::now(),
             clock: Clock::new(4),
             last: None,
-            throttle: Instant::now()
+            throttle: Instant::now(),
         };
         emu.bindings.init();
         emu
@@ -174,7 +174,7 @@ impl Emulator {
             preview,
             cover: None,
             path,
-            ts: time
+            ts: time,
         };
         let v = bincode::serialize(&state).expect("failed to save state");
         h.write_all(&v).expect("failed to save state");
@@ -434,5 +434,8 @@ impl ppu::VramAccess for Emulator {
 impl ppu::PpuAccess for Emulator {
     fn ppu(&self) -> &ppu::Ppu {
         self.console.gb.ppu.inner()
+    }
+    fn ppu_mut(&mut self) -> &mut ppu::Ppu {
+        self.console.gb.ppu.inner_mut()
     }
 }

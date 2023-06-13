@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use lcd::{Lcd, LCD};
 use mem::{oam::{Oam, Sprite}, Vram};
 use pixel::Pixel;
-use shared::{io::{IO, IODevice, IORegs, LCDC}, egui::{epaint::ahash::{HashMap, HashMapExt}}};
+use shared::{egui::epaint::ahash::{HashMap, HashMapExt}, io::{IO, IODevice, IORegs, LCDC}};
 use shared::mem::*;
 use states::*;
+
 use super::render::ColorBuffer;
 
 mod fetcher;
@@ -49,6 +50,7 @@ pub(crate) struct Scroll {
 
 #[derive(Serialize, Deserialize)]
 pub struct Ppu {
+    pub(crate) sprite_debug: bool,
     pub(crate) cram: cram::CRAM,
     pub(crate) sprites: Vec<usize>,
     pub(crate) win: Window,
@@ -59,13 +61,15 @@ pub struct Ppu {
     pub(crate) oam: Option<&'static mut Lock<Oam>>,
     #[serde(default, skip)]
     pub(crate) vram: Option<&'static mut Lock<Vram>>,
-    pub(crate) tile_cache: HashMap<usize, ColorBuffer<8, 8>>
+    tile_cache: HashMap<usize, ColorBuffer>,
+    pub(crate) draw_cache: HashMap<usize, ColorBuffer>,
 }
 
 impl Ppu {
     pub fn new() -> Self {
         let sprites = Vec::with_capacity(10);
         Self {
+            sprite_debug: false,
             sc: Scroll::default(),
             cram: cram::CRAM::default(),
             sprites,
@@ -74,18 +78,16 @@ impl Ppu {
             stat: REdge::new(),
             oam: None,
             vram: None,
-            tile_cache: HashMap::with_capacity(768)
+            tile_cache: HashMap::with_capacity(768),
+            draw_cache: HashMap::with_capacity(768),
         }
     }
 
-    pub(crate) fn mark(&mut self, tile: usize) {
-        self.tile_cache.entry(tile).or_insert_with(ColorBuffer::<8, 8>::new);
-    }
-
-    pub(crate) fn store_tile(&mut self, io: &IORegs, tile: usize, y: u8, pixels: impl Iterator<Item=Pixel>) {
-        self.tile_cache.entry(tile)
-        .and_modify(|tile| {
-            tile.set_line(y as usize, pixels);
+    pub(crate) fn tile_data(&mut self, io: &IORegs, tile: usize, y: u8, pixels: impl Iterator<Item=Pixel>) {
+        let tile = self.tile_cache.entry(tile)
+            .or_insert_with(ColorBuffer::new);
+        pixels.enumerate().for_each(|(x, pix)| {
+            tile.color(x, y as usize, self.cram.color(pix, io));
         });
     }
 
@@ -139,6 +141,8 @@ impl Ppu {
             if let Some(next) = state.tick(self, io, lcd) {
                 let mode = next.mode();
                 if mode == Mode::VBlank {
+                    std::mem::swap(&mut self.tile_cache, &mut self.draw_cache);
+                    self.tile_cache.clear();
                     lcd.vblank();
                     lcd.enable();
                 }

@@ -1,7 +1,8 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use shared::{mem::Mem, egui::ColorImage};
+use shared::mem::Mem;
 
 const BANK_SIZE: usize = 0x2000;
 
@@ -18,7 +19,7 @@ impl Serialize for Storage {
                 let mut v = bank.to_vec();
                 v.insert(0, 0);
                 v
-            },
+            }
             Storage::CGB(banks, selected) => {
                 let mut v = banks[0].to_vec();
                 v.insert(0, 1);
@@ -30,7 +31,7 @@ impl Serialize for Storage {
     }
 }
 
-impl <'de> Deserialize<'de> for Storage {
+impl<'de> Deserialize<'de> for Storage {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         Deserialize::deserialize(deserializer).map(|v: Vec<u8>| {
             if v[0] == 1 {
@@ -85,7 +86,6 @@ pub struct Vram {
 }
 
 impl Vram {
-
     pub fn tile_data(&self, tile: usize, bank: usize) -> [u8; 64] {
         let mut out = [0; 64];
         for y in 0..8 {
@@ -122,7 +122,6 @@ impl Mem for Vram {
 impl Vram {
     pub fn new(cgb: bool) -> Self {
         Self {
-            draw_cache: HashMap::with_capacity(768),
             tile_cache: HashSet::with_capacity(768),
             mem: if cgb {
                 Storage::CGB([[0; BANK_SIZE]; 2], 0)

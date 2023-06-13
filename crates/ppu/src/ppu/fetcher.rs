@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+
 use mem::oam::Sprite;
 use shared::io::{CGB_MODE, IO, IORegs, LCDC};
 use shared::mem::Source;
@@ -31,6 +32,7 @@ pub struct Fetcher {
     ly: u8,
     attrs: Attributes,
     tile: u16,
+    addr: u16,
     mode: Mode,
     prev: Mode,
     low: Option<u8>,
@@ -46,6 +48,7 @@ impl Fetcher {
             x: 0,
             y: 0,
             ly,
+            addr: 0,
             attrs: Attributes::default(),
             tile: 0,
             mode: Mode::Bg,
@@ -98,7 +101,7 @@ impl Fetcher {
         State::DataLow
     }
 
-    fn get_tile_data(&self, ppu: &Ppu, io: &IORegs, high: bool) -> u8 {
+    fn get_tile_addr(&mut self, ppu: &Ppu, io: &IORegs) {
         let scy = io.io(IO::SCY).value();
         let (wrap, tile) = if let Mode::Sprite(..) = self.mode {
             if ppu.lcdc.obj_tall() { (0xF, self.tile & 0xFE) } else { (0x7, self.tile) }
@@ -109,11 +112,14 @@ impl Fetcher {
             Mode::Sprite(s, ..) => self.ly.wrapping_sub(s.y),
         } & wrap) as u16;
         self.y = if self.attrs.flip_y() { wrap as u16 - y } else { y } as u8;
-        let addr = (match self.mode {
+        self.addr = (match self.mode {
             Mode::Bg | Mode::Window => !(!ppu.lcdc.relative_addr() || (tile & 0x80) != 0) as u16,
             Mode::Sprite(..) => 0
-        } << 12) | (tile << 4) | ((self.y as u16) << 1) | (high as u16);
-        ppu.vram().get(Source::Ppu, |v| v.read_bank(addr, self.attrs.bank()))
+        } << 12) | (tile << 4) | ((self.y as u16) << 1);
+    }
+
+    fn get_tile_data(&self, ppu: &Ppu, high: bool) -> u8 {
+        ppu.vram().get(Source::Ppu, |v| v.read_bank(self.addr + high as u16, self.attrs.bank()))
     }
 
     fn data_low(&mut self, ppu: &Ppu, io: &IORegs) -> State {
@@ -122,7 +128,8 @@ impl Fetcher {
             return State::DataLow;
         }
         self.clock = 0;
-        self.low = Some(self.get_tile_data(ppu, io, false));
+        self.get_tile_addr(ppu, io);
+        self.low = Some(self.get_tile_data(ppu, false));
         State::DataHigh
     }
 
@@ -132,7 +139,7 @@ impl Fetcher {
             return State::DataHigh;
         }
         self.clock = 0;
-        self.high = Some(self.get_tile_data(ppu, io, true));
+        self.high = Some(self.get_tile_data(ppu, true));
         match self.push(ppu, io, fifo, oam) {
             State::Push => State::Sleep,
             State::Tile => State::Tile,
@@ -148,11 +155,15 @@ impl Fetcher {
                 *c = ((low >> x) & 0x1) | (((high >> x) & 0x1) << 1);
             });
             if self.attrs.flip_x() { colors.reverse(); }
-            ppu.store_tile(io, self.tile, self.y & 8, colors.iter().map(|x| if let Mode::Sprite(..) = self.mode {
-                Pixel::sprite(*x, 0, self.attrs)
-            } else {
-                Pixel::bg(if io.io(IO::KEY0).value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { *x }, self.attrs)
-            }));
+            if ppu.sprite_debug {
+                let mut pixels = Vec::with_capacity(8);
+                colors.iter().map(|x| if let Mode::Sprite(..) = self.mode {
+                    Pixel::sprite(*x, 0, self.attrs)
+                } else {
+                    Pixel::bg(if io.io(IO::KEY0).value() & CGB_MODE == 0 && !ppu.lcdc.priority() { 0 } else { *x }, self.attrs)
+                }).collect_into(&mut pixels);
+                ppu.tile_data(io, self.addr as usize / 16 + self.attrs.bank() * 384, self.y & 7, pixels.into_iter());
+            }
             if let Mode::Sprite(sp, n) = self.mode {
                 let s = 8u8.saturating_sub(sp.x) as usize;
                 colors.rotate_left(s);

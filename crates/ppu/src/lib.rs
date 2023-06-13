@@ -2,6 +2,8 @@
 #![allow(incomplete_features)]
 #![feature(generic_const_exprs)]
 #![feature(if_let_guard)]
+#![feature(iter_collect_into)]
+#![feature(exact_size_is_empty)]
 
 extern crate core;
 
@@ -77,6 +79,7 @@ impl Controller {
     }
 
     pub fn inner(&self) -> &Ppu { &self.ppu }
+    pub fn inner_mut(&mut self) -> &mut Ppu { &mut self.ppu }
 
     pub fn can_serde(&self) -> bool {
         self.state.first_tick()
