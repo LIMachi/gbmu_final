@@ -1,20 +1,23 @@
 use std::collections::HashSet;
 use std::hash::Hash;
+
 use serde::{Deserialize, Serialize};
+
 use crate::io::{IO, IODevice};
-use super::{Mem, IOBus};
+
+use super::{IOBus, Mem};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Source {
     Hdma = 0x0,
     Ppu = 0x1,
-    Dma = 0x2
+    Dma = 0x2,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Lock<M: Mem> {
     inner: M,
-    lock: HashSet<Source>
+    lock: HashSet<Source>,
 }
 
 pub trait Locked {
@@ -31,7 +34,7 @@ impl<M: Mem> Lock<M> {
     }
 
     pub fn lock(&mut self, level: Source) {
-       self.lock.insert(level);
+        self.lock.insert(level);
     }
     pub fn unlock(&mut self, level: Source) {
         self.lock.remove(&level);
@@ -48,6 +51,12 @@ impl<M: Mem> Lock<M> {
         match source {
             v if self.lock.iter().find(|x| x > &&v).is_none() => Some(&mut self.inner),
             _ => None
+        }
+    }
+
+    pub fn do_mut<F: Fn(&mut M)>(&mut self, source: Source, f: F) {
+        if self.lock.iter().find(|x| x > &&source).is_none() {
+            f(&mut self.inner);
         }
     }
 
