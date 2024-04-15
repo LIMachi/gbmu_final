@@ -50,14 +50,14 @@ pub struct Oam {
 impl Mem for Oam {
     fn read(&self, addr: u16, absolute: u16) -> u8 {
         match addr {
-            0..160 => self.sprites[(addr / 4) as usize].read(addr % 4, absolute),
+            0..=159 => self.sprites[(addr / 4) as usize].read(addr % 4, absolute),
             _ => unreachable!()
         }
     }
 
     fn write(&mut self, addr: u16, value: u8, absolute: u16) {
         match addr {
-            0..160 => self.sprites[(addr / 4) as usize].write(addr % 4, value, absolute),
+            0..=159 => self.sprites[(addr / 4) as usize].write(addr % 4, value, absolute),
             _ => unreachable!()
         }
     }

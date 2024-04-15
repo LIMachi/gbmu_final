@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::collections::HashMap;
+use wgpu::InstanceDescriptor;
 
 use winit::event::WindowEvent;
 use winit::event_loop::ControlFlow;
@@ -17,7 +18,7 @@ pub struct Windows {
 impl Windows {
     pub fn new(proxy: Proxy) -> Self {
         Self {
-            instance: Instance::new(wgpu::Backends::PRIMARY),
+            instance: Instance::new(InstanceDescriptor::default()),
             proxy,
             handles: Default::default(),
             windows: Default::default(),

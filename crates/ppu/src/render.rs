@@ -50,23 +50,21 @@ pub(crate) enum Textures {
     Miniature,
 }
 
-struct PixelBuffer<const W: usize, const H: usize> where [(); W * H]: Sized {
-    pixels: [u8; W * H],
+struct PixelBuffer<const W: usize, const H: usize, const T: usize> where [(); T]: Sized {
+    pixels: [u8; T],
 }
 
-impl<const W: usize, const H: usize> PixelBuffer<W, H> where [(); W * H]: Sized {
-    pub fn new(pixels: [u8; W * H]) -> Self {
-        Self { pixels }
-    }
+impl<const W: usize, const H: usize, const T: usize> PixelBuffer<W, H, T> where [(); T]: Sized {
+    pub fn new(pixels: [u8; T]) -> Self { Self { pixels } }
 
-    pub fn image<const IW: usize, const IH: usize>(&self) -> ColorImage where
-        [(); IW * IH * 4]: Sized
+    pub fn image<const IW: usize, const IH: usize, const IT: usize>(&self) -> ColorImage where
+        [(); IT]: Sized
     {
         let sw = IW / W; // 8
         let sh = IH / H; // 8
         assert_eq!(IW % W, 0);
         assert_eq!(IH % H, 0);
-        let mut buf = [0; IW * IH * 4]; // 64 * 4
+        let mut buf = [0; IT]; // 64 * 4
         for w in 0..W { // 0..8
             for h in 0..H { // 0..8
                 let color = match self.pixels[w + h * W] { // w + 8 * h
@@ -121,6 +119,13 @@ impl<E: Emulator> VramViewer<E> {
     }
 }
 
+const PIXEL_BUFFER_WIDTH: usize = 8;
+const PIXEL_BUFFER_HEIGHT: usize = 8;
+const PIXEL_BUFFER_SIZE: usize = PIXEL_BUFFER_WIDTH * PIXEL_BUFFER_HEIGHT;
+const IMAGE_BUFFER_WIDTH: usize = 64;
+const IMAGE_BUFFER_HEIGHT: usize = 64;
+const IMAGE_BUFFER_SIZE: usize = IMAGE_BUFFER_WIDTH * IMAGE_BUFFER_HEIGHT * 4;
+
 impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
     type Ext = E;
 
@@ -141,7 +146,7 @@ impl<E: Emulator + PpuAccess> shared::Ui for VramViewer<E> {
         let tiles: Vec<usize> = emu.vram_mut().tile_cache.drain().collect();
         let vram = emu.vram();
         for n in tiles {
-            let buf = PixelBuffer::<8, 8>::new(vram.tile_data(n % 384, n / 384)).image::<64, 64>();
+            let buf = PixelBuffer::<PIXEL_BUFFER_WIDTH, PIXEL_BUFFER_HEIGHT, PIXEL_BUFFER_SIZE>::new(vram.tile_data(n % 384, n / 384)).image::<IMAGE_BUFFER_WIDTH, IMAGE_BUFFER_HEIGHT, IMAGE_BUFFER_SIZE>();
             let id = self.tex(Textures::Tile(n)).expect(format!("can't access tile {n}").as_str()).id();
             ctx.tex_manager().write().set(id, ImageDelta::full(buf, TextureOptions::NEAREST));
         }

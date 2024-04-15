@@ -33,7 +33,7 @@ impl shared::Ui for Menu {
         for evt in self.roms.update() {
             match evt {
                 Event::Delete(path) => {
-                    emu.roms.paths.drain_filter(|x| Path::new(x) == &path);
+                    emu.roms.paths.retain(|x| Path::new(x) != &path);
                 }
                 Event::Added(root, path, mut rom) => {
                     self.add_cover(&path, &mut rom, ctx);

@@ -1,9 +1,10 @@
 use std::any::Any;
 
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
+use egui_wgpu_backend::{RenderPass, ScreenDescriptor, wgpu::Device};
+use egui_wgpu_backend::wgpu::TextureFormat;
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use log::error;
-use wgpu::{CompositeAlphaMode, Device, PresentMode, Queue, SurfaceConfiguration, TextureFormat, TextureUsages};
+use wgpu::{CompositeAlphaMode, PresentMode, Queue, SurfaceConfiguration, TextureUsages};
 use winit::event::WindowEvent;
 
 use shared::{egui, Ui};
@@ -25,7 +26,7 @@ pub struct EguiContext<Ctx, U: Ui<Ext=Ctx> + Default> {
 
 impl<Ctx: 'static, U: 'static + Ui<Ext=Ctx> + Default> EguiContext<Ctx, U> {
     pub fn new(instance: &Instance, window: Window, mut data: U, ctx: &mut Ctx) -> Self {
-        let surface = unsafe { instance.create_surface(&window) };
+        let surface = unsafe { instance.create_surface(&window).unwrap() };
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: Some(&surface),
@@ -46,6 +47,7 @@ impl<Ctx: 'static, U: 'static + Ui<Ext=Ctx> + Default> EguiContext<Ctx, U> {
             height: size.height,
             present_mode: PresentMode::default(),
             alpha_mode: CompositeAlphaMode::Auto,
+            view_formats: vec![],
         };
 
         surface.configure(&device, &config);

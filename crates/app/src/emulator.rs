@@ -166,7 +166,7 @@ impl Emulator {
         let rom = self.console.rom.as_ref().unwrap();
         let (time, path) = AppConfig::save_path(&rom.header.title);
         let v = bincode::serialize(&self.console).expect("cannot serialize Console");
-        let buf = self.console.gb.lcd.pixels.as_ref().unwrap().get_frame().to_owned();
+        let buf = self.console.gb.lcd.pixels.as_ref().unwrap().frame().to_owned();
         let preview = RawData { w: 160, h: 144, data: buf }.downsize([8, 0], [152, 144]);
         let mut h = File::create(&path).expect(format!("cannot open path {path:?}").as_str());
         let state = State {

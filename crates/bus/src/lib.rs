@@ -1,5 +1,3 @@
-#![feature(trait_upcasting)]
-
 pub use devices::Devices;
 pub use devices::Settings;
 use mem::{Hram, mbc, Oam, Vram, Wram};
@@ -230,7 +228,7 @@ impl shared::cpu::Bus for Bus {
                 }
             }
             HRAM..=HRAM_END => self.hram.write(addr - HRAM, value, addr),
-            END => { self.ie.write(0, value, addr) }
+            END => self.ie.write(0, value, addr)
         };
     }
 

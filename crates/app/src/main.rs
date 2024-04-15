@@ -1,8 +1,4 @@
 #![windows_subsystem = "windows"]
-#![feature(hash_drain_filter)]
-#![feature(is_some_and)]
-#![feature(drain_filter)]
-#![feature(try_blocks)]
 
 extern crate core;
 

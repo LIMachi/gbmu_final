@@ -57,14 +57,15 @@ impl ShelfItem for Rom {
             .and_then(|x|
                 x.filter_map(|x| x.ok().filter(|e| e.file_type().map(|ty| ty.is_file()).unwrap_or(false)))
                     .filter(|e| e.path() != path)
-                    .filter_map(|x| try {
-                        (
-                            x.path(),
-                            x.path().extension().and_then(|ext| ext.to_str()).map(|s| s.to_string())?,
-                            x.path().file_stem().and_then(|x| x.to_str()).map(|s| s.to_string())?)
-                    })
-                    .filter(|(_, ext, _)| ["jpeg", "jpg", "png"].contains(&ext.as_str()))
-                    .filter_map(|(path, _, file)| if file == "cover" || file == "default" {
+                    .filter_map(|x|
+                        x.path().extension().and_then(|ext| ext.to_str()).map(|s| s.to_string())
+                            .and_then(|ext| {
+                                if !["jpeg", "jpg", "png"].contains(&ext.as_str()) { return None; }
+                                x.path().file_stem().and_then(|x| x.to_str()).map(|s| s.to_string())
+                                    .map(|file| (x.path(), file))
+                            })
+                    )
+                    .filter_map(|(path, file)| if file == "cover" || file == "default" {
                         default = Some(path);
                         None
                     } else { Some((path, file)) })
@@ -75,7 +76,7 @@ impl ShelfItem for Rom {
     }
 
     fn remove(storage: &mut Storage<Rom>, path: &PathBuf) {
-        storage.shelves.drain_filter(|x| x.has_root(path));
+        storage.shelves.retain(|x| !x.has_root(path));
         storage.watcher.remove_path(path);
     }
 }

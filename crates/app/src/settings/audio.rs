@@ -43,7 +43,7 @@ impl<'a> Widget for Audio<'a> {
                             res
                         });
                     if device != &self.emu.audio.device() {
-                        let device = device.clone().clone();
+                        let device = (*device).clone();
                         self.emu.audio.switch(device, &mut self.emu.console.gb.apu);
                     }
                     res.inner

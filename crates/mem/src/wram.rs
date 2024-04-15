@@ -3,7 +3,12 @@ use shared::mem::*;
 use shared::utils::serde_arrays;
 
 const BANK_SIZE: usize = 0x1000;
+
+const INCLUSIVE_BANK_SIZE: usize = BANK_SIZE - 1;
+
 const WRAM_SIZE: usize = 2 * BANK_SIZE;
+
+const INCLUSIVE_WRAM_SIZE: usize = WRAM_SIZE - 1;
 
 #[derive(Serialize, Deserialize, Clone)]
 struct CgbStorage {
@@ -84,8 +89,8 @@ impl Mem for Storage {
             Storage::Dmg(v) => v[addr],
             Storage::Cgb(c) => {
                 match addr as usize {
-                    0..BANK_SIZE => c.bank(0)[addr],
-                    BANK_SIZE..WRAM_SIZE => c.bank(c.selected)[addr - BANK_SIZE],
+                    0..=INCLUSIVE_BANK_SIZE => c.bank(0)[addr],
+                    BANK_SIZE..=INCLUSIVE_WRAM_SIZE => c.bank(c.selected)[addr - BANK_SIZE],
                     _ => unreachable!()
                 }
             }
@@ -98,8 +103,8 @@ impl Mem for Storage {
             Storage::Dmg(v) => v[addr] = value,
             Storage::Cgb(c) => {
                 match addr as usize {
-                    0..BANK_SIZE => c.mut_bank(0)[addr] = value,
-                    BANK_SIZE..WRAM_SIZE => c.mut_bank(c.selected)[addr - BANK_SIZE] = value,
+                    0..=INCLUSIVE_BANK_SIZE => c.mut_bank(0)[addr] = value,
+                    BANK_SIZE..=INCLUSIVE_WRAM_SIZE => c.mut_bank(c.selected)[addr - BANK_SIZE] = value,
                     _ => unreachable!()
                 }
             }
@@ -113,9 +118,9 @@ impl Mem for Storage {
             Storage::Dmg(v) => v[st..(st + len).min(WRAM_SIZE)].to_vec(),
             Storage::Cgb(c) => {
                 match (st, len) {
-                    (st @ BANK_SIZE..WRAM_SIZE, len) => c.bank(c.selected)[(st - BANK_SIZE)..(st + len - BANK_SIZE).min(BANK_SIZE)].to_vec(),
-                    (st @ 0..BANK_SIZE, len) if st + len < BANK_SIZE => c.bank(0)[st..(st + len)].to_vec(),
-                    (st @ 0..BANK_SIZE, len) => {
+                    (st @ BANK_SIZE..=INCLUSIVE_WRAM_SIZE, len) => c.bank(c.selected)[(st - BANK_SIZE)..(st + len - BANK_SIZE).min(BANK_SIZE)].to_vec(),
+                    (st @ 0..=INCLUSIVE_BANK_SIZE, len) if st + len < BANK_SIZE => c.bank(0)[st..(st + len)].to_vec(),
+                    (st @ 0..=INCLUSIVE_BANK_SIZE, len) => {
                         let mut ret = c.bank(0)[st..].to_vec();
                         ret.extend_from_slice(&c.bank(c.selected)[..(len - BANK_SIZE - st).min(BANK_SIZE)]);
                         ret

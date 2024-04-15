@@ -1,6 +1,3 @@
-#![feature(drain_filter)]
-#![feature(if_let_guard)]
-
 use std::collections::HashMap;
 
 use render::{Disassembly, Viewer};

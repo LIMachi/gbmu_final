@@ -286,15 +286,15 @@ impl<E: Emulator> shared::Ui for Ninja<E> {
                                     .body(|mut body| {
                                         ext.breakpoints()
                                             .bp_mut()
-                                            .drain_filter(|bp| {
-                                                if bp.temp() { return false; };
+                                            .retain_mut(|bp| {
+                                                if bp.temp() { return true; };
                                                 let mut rem = false;
                                                 body.row(30.0, |mut row| {
                                                     row.col(|ui| { if ui.button("-").clicked() { rem = true; } });
                                                     row.col(|ui| { ui.checkbox(&mut bp.enabled, ""); });
                                                     row.col(|ui| { ui.label(bp.display()); });
                                                 });
-                                                rem
+                                                !rem
                                             });
                                     });
                             });

@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 
 use shared::egui;
-use shared::egui::{Button, Context, Direction, Image, Layout, Rect, Response, Sense, TextureHandle, TextureOptions, Ui, Vec2, Widget};
+use shared::egui::{Context, Direction, Image, Layout, Rect, Response, Sense, TextureHandle, TextureOptions, Ui, Vec2, Widget};
 use shared::utils::DARK_BLACK;
 
 use crate::app::render::rom::ROM_GRID;
 use crate::app::render::shelves::ShelfView;
-use crate::app::{Event, Shelf, Storage, Texture};
+use crate::app::{Event, Storage, Texture};
 pub use crate::emulator::State;
 
 pub struct StateView<'a> {
@@ -30,7 +30,7 @@ impl<'a> Widget for StateView<'a> {
             .fill(DARK_BLACK)
             .show(&mut ui, |ui| {
                 if ui.button("x").clicked() {
-                    self.events.send(Event::Delete(PathBuf::from(&self.state.path)));
+                    self.events.send(Event::Delete(PathBuf::from(&self.state.path))).expect("Could not send delete event");
                 };
             });
         response

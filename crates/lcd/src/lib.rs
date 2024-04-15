@@ -42,7 +42,7 @@ impl LCD for Lcd {
         self.enabled = false;
         let white = if io.io(IO::CGB).bit(0) != 0 { [0xFF; 3] } else { io.palette().color(0) };
         if let Some(pixels) = self.pixels.as_mut() {
-            let pixels = pixels.get_frame_mut();
+            let pixels = pixels.frame_mut();
             for i in 0..(4 * Lcd::WIDTH * Lcd::HEIGHT) as usize {
                 pixels[i] = if i % 4 == 3 { 0xFF } else { white[i % 4] };
             }
@@ -51,7 +51,7 @@ impl LCD for Lcd {
 
     fn vblank(&mut self) {
         if let Some(pixels) = self.pixels.as_mut() {
-            pixels.get_frame_mut()
+            pixels.frame_mut()
                 .iter_mut()
                 .zip(self.frame.iter_mut())
                 .for_each(|(d, s)| *d = *s);

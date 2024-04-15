@@ -1,8 +1,3 @@
-#![feature(if_let_guard)]
-#![feature(drain_filter)]
-#![feature(hash_drain_filter)]
-
-
 pub use egui;
 pub use serde;
 pub use winit;
@@ -10,7 +5,7 @@ pub use winit;
 use crate::input::KeyCat;
 
 pub mod events {
-    pub use super::winit::event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent};
+    pub use super::winit::event::{ElementState, WindowEvent};
 }
 
 pub mod widgets;

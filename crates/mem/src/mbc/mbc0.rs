@@ -15,7 +15,7 @@ impl Mem for Mbc0 {
         match absolute {
             ROM..=SROM_END => self.rom[absolute as usize],
             SRAM..=SRAM_END => self.ram[addr as usize],
-            a => unreachable!("unexpected addr {a:#06X}")
+            a => unreachable!("unexpected addr {:#06X?}", a)
         }
     }
 

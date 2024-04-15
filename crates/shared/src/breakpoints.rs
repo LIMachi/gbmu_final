@@ -151,7 +151,7 @@ impl Break {
                 *n == 0
             }
             Break::Register(r, v) if runner.done() && runner.register(*r) == *v => true,
-            Break::Access(access) if let Some(last) = last => access.matches(last),
+            Break::Access(access) if last.is_some() => access.matches(last.unwrap()),
             _ => false
         }
     }
@@ -229,18 +229,18 @@ impl Breakpoints {
         let mut stop = false;
         if self.and {
             let mut all_match = !self.breakpoints.is_empty();
-            self.breakpoints.drain_filter(|bp| {
+            self.breakpoints.retain_mut(|bp| {
                 let (once, res) = bp.tick(cpu, last);
                 if once { stop |= res; }
                 all_match &= res;
-                once && res
+                !(once && res)
             });
             stop |= all_match
         } else {
-            self.breakpoints.drain_filter(|bp| {
+            self.breakpoints.retain_mut(|bp| {
                 let (once, res) = bp.tick(cpu, last);
                 stop |= res;
-                once && res
+                !(once && res)
             });
         }
         !stop

@@ -274,19 +274,19 @@ impl<E: Emulator> Disassembly<E> {
                         let op = &current.ops().ops[st];
                         if (row.col(|ui| {
                             let rect = ui.available_rect_before_wrap().expand2(Vec2::new(8., 0.));
-                            if Some(index) == self.hover {  ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::from_white_alpha(20)) }
+                            if Some(index) == self.hover { ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::from_white_alpha(20)) }
                             else if index == cursor { ui.painter().rect_filled(rect, Rounding { nw: 4., sw: 4., ne: 0., se: 0. }, Color32::DARK_GREEN); }
                             ui.label(egui::RichText::new(format!("{:#06X}", addr + op.offset)));
                         }).1 | row.col(|ui| {
                             let mut rect = ui.available_rect_before_wrap();
                             rect.max.x += 8.;
-                            if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
+                            if Some(index) == self.hover { ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
                             else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
                             ui.label(egui::RichText::new(&op.instruction));
                         }).1 | row.col(|ui| {
                             let mut rect = ui.available_rect_before_wrap();
                             rect.max.x += 8.;
-                            if Some(index) == self.hover {  ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
+                            if Some(index) == self.hover { ui.painter().rect_filled(rect, 0., Color32::from_white_alpha(20)) }
                             else if index == cursor { ui.painter().rect_filled(rect, 0., Color32::DARK_GREEN); }
                             let mut code = String::new();
                             for o in &op.data { code.push_str(format!(" {o:02X}").as_str()); }
