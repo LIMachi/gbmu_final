@@ -72,6 +72,7 @@ impl Controller {
     }
 
     pub fn inner(&self) -> &Ppu { &self.ppu }
+    pub fn inner_mut(&mut self) -> &mut Ppu { &mut self.ppu }
 
     pub fn can_serde(&self) -> bool {
         self.state.first_tick()

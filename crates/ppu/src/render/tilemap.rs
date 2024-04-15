@@ -1,9 +1,11 @@
 use shared::egui::{Image, Response, TextureId, Ui, Widget};
 use shared::emulator::Emulator;
+
 use crate::render::Textures;
 use crate::VramViewer;
 
 pub struct Tilemap<'a, E: Emulator>(pub(crate) &'a mut VramViewer<E>);
+
 struct Tile(Image, u8, bool);
 
 impl Widget for Tile {
@@ -20,7 +22,6 @@ impl Tile {
     }
 }
 
-
 impl<E: Emulator> Widget for Tilemap<'_, E> {
     fn ui(self, ui: &mut Ui) -> Response {
         ui.spacing_mut().item_spacing.x = 1.;
@@ -32,18 +33,14 @@ impl<E: Emulator> Widget for Tilemap<'_, E> {
                     ui.spacing_mut().item_spacing.y = 0.;
                     for i in 0..16 {
                         let addr = i + j * 16;
-                        let tex = self.0.get(addr).id();
                         if i == 15 { ui.spacing_mut().item_spacing.x = 8. }
-                        ui.add(Tile::new(tex, addr));
+                        ui.add(Tile::new(self.0.draw_tex(addr).unwrap(), addr));
                     }
                     let blank = self.0.tex(Textures::Blank).unwrap().id();
                     ui.spacing_mut().item_spacing.x = 1.;
                     for i in 0..16 {
                         let n = i + j * 16;
-                        let tex = self.0.tex(Textures::Tile(n + 384))
-                            .map(|x| x.id())
-                            .unwrap_or(blank);
-                        ui.add(Tile::new(tex, n));
+                        ui.add(Tile::new(self.0.draw_tex(n + 384).unwrap_or(blank), n));
                     }
                 });
             }

@@ -30,7 +30,7 @@ impl<'a> Widget for StateView<'a> {
             .fill(DARK_BLACK)
             .show(&mut ui, |ui| {
                 if ui.button("x").clicked() {
-                    self.events.send(Event::Delete(PathBuf::from(&self.state.path))).expect("Could not send delete event");
+                    self.events.send(Event::Delete(PathBuf::from(&self.state.path))).ok();
                 };
             });
         response

@@ -25,7 +25,7 @@ pub struct Cpu {
     prefixed: bool,
     finished: bool,
     ime: bool,
-    doctor: Option<std::fs::File>, //TODO serde: rebind
+    doctor: Option<std::fs::File>,
     stop: usize,
 }
 

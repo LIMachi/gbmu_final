@@ -81,9 +81,9 @@ impl Windows {
     }
 
     pub fn create<'a>(&mut self, handle: Handle, emu: &mut Emulator, event_loop: &EventLoopWindowTarget<Events>) {
-        if self.handles.contains_key(&handle) {
-            log::warn!("window {handle:?} already opened. Please don't do that.");
-            return;
+        if let Some(handle) = self.handles.get(&handle) {
+            self.windows.get_mut(handle).map(|ctx| ctx.inner().focus_window());
+             return;
         }
         let proxy = self.proxy.clone();
         let kind = WindowType(handle);
@@ -91,7 +91,6 @@ impl Windows {
         let id = window.id();
 
         let ctx = kind.builder(emu)(&self.instance, window, proxy);
-
         self.handles.insert(handle, id);
         self.windows.insert(id, ctx);
     }

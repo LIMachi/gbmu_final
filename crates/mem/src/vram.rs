@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use shared::mem::Mem;
@@ -18,7 +19,7 @@ impl Serialize for Storage {
                 let mut v = bank.to_vec();
                 v.insert(0, 0);
                 v
-            },
+            }
             Storage::CGB(banks, selected) => {
                 let mut v = banks[0].to_vec();
                 v.insert(0, 1);
@@ -30,7 +31,7 @@ impl Serialize for Storage {
     }
 }
 
-impl <'de> Deserialize<'de> for Storage {
+impl<'de> Deserialize<'de> for Storage {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
         Deserialize::deserialize(deserializer).map(|v: Vec<u8>| {
             if v[0] == 1 {

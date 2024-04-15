@@ -10,7 +10,7 @@ use winit::{
 use winit::event_loop::EventLoopBuilder;
 
 use render::windows::Windows;
-use shared::{Events, Handle};
+use shared::{Events, Handle, emulator::Schedule};
 use shared::utils::clock::Chrono;
 
 use crate::app::{AppConfig, DbgConfig};
@@ -44,7 +44,7 @@ impl App {
 
     pub fn proxy(&self) -> Proxy { self.event_loop.as_ref().unwrap().create_proxy() }
 
-    pub fn open<'a>(&mut self, handle: Handle, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
+    pub fn open(&mut self, handle: Handle, event_loop: &EventLoopWindowTarget<Events>) -> &mut Self {
         self.windows.create(handle, &mut self.emu, event_loop);
         self
     }
@@ -57,15 +57,11 @@ impl App {
     pub fn handle_events(&mut self, event: &Event, target: &EventLoopWindowTarget<Events>, flow: &mut ControlFlow) {
         match event {
             Event::UserEvent(Events::Play(_)) => {
-                if !self.windows.is_open(Handle::Game) {
-                    self.open(Handle::Game, target);
-                }
+                self.open(Handle::Game, target);
             }
             Event::UserEvent(Events::Open(handle)) => {
                 let handle = *handle;
-                if !self.windows.is_open(handle) {
-                    self.open(handle, target);
-                }
+                self.open(handle, target);
             }
             Event::UserEvent(Events::Close(handle)) => {
                 self.windows.close(*handle);
@@ -144,6 +140,7 @@ fn main() {
                     let p = (t / 4194304.) * 100.;
                     let n = dt.as_secs_f64() * 100.;
                     log::info!("cycles: {:.0} ({:0.2} %) | took {dt:?} ({n:0.2}% capacity)", t, p);
+                    if n > 100. { app.emu.speeddown(); }
                     dt = Duration::from_secs(0);
                     cycles = 0;
                 }
