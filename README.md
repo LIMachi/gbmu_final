@@ -1,23 +1,21 @@
 # Gbmu
 
-Création d’un émulateur de GameBoy Gris et de GameBoy Color.
+Creation of a GameBoy emulator.
 
-## 🚀 Projet
+## 🚀 Project
 ### Compile
-> rust nightly >= 1.72
-
 > cargo build --release
 
-=> Dependencies graphics: Winit / egui / egui-winit / pixels
+=> Graphic dependencies: Winit / egui / egui-winit / pixels
 
-### Feature
-- [x] Débogueur
+### Features
+- [x] Debugger
 - [x] Backup
-- [x] Save State
-- [x] (partially) Serial Port
-- [x] Special palettes / default palettes
-- [x] Joypad support
+- [x] Save States
+- [x] Serial Port support (partial)
+- [x] Color palettes
+- [x] Joypad
 
-## ✍️ Autor
+## ✍️ Authors
 
 Seth Quantix, LIMachi, agogibus
